@@ -32,6 +32,7 @@ import org.nd4j.linalg.factory.Nd4j;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 @NoArgsConstructor
 public class UnsortedSegmentSum extends DynamicCustomOp {
@@ -50,6 +51,16 @@ public class UnsortedSegmentSum extends DynamicCustomOp {
         addIArgument(numSegments);
     }
 
+    public UnsortedSegmentSum(SameDiff sd, SDVariable data, SDVariable segmentIds, SDVariable numSegments) {
+        super(sd,new SDVariable[]{data,segmentIds,numSegments});
+        System.out.println();
+    }
+
+    public UnsortedSegmentSum(INDArray data, INDArray segmentIds, INDArray numSegments) {
+        super(new INDArray[]{data,segmentIds,numSegments},null);
+    }
+
+
     @Override
     public String opName(){
         return "unsorted_segment_sum";
@@ -63,6 +74,16 @@ public class UnsortedSegmentSum extends DynamicCustomOp {
     @Override
     public List<SDVariable> doDiff(List<SDVariable> gradients){
         return new UnsortedSegmentSumBp(sameDiff, arg(0), arg(1), gradients.get(0), numSegments).outputs();
+    }
+
+    @Override
+    public void configureFromArguments() {
+        super.configureFromArguments();
+    }
+
+    @Override
+    public void setPropertiesForFunction(Map<String, Object> properties) {
+        super.setPropertiesForFunction(properties);
     }
 
     @Override

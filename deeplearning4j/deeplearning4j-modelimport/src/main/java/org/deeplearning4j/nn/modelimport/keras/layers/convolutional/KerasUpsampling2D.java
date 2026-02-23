@@ -20,11 +20,11 @@
 
 package org.deeplearning4j.nn.modelimport.keras.layers.convolutional;
 
-import org.deeplearning4j.nn.conf.inputs.InputType;
-import org.deeplearning4j.nn.conf.layers.Upsampling2D;
 import org.deeplearning4j.nn.modelimport.keras.KerasLayer;
 import org.deeplearning4j.nn.modelimport.keras.exceptions.InvalidKerasConfigurationException;
 import org.deeplearning4j.nn.modelimport.keras.exceptions.UnsupportedKerasConfigurationException;
+import org.deeplearning4j.nn.conf.inputs.InputType;
+import org.deeplearning4j.nn.conf.layers.Upsampling2D;
 
 import java.util.Map;
 
@@ -60,7 +60,7 @@ public class KerasUpsampling2D extends KerasLayer {
             throws InvalidKerasConfigurationException, UnsupportedKerasConfigurationException {
         super(layerConfig, enforceTrainingConfig);
 
-        int[] size = KerasConvolutionUtils.getUpsamplingSizeFromConfig(layerConfig, 2, conf);
+        long[] size = KerasConvolutionUtils.getUpsamplingSizeFromConfigLong(layerConfig, 2, conf);
         Upsampling2D.Builder builder = new Upsampling2D.Builder()
                 .name(this.layerName)
                 .dropOut(this.dropout)

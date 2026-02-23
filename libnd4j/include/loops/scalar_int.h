@@ -35,8 +35,6 @@
 #include <ops/ops.h>
 #include <system/op_boilerplate.h>
 
-#include "helpers/logger.h"
-
 #ifdef __CUDACC__
 #include <cuda.h>
 #include <cuda_runtime.h>
@@ -57,16 +55,17 @@ class ScalarIntTransform {
 
   template <typename OpType>
   SD_DEVICE static void transformCuda(const void *scalar, const void *vy, const sd::LongType *shapeInfo, void *vparams,
-                                      void *vresult, const sd::LongType *resultShapeInfo, int *allocationBuffer);
+                                      void *vresult, const sd::LongType *resultShapeInfo,
+                                      sd::LongType *allocationBuffer);
 
   template <typename OpType>
   SD_DEVICE static void transformCuda(sd::LongType n, const void *vx, const void *vy, sd::LongType yEWS, void *vparams,
-                                      void *vz, sd::LongType zEWS, int *allocationBuffer);
+                                      void *vz, sd::LongType zEWS, sd::LongType *allocationBuffer);
 
   template <typename OpType>
   SD_DEVICE static void transformCuda(const void *vx, const sd::LongType *xShapeInfo, void *vextraParams, void *vz,
-                                      const sd::LongType *zShapeInfo, const void *vscalars, int *dimension,
-                                      int dimensionLength, const sd::LongType *tadShapeInfo,
+                                      const sd::LongType *zShapeInfo, const void *vscalars, sd::LongType *dimension,
+                                      sd::LongType dimensionLength, const sd::LongType *tadShapeInfo,
                                       const sd::LongType *tadOffsets, const sd::LongType *tadShapeInfoZ,
                                       const sd::LongType *tadOffsetsZ);
 
@@ -74,14 +73,14 @@ class ScalarIntTransform {
   SD_HOST static void intermediateAlongDimension(dim3 &launchDims, cudaStream_t *stream, const void *x,
                                                  const sd::LongType *xShapeInfo, void *z,
                                                  const sd::LongType *zShapeInfo, const void *scalars, void *extraParams,
-                                                 int *dimension, int dimensionLength, const sd::LongType *tadShapeInfo,
+                                                 sd::LongType *dimension, sd::LongType dimensionLength, const sd::LongType *tadShapeInfo,
                                                  const sd::LongType *tadOffsets, const sd::LongType *tadShapeInfoZ,
                                                  const sd::LongType *tadOffsetsZ);
 
   template <typename OpType>
   SD_HOST static void intermediateShaped(dim3 &launchDims, cudaStream_t *stream, const void *vx,
                                          const sd::LongType *xShapeInfo, void *vz, const sd::LongType *zShapeInfo,
-                                         const void *vscalar, void *vextraParams, int *allocPointer);
+                                         const void *vscalar, void *vextraParams, sd::LongType *allocPointer);
 
   SD_HOST
   static void executeCudaShaped(dim3 &launchDims, cudaStream_t *stream, int opNum, const void *x,
@@ -91,30 +90,33 @@ class ScalarIntTransform {
   SD_HOST
   static void executeCudaAlongDimension(dim3 &launchDims, cudaStream_t *stream, int opNum, const void *x,
                                         const sd::LongType *xShapeInfo, void *z, const sd::LongType *zShapeInfo,
-                                        const void *scalars, void *extraParams, int *dimension, int dimensionLength,
+                                        const void *scalars, void *extraParams, sd::LongType *dimension,
+                                        sd::LongType dimensionLength,
                                         const sd::LongType *tadShapeInfo, const sd::LongType *tadOffsets,
                                         const sd::LongType *tadShapeInfoZ, const sd::LongType *tadOffsetsZ);
 
 #else
   template <typename OpType>
   static void transform(const void *x, const sd::LongType *xShapeInfo, void *extraParams, void *z,
-                        const sd::LongType *zShapeInfo, const void *scalars, int *dimension, int dimensionLength,
+                        const sd::LongType *zShapeInfo, const void *scalars, sd::LongType *dimension,
+                        sd::LongType dimensionLength,
                         const sd::LongType *tadShapeInfo, const sd::LongType *tadOffsets,
-                        const sd::LongType *tadShapeInfoZ, const sd::LongType *tadOffsetsZ, uint64_t start,
-                        uint64_t stop);
+                        const sd::LongType *tadShapeInfoZ, const sd::LongType *tadOffsetsZ, const sd::LongType start,
+                        const sd::LongType stop);
 
   static void transform(int opNum, const void *x, const sd::LongType *xShapeInfo, void *extraParams, void *z,
-                        const sd::LongType *zShapeInfo, const void *scalars, int *dimension, int dimensionLength,
+                        const sd::LongType *zShapeInfo, const void *scalars, sd::LongType *dimension,
+                        sd::LongType dimensionLength,
                         const sd::LongType *tadShapeInfo, const sd::LongType *tadOffsets,
-                        const sd::LongType *tadShapeInfoZ, const sd::LongType *tadOffsetsZ, uint64_t start,
-                        uint64_t stop);
+                        const sd::LongType *tadShapeInfoZ, const sd::LongType *tadOffsetsZ, const sd::LongType start,
+                        const sd::LongType stop);
 
   static void transform(int opNum, const void *x, const sd::LongType *xShapeInfo, void *result,
-                        const sd::LongType *resultShapeInfo, const void *scalar, void *extraParams, uint64_t start,
-                        uint64_t stop);
+                        const sd::LongType *resultShapeInfo, const void *scalar, void *extraParams, sd::LongType start,
+                        sd::LongType stop);
 
   static void transform(int opNum, const void *x, sd::LongType xStride, void *result, sd::LongType resultStride,
-                        const void *scalar, void *extraParams, uint64_t n, uint64_t start, uint64_t stop);
+                        const void *scalar, void *extraParams, sd::LongType n, sd::LongType start, sd::LongType stop);
 
   /*
    * ScalarOp along dimension
@@ -134,8 +136,8 @@ class ScalarIntTransform {
 
   template <typename OpType>
   static void transform(const void *x, const sd::LongType *xShapeInfo, void *result,
-                        const sd::LongType *resultShapeInfo, const void *scalar, void *extraParams, uint64_t start,
-                        uint64_t stop);
+                        const sd::LongType *resultShapeInfo, const void *scalar, void *extraParams, sd::LongType start,
+                        sd::LongType stop);
 
   /**
    * CPU implementation of scalar operation
@@ -151,7 +153,7 @@ class ScalarIntTransform {
 
   template <typename OpType>
   static void transform(const void *x, sd::LongType xStride, void *result, sd::LongType resultStride,
-                        const void *scalar, void *extraParams, uint64_t n, uint64_t start, uint64_t stop);
+                        const void *scalar, void *extraParams, sd::LongType n, sd::LongType start, sd::LongType stop);
 #endif
 };
 }  // namespace scalar

@@ -31,7 +31,6 @@ static void _compare_elem(NDArray* input, bool isStrictlyIncreasing, bool& outpu
   sd::LongType sumt = 0;
 
   if (isStrictlyIncreasing) {
-    // PRAGMA_OMP_PARALLEL_FOR_SIMD_REDUCTION(+:sum)
     auto func = PRAGMA_REDUCE_LONG {
       sd::LongType sum = 0;
       for (auto i = start; i < stop; i++) {
@@ -43,7 +42,6 @@ static void _compare_elem(NDArray* input, bool isStrictlyIncreasing, bool& outpu
     };
     sumt = samediff::Threads::parallel_long(func, LAMBDA_SUML, 0, length - 1);
   } else {
-    // PRAGMA_OMP_PARALLEL_FOR_SIMD_REDUCTION(+:sum)
     auto func = PRAGMA_REDUCE_LONG {
       sd::LongType sum = 0;
       for (auto i = start; i < stop; i++) {
@@ -57,8 +55,6 @@ static void _compare_elem(NDArray* input, bool isStrictlyIncreasing, bool& outpu
     sumt = samediff::Threads::parallel_long(func, LAMBDA_SUML, 0, length - 1);
   }
 
-  // sd_printf("Sum: %lld\n", sumt)
-
   output = (sumt > -1);
 }
 
@@ -68,7 +64,7 @@ void compare_elem(sd::LaunchContext* context, NDArray* input, bool isStrictlyInc
   BUILD_SINGLE_SELECTOR(xType, _compare_elem, (input, isStrictlyIncreasing, output), SD_COMMON_TYPES);
 }
 
-BUILD_SINGLE_TEMPLATE(template void _compare_elem, (NDArray * A, bool isStrictlyIncreasing, bool& output);
+BUILD_SINGLE_TEMPLATE( void _compare_elem, (NDArray * A, bool isStrictlyIncreasing, bool& output);
                       , SD_COMMON_TYPES);
 }  // namespace helpers
 }  // namespace ops

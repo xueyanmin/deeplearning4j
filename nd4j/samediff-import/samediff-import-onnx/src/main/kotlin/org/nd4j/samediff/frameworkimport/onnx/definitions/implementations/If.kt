@@ -24,10 +24,8 @@ import org.nd4j.autodiff.samediff.SDVariable
 import org.nd4j.autodiff.samediff.SameDiff
 import org.nd4j.autodiff.samediff.SameDiffNoArgSingleLambda
 import org.nd4j.autodiff.samediff.internal.SameDiffOp
-import org.nd4j.ir.OpNamespace
 import org.nd4j.samediff.frameworkimport.ImportGraph
 import org.nd4j.samediff.frameworkimport.hooks.PreImportHook
-import org.nd4j.samediff.frameworkimport.hooks.annotations.HookResult
 import org.nd4j.samediff.frameworkimport.hooks.annotations.PreHookRule
 import org.nd4j.samediff.frameworkimport.onnx.ir.OnnxIRGraph
 import org.nd4j.samediff.frameworkimport.registry.OpMappingRegistry
@@ -49,7 +47,8 @@ class If : PreImportHook  {
         outputNames: List<String>,
         op: SameDiffOp,
         mappingRegistry: OpMappingRegistry<GeneratedMessageV3, GeneratedMessageV3, GeneratedMessageV3, GeneratedMessageV3, ProtocolMessageEnum, GeneratedMessageV3, GeneratedMessageV3>,
-        importGraph: ImportGraph<GeneratedMessageV3, GeneratedMessageV3, GeneratedMessageV3, GeneratedMessageV3, GeneratedMessageV3, GeneratedMessageV3, ProtocolMessageEnum>
+        importGraph: ImportGraph<GeneratedMessageV3, GeneratedMessageV3, GeneratedMessageV3, GeneratedMessageV3, GeneratedMessageV3, GeneratedMessageV3, ProtocolMessageEnum>,
+        dynamicVariables: Map<String, GeneratedMessageV3>
     ): Map<String, List<SDVariable>> {
         // Parameter docs below are from the onnx operator docs:
         // https://github.com/onnx/onnx/blob/master/docs/Operators.md#non
@@ -62,14 +61,18 @@ class If : PreImportHook  {
             wrappedThenBranch,
             null,
             null, mutableMapOf(),
-            registryCast)
+            registryCast,
+            false
+        )
 
         sd.putSubFunction("${op.name}_then_branch",thenBranchSubGraph)
         val elseBranchSubGraph = importGraphCast.importGraph(
             wrappedElseBranch,
             null,
             null, mutableMapOf(),
-            registryCast)
+            registryCast,
+            false
+        )
         sd.putSubFunction("${op.name}_else_branch",elseBranchSubGraph)
 
         val outputVarName = outputNames[0]

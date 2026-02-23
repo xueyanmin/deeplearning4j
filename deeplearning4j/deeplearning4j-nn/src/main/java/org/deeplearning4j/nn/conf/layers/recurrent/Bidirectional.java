@@ -20,7 +20,14 @@
 
 package org.deeplearning4j.nn.conf.layers.recurrent;
 
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.NonNull;
+import lombok.Setter;
+
 import org.deeplearning4j.nn.api.ParamInitializer;
 import org.deeplearning4j.nn.conf.GradientNormalization;
 import org.deeplearning4j.nn.conf.InputPreProcessor;
@@ -107,7 +114,10 @@ public class Bidirectional extends Layer {
     public long getNOut() {
         if (this.fwd instanceof LastTimeStep) {
             return ((FeedForwardLayer) ((LastTimeStep) this.fwd).getUnderlying()).getNOut();
-        } else {
+        } else if(this.mode == Mode.CONCAT) {
+            return ((FeedForwardLayer) this.fwd).getNOut() * 2;
+        }
+        else {
             return ((FeedForwardLayer) this.fwd).getNOut();
         }
     }
@@ -133,9 +143,10 @@ public class Bidirectional extends Layer {
         c1.setLayer(fwd);
         c2.setLayer(bwd);
 
+        INDArray layerParamsReshape = layerParamsView.reshape(layerParamsView.length());
         long n = layerParamsView.length() / 2;
-        INDArray fp = layerParamsView.get(interval(0,0,true), interval(0, n));
-        INDArray bp = layerParamsView.get(interval(0,0,true), interval(n, 2 * n));
+        INDArray fp = layerParamsReshape.get(interval(0, n));
+        INDArray bp = layerParamsReshape.get(interval(n, 2 * n));
         org.deeplearning4j.nn.api.Layer f = fwd.instantiate(c1, trainingListeners, layerIndex, fp, initializeParams, networkDataType);
 
         org.deeplearning4j.nn.api.Layer b = bwd.instantiate(c2, trainingListeners, layerIndex, bp, initializeParams, networkDataType);

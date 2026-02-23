@@ -25,16 +25,17 @@ import lombok.extern.slf4j.Slf4j;
 import java.util.*;
 
 @Slf4j
-public class DependencyTracker<T, D> extends AbstractDependencyTracker<T,D> {
+public class DependencyTracker<T, D> extends AbstractDependencyTracker<T, D> {
+
 
     @Override
-    protected Map<T, ?> newTMap() {
-        return new HashMap<>();
+    protected IDependencyMap<T, D> newTMap() {
+        return new DependencMapLinkedHash<T, D>();
     }
 
     @Override
     protected Set<T> newTSet() {
-        return new HashSet<>();
+        return new LinkedHashSet<>();
     }
 
     @Override

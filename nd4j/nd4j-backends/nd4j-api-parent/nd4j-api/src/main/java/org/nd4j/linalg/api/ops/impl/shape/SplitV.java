@@ -24,7 +24,6 @@ import lombok.val;
 import org.nd4j.autodiff.samediff.SDVariable;
 import org.nd4j.autodiff.samediff.SameDiff;
 import org.nd4j.imports.descriptors.properties.PropertyMapping;
-import org.nd4j.imports.graphmapper.tf.TFGraphMapper;
 import org.nd4j.linalg.api.buffer.DataType;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.api.ops.DynamicCustomOp;
@@ -71,17 +70,17 @@ public class SplitV extends DynamicCustomOp {
 
     @Override
     public void initFromTensorFlow(NodeDef nodeDef, SameDiff initWith, Map<String, AttrValue> attributesForNode, GraphDef graph) {
-        val splitDim = TFGraphMapper.getArrayFrom(TFGraphMapper.getNodeWithNameFromGraph(graph,nodeDef.getInput(0)),graph);
-        if(splitDim != null) {
-            this.splitDim = splitDim.getInt(0);
-            addIArgument(splitDim.getInt(0));
-        }
+        throw new UnsupportedOperationException("Use the new Tensorflow Importer instead. This method is now removed.");
 
-        val numSplits = (int) attributesForNode.get("num_split").getI();
-        this.numSplit = numSplits;
-        //addIArgument(numSplits);  //libnd4j op doesn't used/need it for execution
     }
 
+    @Override
+    public Map<String, Object> propertiesForFunction() {
+        Map<String,Object> ret = new HashMap<>();
+        ret.put("numSplit",numSplit);
+        ret.put("splitDim",splitDim);
+        return ret;
+    }
 
     @Override
     public Map<String, Map<String, PropertyMapping>> mappingsForFunction() {
@@ -108,8 +107,36 @@ public class SplitV extends DynamicCustomOp {
     }
 
     @Override
-    public int getNumOutputs(){
+    public void configureWithSameDiff(SameDiff sameDiff) {
+        super.configureWithSameDiff(sameDiff);
+    }
+
+    @Override
+    public void configureFromArguments() {
+        super.configureFromArguments();
+    }
+
+    @Override
+    public void setPropertiesForFunction(Map<String, Object> properties) {
+        if(properties.containsKey("splitDim")) {
+            Integer splitDim = getIntValueFromProperty("splitDim",properties);
+            this.splitDim = splitDim;
+        }
+
+        if(properties.containsKey("numSplit")) {
+            Integer numSplit = getIntValueFromProperty("numSplit",properties);
+            this.numSplit = numSplit;
+        }
+    }
+
+    @Override
+    public int getNumOutputs() {
         return numSplit;
+    }
+
+    @Override
+    public List<SDVariable> doDiff(List<SDVariable> f1) {
+        return Arrays.asList(new Concat(sameDiff,splitDim,f1.toArray(new SDVariable[f1.size()])).outputVariables());
     }
 
     @Override

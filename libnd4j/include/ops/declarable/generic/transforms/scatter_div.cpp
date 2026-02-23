@@ -33,6 +33,8 @@ OP_IMPL(scatter_div, 3, 1, true) {
   auto input = INPUT_VARIABLE(0);
   auto indices = INPUT_VARIABLE(1);
   auto updates = INPUT_VARIABLE(2);
+  if(indices->isEmpty())
+    return Status::OK;
 
   auto output = OUTPUT_VARIABLE(0);
 
@@ -53,32 +55,34 @@ OP_IMPL(scatter_div, 3, 1, true) {
                  "but got %s and %s correspondingly !",
                  ShapeUtils::shapeAsString(indices).c_str(), ShapeUtils::shapeAsString(updates).c_str());
   } else if (inRank == updRank && indices->isVector()) {
-    std::vector<sd::LongType> updShape = updates->getShapeAsVector();
-    std::vector<sd::LongType> inShape = input->getShapeAsVector();
-    std::vector<sd::LongType> expectedUpdShape = {indices->lengthOf()};
-    expectedUpdShape.insert(expectedUpdShape.end(), inShape.begin() + 1, inShape.end());
+    auto* updShapeVec = updates->getShapeAsVector();
+    auto* inShapeVec = input->getShapeAsVector();
+    std::vector<LongType> expectedUpdShape = {indices->lengthOf()};
+    expectedUpdShape.insert(expectedUpdShape.end(), inShapeVec->begin() + 1, inShapeVec->end());
 
-    REQUIRE_TRUE(expectedUpdShape == updShape, 0,
+    REQUIRE_TRUE(expectedUpdShape == *updShapeVec, 0,
                  "SCATTER_DIV OP: wrong shape of updates array, expected is %s, but got %s instead !",
-                 ShapeUtils::shapeAsString(expectedUpdShape).c_str(), ShapeUtils::shapeAsString(updShape).c_str());
+                 ShapeUtils::shapeAsString(expectedUpdShape).c_str(), ShapeUtils::shapeAsString(*updShapeVec).c_str());
+    delete updShapeVec;
+    delete inShapeVec;
   } else {
-    REQUIRE_TRUE(updRank == indRank + inRank - 1, 0,
-                 "SCATTER_DIV OP: wrong rank of updates array, expected is %i, but got %i instead !",
-                 indRank + inRank - 1, updRank);
+    auto* updShapeVec = updates->getShapeAsVector();
+    auto* inShapeVec = input->getShapeAsVector();
+    auto* indShapeVec = indices->getShapeAsVector();
+    std::vector<LongType> expectedUpdShape = *indShapeVec;
+    expectedUpdShape.insert(expectedUpdShape.end(), inShapeVec->begin() + 1, inShapeVec->end());
 
-    std::vector<sd::LongType> updShape = updates->getShapeAsVector();
-    std::vector<sd::LongType> inShape = input->getShapeAsVector();
-    std::vector<sd::LongType> expectedUpdShape = indices->getShapeAsVector();
-    expectedUpdShape.insert(expectedUpdShape.end(), inShape.begin() + 1, inShape.end());
-
-    REQUIRE_TRUE(expectedUpdShape == updShape, 0,
+    REQUIRE_TRUE(expectedUpdShape == *updShapeVec, 0,
                  "SCATTER_DIV OP: wrong shape of updates array, expected is %s, but got %s instead !",
-                 ShapeUtils::shapeAsString(expectedUpdShape).c_str(), ShapeUtils::shapeAsString(updShape).c_str());
+                 ShapeUtils::shapeAsString(expectedUpdShape).c_str(), ShapeUtils::shapeAsString(*updShapeVec).c_str());
+    delete updShapeVec;
+    delete inShapeVec;
+    delete indShapeVec;
   }
 
   if (!indices->isEmpty()) {
     if (checkIndices) {
-      const sd::LongType numOfBadIndx = helpers::checkIndices(block.launchContext(), *indices, *output, 0);
+      const LongType numOfBadIndx = helpers::checkIndices(block.launchContext(), *indices, *output, 0);
       REQUIRE_TRUE(numOfBadIndx == 0, 0,
                    "SCATTER_DIV OP: please check elements of indices-array, total number of wrong elements is %lld!",
                    numOfBadIndx);
@@ -87,7 +91,7 @@ OP_IMPL(scatter_div, 3, 1, true) {
     helpers::scatter(block.launchContext(), pairwise::Divide, *indices, *updates, *output, lock);
   }
 
-  return sd::Status::OK;
+  return Status::OK;
 }
 DECLARE_SYN(ScatterDiv, scatter_div);
 

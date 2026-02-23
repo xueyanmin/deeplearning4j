@@ -26,8 +26,11 @@ import lombok.Setter;
 import lombok.val;
 import onnx.Onnx;
 import org.nd4j.autodiff.functions.DifferentialFunction;
+import org.nd4j.autodiff.listeners.At;
+import org.nd4j.autodiff.listeners.Listener;
 import org.nd4j.autodiff.samediff.SDVariable;
 import org.nd4j.autodiff.samediff.SameDiff;
+import org.nd4j.autodiff.samediff.internal.SameDiffOp;
 import org.nd4j.common.base.Preconditions;
 import org.nd4j.graph.OpType;
 import org.nd4j.imports.NoOpNameFoundException;
@@ -106,19 +109,19 @@ public abstract class BaseOp extends DifferentialFunction implements Op {
             if (op.y() == null) {
                 type = Type.TRANSFORM_FLOAT;
             } else {
-                type = Op.Type.PAIRWISE;
+                type = Type.PAIRWISE;
             }
         } else if (op instanceof ReduceOp) {
             if (op.y() == null)
                 type = ((ReduceOp) op).getOpType();
             else
-                type = Op.Type.REDUCE3;
+                type = Type.REDUCE3;
         } else if (op instanceof ScalarOp) {
-            type = Op.Type.SCALAR;
+            type = Type.SCALAR;
         } else if (op instanceof BroadcastOp) {
-            type = Op.Type.BROADCAST;
+            type = Type.BROADCAST;
         } else if (op instanceof IndexAccumulation) {
-            type = Op.Type.INDEXREDUCE;
+            type = Type.INDEXREDUCE;
         } else if (op instanceof MetaOp) {
             type = Type.META;
         } else if (op instanceof GridOp) {
@@ -249,9 +252,9 @@ public abstract class BaseOp extends DifferentialFunction implements Op {
             //no need to dynamically create if already exists
             if(outputNames != null) {
                 zVertexId = sameDiff.getVariable(outputNames[0]).name();
+                SDVariable[] ret =  new SDVariable[]{sameDiff.getVariable(outputNames[0])};
+                return ret;
 
-
-                return new SDVariable[]{sameDiff.getVariable(outputNames[0])};
             }
 
             if(isInPlace()) {
@@ -259,6 +262,7 @@ public abstract class BaseOp extends DifferentialFunction implements Op {
                 val inputArr = x();
                 //in place op
                 if(inputArr == null) {
+                    computeVariables(newVars);
                     return newVars;
                 }
 
@@ -266,6 +270,8 @@ public abstract class BaseOp extends DifferentialFunction implements Op {
                 z = inputArr;
                 if(sameDiff.getOutputsForOp(this) == null)
                     sameDiff.addOutgoingFor(newVars,this);
+                computeVariables(newVars);
+
                 return newVars;
             }
 
@@ -293,13 +299,90 @@ public abstract class BaseOp extends DifferentialFunction implements Op {
                 x = args[0].getArr();
                 if(this.opType()  == Type.REDUCE3 ||
                         this.opType() == Type.PAIRWISE_BOOL
-                        || this.opType() == Type.TRANSFORM_SAME ||
-                        this.opType() == Type.REDUCE_SAME)
+                        || this.opType() == Type.TRANSFORM_SAME)
                     y = args[1].getArr();
-                else if(opType() == Type.REDUCE_FLOAT || opType() == Type.REDUCE_LONG || opType() == Type.REDUCE_BOOL) {
+                else if((opType() == Type.REDUCE_FLOAT || opType() == Type.REDUCE_LONG || opType() == Type.REDUCE_BOOL  || opType() == Type.REDUCE_BOOL || opType() == Type.REDUCE_SAME) && args.length > 1) {
                     this.dimensionz = args[1].getArr();
-                    this.dimensions = args[1].getArr().toIntVector();
+                    if(!args[1].getArr().isEmpty())
+                        this.dimensions = args[1].getArr().toLongVector();
+                    else
+                        this.dimensions = new long[0];
                 }
+            }
+
+            if(x == null) {
+                throw new IllegalArgumentException("No variable found for the given input variables of " +  args[0].name() + " At least one input required.");
+            }
+
+            //ensure data types are correct
+            if(args.length > 0 && args[0].dataType() != null) {
+                x = x.castTo(args[0].dataType());
+            }
+
+            //can be reduce float op or something similar where dimensions were specified
+            //as an input
+            if(args.length > 1 && args[1].dataType() != null && y != null) {
+                y = y.castTo(args[1].dataType());
+            }
+
+            if(z == null) {
+                if(!(this instanceof ReduceOp)) {
+                    if(x.isEmpty()) {
+                        setZ(Nd4j.emptyWithShape(x.shape(),x.dataType()));
+                    }
+                    else {
+                        setZ(Nd4j.zeros(x.shape()).castTo(newVars[0].dataType()).detach());
+                    }
+                }  else {
+                    if(this instanceof BaseReduceOp) {
+                        if(dimensions == null && dimensionz != null)
+                            dimensions = dimensionz.ravel().toLongVector();
+                        BaseReduceOp baseReduceOp = (BaseReduceOp) this;
+                        setZ(Nd4j.create(Shape.reductionShape(x,dimensions,true,baseReduceOp.keepDims)).castTo(newVars[0].dataType()).detach());
+                    } else {
+                        setZ(Nd4j.create(Shape.reductionShape(x,dimensions,true,false)).castTo(newVars[0].dataType()).detach());
+
+                    }
+                }
+            }
+
+            if(this instanceof BaseScalarOp) {
+                BaseScalarOp baseScalarOp = (BaseScalarOp) this;
+                if(baseScalarOp.scalar() != null) {
+                    if(baseScalarOp.scalar().dataType() != baseScalarOp.x().dataType()) {
+                        baseScalarOp.setScalar(baseScalarOp.scalar().castTo(x().dataType()));
+                    }
+                }
+            }
+
+
+            try(OpContext ctx = Nd4j.getExecutioner().buildContext()) {
+                if(y == null)
+                    ctx.setInputArrays(x);
+                else if(y != null) {
+                    ctx.setInputArrays(x,y);
+                }
+
+                ctx.setOutputArrays(z);
+
+                SameDiffOp op2 = sameDiff.getOps().get(getOwnName());
+                for(Listener l : sameDiff.getListeners()) {
+                    l.preOpExecution(sameDiff, At.defaultAt(),op2,ctx);
+                }
+
+                INDArray exec = Nd4j.getExecutioner().exec(this,ctx);
+                for(Listener  l : sameDiff.getListeners()) {
+                    l.opExecution(sameDiff, At.defaultAt(),null,op2,ctx,new INDArray[]{exec});
+                }
+
+                for(Listener  l : sameDiff.getListeners()) {
+                    l.preUpdate(sameDiff,At.defaultAt(),sameDiff.getVariables().get(outputVariable().name()),z);
+
+                }
+
+
+            } catch (Exception e) {
+                throw new RuntimeException(e);
             }
 
             INDArray exec = Nd4j.getExecutioner().exec(this);
@@ -370,7 +453,7 @@ public abstract class BaseOp extends DifferentialFunction implements Op {
         return result;
     }
 
-    protected void defineDimensions(int... dimensions){
+    protected void defineDimensions(long... dimensions) {
         if (dimensions != null && dimensions.length > 0) {
             if(x != null) {
                 dimensions = Shape.normalizeAxis(x.rank(), dimensions);
@@ -378,13 +461,15 @@ public abstract class BaseOp extends DifferentialFunction implements Op {
         }
 
         if (dimensions == null || dimensions.length == 0)
-            dimensions = new int[]{Integer.MAX_VALUE};
+            dimensions = new long[]{Integer.MAX_VALUE};
 
-        try(MemoryWorkspace ws = Nd4j.getWorkspaceManager().scopeOutOfWorkspaces()) {
-            this.dimensionz = Shape.ndArrayDimFromInt(dimensions);
-        }
+        this.dimensionz = Shape.ndArrayDimFromLong(dimensions).detach();
+
     }
 
+    public long[] dimensionsArr() {
+        return dimensions;
+    }
     public INDArray dimensions() {
         return dimensionz;
     }

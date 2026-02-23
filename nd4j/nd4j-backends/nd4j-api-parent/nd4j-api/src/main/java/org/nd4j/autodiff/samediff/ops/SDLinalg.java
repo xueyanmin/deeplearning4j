@@ -146,7 +146,45 @@ public class SDLinalg extends SDOps {
   }
 
   /**
-   * Performs matrix mutiplication on input tensors.<br>
+   * Performs matrix multiplication on input tensors.<br>
+   *
+   * @param a input tensor (NUMERIC type)
+   * @param b input tensor (NUMERIC type)
+   * @param alpha Defaults to 1.0: the scalar multiplier for the product of a* b 
+   * @param beta Defaults to 1.0: the scalar multiplier for c 
+   * @param transA Whether to transpose a when running multiply 
+   * @param transB Whether to transpose b when running multiply 
+   * @return output  (FLOATING_POINT type)
+   */
+  public SDVariable matmul(SDVariable a, SDVariable b, double alpha, double beta, boolean transA,
+      boolean transB) {
+    SDValidation.validateNumerical("Matmul", "a", a);
+    SDValidation.validateNumerical("Matmul", "b", b);
+    return new org.nd4j.linalg.api.ops.impl.reduce.Mmul(sd,a, b, alpha, beta, transA, transB).outputVariable();
+  }
+
+  /**
+   * Performs matrix multiplication on input tensors.<br>
+   *
+   * @param name name May be null. Name for the output variable
+   * @param a input tensor (NUMERIC type)
+   * @param b input tensor (NUMERIC type)
+   * @param alpha Defaults to 1.0: the scalar multiplier for the product of a* b 
+   * @param beta Defaults to 1.0: the scalar multiplier for c 
+   * @param transA Whether to transpose a when running multiply 
+   * @param transB Whether to transpose b when running multiply 
+   * @return output  (FLOATING_POINT type)
+   */
+  public SDVariable matmul(String name, SDVariable a, SDVariable b, double alpha, double beta,
+      boolean transA, boolean transB) {
+    SDValidation.validateNumerical("Matmul", "a", a);
+    SDValidation.validateNumerical("Matmul", "b", b);
+    SDVariable out =  new org.nd4j.linalg.api.ops.impl.reduce.Mmul(sd,a, b, alpha, beta, transA, transB).outputVariable();
+    return sd.updateVariableNameAndReference(out, name);
+  }
+
+  /**
+   * Performs matrix multiplication on input tensors.<br>
    *
    * @param a input tensor (NUMERIC type)
    * @param b input tensor (NUMERIC type)
@@ -155,11 +193,11 @@ public class SDLinalg extends SDOps {
   public SDVariable matmul(SDVariable a, SDVariable b) {
     SDValidation.validateNumerical("Matmul", "a", a);
     SDValidation.validateNumerical("Matmul", "b", b);
-    return new org.nd4j.linalg.api.ops.impl.reduce.Mmul(sd,a, b).outputVariable();
+    return new org.nd4j.linalg.api.ops.impl.reduce.Mmul(sd,a, b, 1.0, 1.0, false, false).outputVariable();
   }
 
   /**
-   * Performs matrix mutiplication on input tensors.<br>
+   * Performs matrix multiplication on input tensors.<br>
    *
    * @param name name May be null. Name for the output variable
    * @param a input tensor (NUMERIC type)
@@ -169,7 +207,7 @@ public class SDLinalg extends SDOps {
   public SDVariable matmul(String name, SDVariable a, SDVariable b) {
     SDValidation.validateNumerical("Matmul", "a", a);
     SDValidation.validateNumerical("Matmul", "b", b);
-    SDVariable out =  new org.nd4j.linalg.api.ops.impl.reduce.Mmul(sd,a, b).outputVariable();
+    SDVariable out =  new org.nd4j.linalg.api.ops.impl.reduce.Mmul(sd,a, b, 1.0, 1.0, false, false).outputVariable();
     return sd.updateVariableNameAndReference(out, name);
   }
 
@@ -414,6 +452,28 @@ public class SDLinalg extends SDOps {
   }
 
   /**
+   * Calculates eigen values<br>
+   *
+   * @param input  (NUMERIC type)
+   */
+  public SDVariable[] eig(SDVariable input) {
+    SDValidation.validateNumerical("eig", "input", input);
+    return new org.nd4j.linalg.api.ops.custom.Eig(sd,input).outputVariables();
+  }
+
+  /**
+   * Calculates eigen values<br>
+   *
+   * @param names names May be null. Arrays of names for the output variables.
+   * @param input  (NUMERIC type)
+   */
+  public SDVariable[] eig(String[] names, SDVariable input) {
+    SDValidation.validateNumerical("eig", "input", input);
+    SDVariable[] out =  new org.nd4j.linalg.api.ops.custom.Eig(sd,input).outputVariables();
+    return sd.updateVariableNamesAndReferences(out, names);
+  }
+
+  /**
    * Calculates log of determinant.<br>
    *
    * @param input  (NUMERIC type)
@@ -434,6 +494,54 @@ public class SDLinalg extends SDOps {
   public SDVariable logdet(String name, SDVariable input) {
     SDValidation.validateNumerical("logdet", "input", input);
     SDVariable out =  new org.nd4j.linalg.api.ops.custom.Logdet(sd,input).outputVariable();
+    return sd.updateVariableNameAndReference(out, name);
+  }
+
+  /**
+   * Calculates matrix determinant.<br>
+   *
+   * @param input  (NUMERIC type)
+   * @return output  (FLOATING_POINT type)
+   */
+  public SDVariable matrixDeterminant(SDVariable input) {
+    SDValidation.validateNumerical("matrixDeterminant", "input", input);
+    return new org.nd4j.linalg.api.ops.impl.transforms.custom.MatrixDeterminant(sd,input).outputVariable();
+  }
+
+  /**
+   * Calculates matrix determinant.<br>
+   *
+   * @param name name May be null. Name for the output variable
+   * @param input  (NUMERIC type)
+   * @return output  (FLOATING_POINT type)
+   */
+  public SDVariable matrixDeterminant(String name, SDVariable input) {
+    SDValidation.validateNumerical("matrixDeterminant", "input", input);
+    SDVariable out =  new org.nd4j.linalg.api.ops.impl.transforms.custom.MatrixDeterminant(sd,input).outputVariable();
+    return sd.updateVariableNameAndReference(out, name);
+  }
+
+  /**
+   * Inverts a matrix<br>
+   *
+   * @param input  (NUMERIC type)
+   * @return output  (FLOATING_POINT type)
+   */
+  public SDVariable matrixInverse(SDVariable input) {
+    SDValidation.validateNumerical("matrixInverse", "input", input);
+    return new org.nd4j.linalg.api.ops.impl.transforms.custom.MatrixInverse(sd,input).outputVariable();
+  }
+
+  /**
+   * Inverts a matrix<br>
+   *
+   * @param name name May be null. Name for the output variable
+   * @param input  (NUMERIC type)
+   * @return output  (FLOATING_POINT type)
+   */
+  public SDVariable matrixInverse(String name, SDVariable input) {
+    SDValidation.validateNumerical("matrixInverse", "input", input);
+    SDVariable out =  new org.nd4j.linalg.api.ops.impl.transforms.custom.MatrixInverse(sd,input).outputVariable();
     return sd.updateVariableNameAndReference(out, name);
   }
 

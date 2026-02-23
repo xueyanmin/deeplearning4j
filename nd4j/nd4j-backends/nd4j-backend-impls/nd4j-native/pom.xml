@@ -26,7 +26,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>org.nd4j</groupId>
+        <groupId>org.eclipse.deeplearning4j</groupId>
         <artifactId>nd4j-backend-impls</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
@@ -36,9 +36,25 @@
     <name>nd4j-native</name>
 
     <properties>
-        <!-- Try to avoid setting this. This is mainly for being able to override for where we put binaries in javacpp jars for android. -->
-        <javacpp.build.output.path>${project.build.directory}/classes/org/nd4j/nativeblas/${javacpp.platform}${javacpp.platform.extension}</javacpp.build.output.path>
+        <javacpp.build.output.path>${project.build.directory}/classes/org/nd4j/linalg/cpu/nativecpu/bindings/${javacpp.platform}${javacpp.platform.extension}</javacpp.build.output.path>
+        <module.name>nd4j.cpu</module.name>
+
+        <compiler.flag.cpp.standard>-std=c++17</compiler.flag.cpp.standard>
+        <javacpp.platform.compiler.output></javacpp.platform.compiler.output>
+        <platform.linker.flag.no.undefined>-Wl,--no-undefined</platform.linker.flag.no.undefined>
+        <platform.linker.flag.rdynamic>-rdynamic</platform.linker.flag.rdynamic>
+        <platform.linker.flag.bsymbolic>-Bsymbolic</platform.linker.flag.bsymbolic>
+        <platform.compiler.flag.optimize.none>-O0</platform.compiler.flag.optimize.none>
+        <platform.compiler.flag.no.omit.fp>-fno-omit-frame-pointer</platform.compiler.flag.no.omit.fp>
+        <platform.compiler.flag.no.optimize.sibling.calls>-fno-optimize-sibling-calls</platform.compiler.flag.no.optimize.sibling.calls>
+        <platform.compiler.flag.debug>-g</platform.compiler.flag.debug>
+        <platform.functrace.libs.unix>-ldl -lunwind -lbfd -ldw</platform.functrace.libs.unix>
+        <libnd4j.outputPath>${project.build.directory}/../../../../../libnd4j/blasbuild/cpu</libnd4j.outputPath>
+        <!-- NDK specific: https://github.com/android/ndk/issues/1690-->
+        <javacpp.compiler.crtoption></javacpp.compiler.crtoption>
+
     </properties>
+
 
     <dependencies>
         <dependency>
@@ -52,40 +68,34 @@
             <groupId>org.bytedeco</groupId>
             <artifactId>javacpp</artifactId>
         </dependency>
+
         <dependency>
-            <groupId>org.bytedeco</groupId>
-            <artifactId>javacpp</artifactId>
-            <classifier>${dependency.platform}</classifier>
-        </dependency>
-        <dependency>
-            <groupId>org.bytedeco</groupId>
-            <artifactId>openblas</artifactId>
-            <version>${openblas.version}-${javacpp-presets.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.bytedeco</groupId>
-            <artifactId>openblas</artifactId>
-            <version>${openblas.version}-${javacpp-presets.version}</version>
-            <classifier>${dependency.platform}</classifier>
-        </dependency>
-        <dependency>
-            <groupId>org.nd4j</groupId>
+            <groupId>org.eclipse.deeplearning4j</groupId>
             <artifactId>nd4j-api</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.nd4j</groupId>
+            <groupId>org.eclipse.deeplearning4j</groupId>
             <artifactId>nd4j-native-api</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.nd4j</groupId>
+            <groupId>org.eclipse.deeplearning4j</groupId>
             <artifactId>nd4j-native-preset</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.deeplearning4j</groupId>
+            <artifactId>nd4j-cpu-backend-common</artifactId>
             <version>${project.version}</version>
         </dependency>
     </dependencies>
 
-
     <build>
         <plugins>
+
+            <plugin>
+                <groupId>org.moditect</groupId>
+                <artifactId>moditect-maven-plugin</artifactId>
+            </plugin>
 
             <plugin>
                 <artifactId>maven-jar-plugin</artifactId>
@@ -97,14 +107,20 @@
                             <goal>jar</goal>
                         </goals>
                         <configuration>
+                            <archive>
+                                <manifestEntries>
+                                    <Automatic-Module-Name>${module.name}</Automatic-Module-Name>
+                                </manifestEntries>
+                            </archive>
                             <excludes>
                                 <exclude>
-                                    org/nd4j/nativeblas/${javacpp.platform}${javacpp.platform.extension}/*
+                                    org/nd4j/linalg/cpu/nativecpu/bindings/${javacpp.platform}${javacpp.platform.extension}/*
                                 </exclude>
                                 <exclude>lib/**</exclude>
                                 <exclude>*.dll</exclude>
                                 <exclude>*.dylib</exclude>
                                 <exclude>*.so</exclude>
+                                <exclude>*.vso</exclude>
                                 <exclude>META-INF/native-image/${javacpp.platform}${javacpp.platform.extension}/</exclude>
                             </excludes>
                         </configuration>
@@ -116,11 +132,16 @@
                             <goal>jar</goal>
                         </goals>
                         <configuration>
+                            <archive>
+                                <manifestEntries>
+                                    <Automatic-Module-Name>${module.name}.binary</Automatic-Module-Name>
+                                </manifestEntries>
+                            </archive>
                             <classifier>${javacpp.platform}${javacpp.platform.extension}</classifier>
                             <skipIfEmpty>true</skipIfEmpty>
                             <includes>
                                 <include>
-                                    org/nd4j/nativeblas/${javacpp.platform}${javacpp.platform.extension}/*
+                                    org/nd4j/linalg/cpu/nativecpu/bindings/${javacpp.platform}${javacpp.platform.extension}/*
                                 </include>
                                 <include>lib/**</include>
                                 <include>META-INF/native-image/${javacpp.platform}${javacpp.platform.extension}/</include>
@@ -129,7 +150,6 @@
                     </execution>
                 </executions>
             </plugin>
-
 
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -144,183 +164,26 @@
                         <configuration>
                             <skipMain>${javacpp.parser.skip}</skipMain>
                             <includes>
-                                <include>org/nd4j/nativeblas/*.java</include>
+                                <include>org/nd4j/linalg/nativecpu/bindings/*.java</include>
                             </includes>
                         </configuration>
                     </execution>
                 </executions>
                 <configuration>
-                    <source>8</source>
-                    <target>8</target>
+                    <source>${maven.compiler.source}</source>
+                    <target>${maven.compiler.target}</target>
+                    <compilerArgs>
+                        <arg>--add-exports</arg>
+                        <arg>java.base/java.nio=ALL-UNNAMED</arg>
+                        <arg>--add-opens</arg>
+                        <arg>java.base/java.nio=ALL-UNNAMED</arg>
+                    </compilerArgs>
                 </configuration>
-            </plugin>
-            <plugin>
-                <groupId>org.bytedeco</groupId>
-                <artifactId>javacpp</artifactId>
-                <version>${javacpp.version}</version>
-                <dependencies>
-                    <dependency>
-                        <groupId>org.nd4j</groupId>
-                        <artifactId>nd4j-native-preset</artifactId>
-                        <version>${project.version}</version>
-                    </dependency>
-                    <dependency>
-                        <groupId>org.nd4j</groupId>
-                        <artifactId>nd4j-native-api</artifactId>
-                        <version>${project.version}</version>
-                    </dependency>
-                    <dependency>
-                        <groupId>org.bytedeco</groupId>
-                        <artifactId>openblas</artifactId>
-                        <version>${openblas.version}-${javacpp-presets.version}</version>
-                    </dependency>
-                    <dependency>
-                        <groupId>org.bytedeco</groupId>
-                        <artifactId>openblas</artifactId>
-                        <version>${openblas.version}-${javacpp-presets.version}</version>
-                        <classifier>${dependency.platform}</classifier>
-                    </dependency>
-                </dependencies>
-                <configuration>
-                    <properties>${javacpp.platform.properties}</properties>
-                    <propertyKeysAndValues>
-                        <property>
-                            <name>platform.root</name>
-                            <value>${javacpp.platform.root}</value>
-                        </property>
-                        <property>
-                            <name>platform.compiler</name>
-                            <value>${javacpp.platform.compiler}</value>
-                        </property>
-                        <property>
-                            <name>platform.sysroot</name>
-                            <value>${javacpp.platform.sysroot}</value>
-                        </property>
-                        <property>
-                            <name>platform.extension</name>
-                            <value>${javacpp.platform.extension}</value>
-                        </property>
-                    </propertyKeysAndValues>
-                    <classPaths>
-                        <classPath>${project.build.outputDirectory}</classPath>
-                    </classPaths>
-                    <includePaths>
-                        <includePath>${libnd4jhome}/blasbuild/cpu/include</includePath>
-                        <includePath>${libnd4jhome}/blasbuild/cpu/flatbuffers-src/include/
-                        </includePath>
-                        <includePath>${libnd4jhome}/blas</includePath>
-                        <includePath>${libnd4jhome}/include</includePath>
-                        <includePath>${libnd4jhome}/include/helpers</includePath>
-                        <includePath>${libnd4jhome}/include/array</includePath>
-                        <includePath>${libnd4jhome}/include/cnpy</includePath>
-                        <includePath>${libnd4jhome}/include/execution</includePath>
-                        <includePath>${libnd4jhome}/include/exceptions</includePath>
-                        <includePath>${libnd4jhome}/include/graph</includePath>
-                        <includePath>${libnd4jhome}/include/indexing</includePath>
-                        <includePath>${libnd4jhome}/include/memory</includePath>
-                        <includePath>${libnd4jhome}/include/performance</includePath>
-                    </includePaths>
-                    <linkPaths>
-                        <linkPath>${libnd4jhome}/blasbuild/cpu/blas</linkPath>
-                        <linkPath>${env.OPENBLAS_PATH}/lib</linkPath>
-                        <linkPath>${env.OPENBLAS_PATH}/</linkPath>
-                    </linkPaths>
-
-                    <buildResources>
-                        <buildResource>/${javacpp.platform.library.path}/</buildResource>
-                        <buildResource>/org/bytedeco/openblas/${javacpp.platform}/</buildResource>
-                        <buildResource>/lib/</buildResource>
-                        <buildResource>/</buildResource>
-                    </buildResources>
-                    <includeResources>
-                        <includeResource>/${javacpp.platform.library.path}/include/
-                        </includeResource>
-                        <includeResource>/org/bytedeco/openblas/${javacpp.platform}/include/
-                        </includeResource>
-                    </includeResources>
-                    <linkResources>
-                        <linkResource>/${javacpp.platform.library.path}/</linkResource>
-                        <linkResource>/${javacpp.platform.library.path}/lib/</linkResource>
-                        <linkResource>/org/bytedeco/openblas/${javacpp.platform}/</linkResource>
-                        <linkResource>/org/bytedeco/openblas/${javacpp.platform}/lib/</linkResource>
-                    </linkResources>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>javacpp-validate</id>
-                        <phase>validate</phase>
-                        <goals>
-                            <goal>build</goal>
-                        </goals>
-                    </execution>
-                    <execution>
-                        <id>javacpp-parser</id>
-                        <phase>generate-sources</phase>
-                        <goals>
-                            <goal>build</goal>
-                        </goals>
-                        <configuration>
-                            <skip>${javacpp.parser.skip}</skip>
-                            <outputDirectory>${project.build.sourceDirectory}</outputDirectory>
-                            <classOrPackageName>org.nd4j.nativeblas.Nd4jCpuPresets
-                            </classOrPackageName>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>javacpp-compiler</id>
-                        <phase>process-classes</phase>
-                        <goals>
-                            <goal>build</goal>
-                        </goals>
-                        <configuration>
-                            <skip>${javacpp.compiler.skip}</skip>
-                            <classOrPackageName>org.nd4j.nativeblas.Nd4jCpu</classOrPackageName>
-                            <copyLibs>true</copyLibs>
-                            <configDirectory>${project.build.directory}/classes/META-INF/native-image/${javacpp.platform}${javacpp.platform.extension}/</configDirectory>
-                            <outputDirectory>${javacpp.build.output.path}</outputDirectory>
-                        </configuration>
-                    </execution>
-                </executions>
             </plugin>
 
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-antrun-plugin</artifactId>
-            </plugin>
-
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-enforcer-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <id>libnd4j-checks</id>
-                        <goals>
-                            <goal>enforce</goal>
-                        </goals>
-                        <configuration>
-                            <rules>
-                                <requireProperty>
-                                    <property>libnd4jhome</property>
-                                    <message>You must set the LIBND4J_HOME environment variable!
-                                    </message>
-                                    <regex>.*/.*</regex>
-                                    <regexMessage>!!! LIBND4J_HOME must be a valid unix path!
-                                    </regexMessage>
-                                </requireProperty>
-                                <requireFilesExist>
-                                    <files>
-                                        <file>${libnd4jhome}/include/legacy/NativeOps.h</file>
-                                        <file>${libnd4jhome}/blasbuild/cpu/blas</file>
-                                    </files>
-                                    <message>!!! You have to compile libnd4j with cpu support
-                                        first!
-                                    </message>
-                                </requireFilesExist>
-                            </rules>
-                            <fail>true</fail>
-                        </configuration>
-                    </execution>
-                </executions>
             </plugin>
 
             <plugin>
@@ -363,35 +226,433 @@
     </build>
 
     <profiles>
+
         <profile>
-            <!-- This causes build failure on osx due to memory issues. For now, just skip this since we publish javadoc from other platforms fine.-->
-            <id>skip-javadoc-on-osx</id>
+            <id>os-unix-flags</id>
+            <activation>
+                <os>
+                    <family>unix</family>
+                    <name>!mac os x</name> </os>
+            </activation>
+            <properties>
+                <platform.linker.flag.no.undefined>-Wl,--no-undefined</platform.linker.flag.no.undefined>
+                <platform.linker.flag.rdynamic>-rdynamic</platform.linker.flag.rdynamic>
+                <platform.linker.flag.bsymbolic>-Bsymbolic</platform.linker.flag.bsymbolic>
+                <platform.compiler.flag.optimize.none>-O0</platform.compiler.flag.optimize.none>
+                <platform.compiler.flag.no.omit.fp>-fno-omit-frame-pointer</platform.compiler.flag.no.omit.fp>
+                <platform.compiler.flag.no.optimize.sibling.calls>-fno-optimize-sibling-calls</platform.compiler.flag.no.optimize.sibling.calls>
+                <platform.compiler.flag.debug>-g</platform.compiler.flag.debug>
+                <platform.functrace.libs>${platform.functrace.libs.unix}</platform.functrace.libs>
+                <platform.compiler.flag.windows.define></platform.compiler.flag.windows.define> </properties>
+        </profile>
+
+        <profile>
+            <id>os-mac-flags</id>
             <activation>
                 <os>
                     <family>mac</family>
                 </os>
             </activation>
+            <properties>
+                <platform.linker.flag.no.undefined>-Wl,-undefined,error</platform.linker.flag.no.undefined> <platform.linker.flag.rdynamic></platform.linker.flag.rdynamic> <platform.linker.flag.bsymbolic></platform.linker.flag.bsymbolic> <platform.compiler.flag.optimize.none>-O0</platform.compiler.flag.optimize.none>
+                <platform.compiler.flag.no.omit.fp>-fno-omit-frame-pointer</platform.compiler.flag.no.omit.fp>
+                <platform.compiler.flag.no.optimize.sibling.calls>-fno-optimize-sibling-calls</platform.compiler.flag.no.optimize.sibling.calls>
+                <platform.compiler.flag.debug>-g</platform.compiler.flag.debug>
+                <platform.functrace.libs>${platform.functrace.libs.unix}</platform.functrace.libs> <platform.compiler.flag.windows.define></platform.compiler.flag.windows.define> </properties>
+        </profile>
+
+        <profile>
+            <id>os-windows-flags</id>
+            <activation>
+                <os>
+                    <family>windows</family>
+                </os>
+            </activation>
+            <properties>
+                <platform.linker.flag.no.undefined>-Wl,--no-undefined</platform.linker.flag.no.undefined> <platform.linker.flag.rdynamic></platform.linker.flag.rdynamic> <platform.linker.flag.bsymbolic></platform.linker.flag.bsymbolic> <platform.compiler.flag.optimize.none>-O0</platform.compiler.flag.optimize.none> <platform.compiler.flag.no.omit.fp>-fno-omit-frame-pointer</platform.compiler.flag.no.omit.fp> <platform.compiler.flag.no.optimize.sibling.calls>-fno-optimize-sibling-calls</platform.compiler.flag.no.optimize.sibling.calls> <platform.compiler.flag.debug>-g</platform.compiler.flag.debug> <platform.functrace.libs></platform.functrace.libs> <platform.compiler.flag.windows.define>-D_WIN32</platform.compiler.flag.windows.define>
+            </properties>
+        </profile>
+        <profile>
+            <id>non-functrace</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+                <property>
+                    <name>!libnd4j.calltrace</name>
+                </property>
+            </activation>
             <build>
                 <plugins>
                     <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-javadoc-plugin</artifactId>
-                        <version>${maven-javadoc-plugin.version}</version>
+                        <groupId>org.bytedeco</groupId>
+                        <artifactId>javacpp</artifactId>
+                        <version>${javacpp.version}</version>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.eclipse.deeplearning4j</groupId>
+                                <artifactId>nd4j-cpu-backend-common</artifactId>
+                                <version>${project.version}</version>
+                            </dependency>
+                            <dependency>
+                                <groupId>org.eclipse.deeplearning4j</groupId>
+                                <artifactId>nd4j-native-preset</artifactId>
+                                <version>${project.version}</version>
+                            </dependency>
+                            <dependency>
+                                <groupId>org.eclipse.deeplearning4j</groupId>
+                                <artifactId>nd4j-native-api</artifactId>
+                                <version>${project.version}</version>
+                            </dependency>
+                            <dependency>
+                                <groupId>org.bytedeco</groupId>
+                                <artifactId>openblas</artifactId>
+                                <version>${openblas.version}-${javacpp-presets.version}</version>
+                                <optional>true</optional>
+                            </dependency>
+                            <dependency>
+                                <groupId>org.bytedeco</groupId>
+                                <artifactId>openblas</artifactId>
+                                <version>${openblas.version}-${javacpp-presets.version}</version>
+                                <classifier>${dependency.platform}</classifier>
+                                <optional>true</optional>
+                            </dependency>
+                        </dependencies>
                         <configuration>
-                            <skip>true</skip>
+                            <properties>${javacpp.platform.properties}</properties>
+                            <propertyKeysAndValues>
+                                <property>
+                                    <name>platform.root</name>
+                                    <value>${javacpp.platform.root}</value>
+                                </property>
+                                <property>
+                                    <name>platform.compiler</name>
+                                    <value>${javacpp.platform.compiler}</value>
+                                </property>
+                                <property>
+                                    <name>platform.sysroot</name>
+                                    <value>${javacpp.platform.sysroot}</value>
+                                </property>
+                                <property>
+                                    <name>platform.extension</name>
+                                    <value>${javacpp.platform.extension}</value>
+                                </property>
+                            </propertyKeysAndValues>
+                            <classPaths>
+                                <classPath>${project.build.outputDirectory}</classPath>
+                            </classPaths>
+                            <includePaths>
+                                <includePath>${libnd4jhome}/blasbuild/cpu/flatbuffers-target-build/include</includePath>
+                                <includePath>${libnd4jhome}/blasbuild/cpu/flatbuffers-host-build/include</includePath>
+                                <includePath>${libnd4jhome}/blasbuild/cpu/include</includePath>
+                                <includePath>${libnd4jhome}/blasbuild/cpu/flatbuffers-src/include/
+                                </includePath>
+                                <includePath>${libnd4jhome}/blas</includePath>
+                                <includePath>${libnd4jhome}/include</includePath>
+                                <includePath>${libnd4jhome}/include/helpers</includePath>
+                                <includePath>${libnd4jhome}/include/array</includePath>
+                                <includePath>${libnd4jhome}/include/cnpy</includePath>
+                                <includePath>${libnd4jhome}/include/execution</includePath>
+                                <includePath>${libnd4jhome}/include/exceptions</includePath>
+                                <includePath>${libnd4jhome}/include/graph</includePath>
+                                <includePath>${libnd4jhome}/include/indexing</includePath>
+                                <includePath>${libnd4jhome}/include/memory</includePath>
+                            </includePaths>
+                            <linkPaths>
+                                <linkPath>${libnd4j.outputPath}</linkPath>
+                                <linkPath>${env.OPENBLAS_PATH}/lib</linkPath>
+                                <linkPath>${env.OPENBLAS_PATH}/</linkPath>
+                            </linkPaths>
+                            <resourcePath>${libnd4jhome}/blasbuild/cpu/blas</resourcePath>
+                            <buildResources>
+                                <buildResource>/${javacpp.platform.library.path}/</buildResource>
+                                <buildResource>/org/bytedeco/openblas/${javacpp.platform}/</buildResource>
+                                <buildResource>/lib/</buildResource>
+                                <buildResource>/</buildResource>
+                                <buildResource>${libnd4jhome}/blasbuild/cpu</buildResource>
+                            </buildResources>
+                            <includeResources>
+                                <includeResource>/${javacpp.platform.library.path}/include/
+                                </includeResource>
+                                <includeResource>/org/bytedeco/openblas/${javacpp.platform}/include/
+                                </includeResource>
+                            </includeResources>
+                            <linkResources>
+                                <linkResource>/${javacpp.platform.library.path}/</linkResource>
+                                <linkResource>/${javacpp.platform.library.path}/lib/</linkResource>
+                                <linkResource>/org/bytedeco/openblas/${javacpp.platform}/</linkResource>
+                                <linkResource>/org/bytedeco/openblas/${javacpp.platform}/lib/</linkResource>
+                            </linkResources>
+                            <compilerOptions>
+                                <compilerOption>${compiler.flag.cpp.standard}</compilerOption>
+                                <compilerOption>${platform.linker.flag.no.undefined}</compilerOption>
+                            </compilerOptions>
                         </configuration>
                         <executions>
                             <execution>
-                                <id>attach-javadocs</id>
+                                <id>javacpp-validate</id>
+                                <phase>validate</phase>
                                 <goals>
-                                    <goal>jar</goal>
+                                    <goal>build</goal>
                                 </goals>
+                            </execution>
+                            <execution>
+                                <id>javacpp-parser</id>
+                                <phase>generate-sources</phase>
+                                <goals>
+                                    <goal>build</goal>
+                                </goals>
+                                <configuration>
+                                    <skip>${javacpp.parser.skip}</skip>
+                                    <outputDirectory>${project.build.sourceDirectory}</outputDirectory>
+                                    <classOrPackageName>org.nd4j.presets.cpu.Nd4jCpuPresets</classOrPackageName>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>javacpp-compiler</id>
+                                <phase>process-classes</phase>
+                                <goals>
+                                    <goal>build</goal>
+                                </goals>
+                                <configuration>
+                                    <skip>${javacpp.compiler.skip}</skip>
+                                    <classOrPackageName>org.nd4j.linalg.cpu.nativecpu.bindings.Nd4jCpu</classOrPackageName>
+                                    <copyLibs>true</copyLibs>
+                                    <copyResources>true</copyResources>
+                                    <configDirectory>${project.build.directory}/classes/META-INF/native-image/${javacpp.platform}${javacpp.platform.extension}/</configDirectory>
+                                    <outputDirectory>${javacpp.build.output.path}</outputDirectory>
+                                </configuration>
                             </execution>
                         </executions>
                     </plugin>
                 </plugins>
             </build>
         </profile>
+
+        <profile>
+            <id>functrace</id>
+            <activation>
+                <activeByDefault>false</activeByDefault>
+                <property>
+                    <name>libnd4j.calltrace</name>
+                    <value>ON</value>
+                </property>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.bytedeco</groupId>
+                        <artifactId>javacpp</artifactId>
+                        <version>${javacpp.version}</version>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.eclipse.deeplearning4j</groupId>
+                                <artifactId>nd4j-cpu-backend-common</artifactId>
+                                <version>${project.version}</version>
+                            </dependency>
+                            <dependency>
+                                <groupId>org.eclipse.deeplearning4j</groupId>
+                                <artifactId>nd4j-native-preset</artifactId>
+                                <version>${project.version}</version>
+                            </dependency>
+                            <dependency>
+                                <groupId>org.eclipse.deeplearning4j</groupId>
+                                <artifactId>nd4j-native-api</artifactId>
+                                <version>${project.version}</version>
+                            </dependency>
+                            <dependency>
+                                <groupId>org.bytedeco</groupId>
+                                <artifactId>openblas</artifactId>
+                                <version>${openblas.version}-${javacpp-presets.version}</version>
+                                <optional>true</optional>
+                            </dependency>
+                            <dependency>
+                                <groupId>org.bytedeco</groupId>
+                                <artifactId>openblas</artifactId>
+                                <version>${openblas.version}-${javacpp-presets.version}</version>
+                                <classifier>${dependency.platform}</classifier>
+                                <optional>true</optional>
+                            </dependency>
+                        </dependencies>
+                        <configuration>
+                            <properties>${javacpp.platform.properties}</properties>
+                            <propertyKeysAndValues>
+                                <property>
+                                    <name>libnd4j.calltrace</name>
+                                    <value>${libnd4j.calltrace}</value>
+                                </property>
+                                <property>
+                                    <name>platform.root</name>
+                                    <value>${javacpp.platform.root}</value>
+                                </property>
+                                <property>
+                                    <name>platform.compiler</name>
+                                    <value>${javacpp.platform.compiler}</value>
+                                </property>
+                                <property>
+                                    <name>platform.sysroot</name>
+                                    <value>${javacpp.platform.sysroot}</value>
+                                </property>
+                                <property>
+                                    <name>platform.extension</name>
+                                    <value>${javacpp.platform.extension}</value>
+                                </property>
+                            </propertyKeysAndValues>
+                            <classPaths>
+                                <classPath>${project.build.outputDirectory}</classPath>
+                            </classPaths>
+                            <includePaths>
+                                <includePath>${libnd4jhome}/blasbuild/cpu/flatbuffers-target-build/include</includePath>
+                                <includePath>${libnd4jhome}/blasbuild/cpu/flatbuffers-host-build/include</includePath>
+                                <includePath>${libnd4jhome}/blasbuild/cpu/include</includePath>
+                                <includePath>${libnd4jhome}/blasbuild/cpu/flatbuffers-src/include/
+                                </includePath>
+                                <includePath>${libnd4jhome}/blas</includePath>
+                                <includePath>${libnd4jhome}/include</includePath>
+                                <includePath>${libnd4jhome}/include/helpers</includePath>
+                                <includePath>${libnd4jhome}/include/array</includePath>
+                                <includePath>${libnd4jhome}/include/cnpy</includePath>
+                                <includePath>${libnd4jhome}/include/execution</includePath>
+                                <includePath>${libnd4jhome}/include/exceptions</includePath>
+                                <includePath>${libnd4jhome}/include/graph</includePath>
+                                <includePath>${libnd4jhome}/include/indexing</includePath>
+                                <includePath>${libnd4jhome}/include/memory</includePath>
+                                <includePath>${libnd4jhome}/include/performance</includePath> </includePaths>
+                            <linkPaths>
+                                <linkPath>${libnd4j.outputPath}</linkPath>
+                                <linkPath>${env.OPENBLAS_PATH}/lib</linkPath>
+                                <linkPath>${env.OPENBLAS_PATH}/</linkPath>
+
+                            </linkPaths>
+                            <resourcePath>${libnd4jhome}/blasbuild/cpu/blas</resourcePath>
+                            <buildResources>
+                                <buildResource>/${javacpp.platform.library.path}/</buildResource>
+                                <buildResource>/org/bytedeco/openblas/${javacpp.platform}/</buildResource>
+                                <buildResource>/lib/</buildResource>
+                                <buildResource>/</buildResource>
+                                <buildResource>${libnd4jhome}/blasbuild/cpu/blas</buildResource>
+                            </buildResources>
+                            <includeResources>
+                                <includeResource>/${javacpp.platform.library.path}/include/
+                                </includeResource>
+                                <includeResource>/org/bytedeco/openblas/${javacpp.platform}/include/
+                                </includeResource>
+                            </includeResources>
+                            <linkResources>
+                                <linkResource>/${javacpp.platform.library.path}/</linkResource>
+                                <linkResource>/${javacpp.platform.library.path}/lib/</linkResource>
+                                <linkResource>/org/bytedeco/openblas/${javacpp.platform}/</linkResource>
+                                <linkResource>/org/bytedeco/openblas/${javacpp.platform}/lib/</linkResource>
+                            </linkResources>
+                            <compilerOptions>
+                                <compilerOption>${compiler.flag.cpp.standard}</compilerOption>
+                                <compilerOption>-DSD_GCC_FUNCTRACE=ON</compilerOption>
+                                <compilerOption>${platform.linker.flag.no.undefined}</compilerOption>
+                                <compilerOption>${platform.linker.flag.rdynamic}</compilerOption>
+                                <compilerOption>${platform.linker.flag.bsymbolic}</compilerOption>
+                                <compilerOption>${platform.compiler.flag.optimize.none}</compilerOption>
+                                <compilerOption>${platform.compiler.flag.no.omit.fp}</compilerOption>
+                                <compilerOption>${platform.compiler.flag.no.optimize.sibling.calls}</compilerOption>
+                                <compilerOption>${platform.compiler.flag.debug}</compilerOption>
+                            </compilerOptions>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>javacpp-validate</id>
+                                <phase>validate</phase>
+                                <goals>
+                                    <goal>build</goal>
+                                </goals>
+                            </execution>
+                            <execution>
+                                <id>javacpp-parser</id>
+                                <phase>generate-sources</phase>
+                                <goals>
+                                    <goal>build</goal>
+                                </goals>
+                                <configuration>
+                                    <skip>${javacpp.parser.skip}</skip>
+                                    <outputDirectory>${project.build.sourceDirectory}</outputDirectory>
+                                    <classOrPackageName>org.nd4j.presets.cpu.Nd4jCpuPresets</classOrPackageName>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>javacpp-compiler</id>
+                                <phase>process-classes</phase>
+                                <goals>
+                                    <goal>build</goal>
+                                </goals>
+                                <configuration>
+                                    <skip>${javacpp.compiler.skip}</skip>
+                                    <classOrPackageName>org.nd4j.linalg.cpu.nativecpu.bindings.Nd4jCpu</classOrPackageName>
+                                    <copyLibs>true</copyLibs>
+                                    <copyResources>true</copyResources>
+                                    <configDirectory>${project.build.directory}/classes/META-INF/native-image/${javacpp.platform}${javacpp.platform.extension}/</configDirectory>
+                                    <outputDirectory>${javacpp.build.output.path}</outputDirectory>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <profile>
+            <id>compat-profile</id>
+            <activation>
+                <property>
+                    <name>javacpp.platform.extension</name>
+                    <value>/.+/</value>
+                </property>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>javacpp</artifactId>
+                    <version>${javacpp.version}</version>
+                </dependency>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>openblas</artifactId>
+                    <version>${openblas.version}-${javacpp-presets.version}</version>
+                    <optional>true</optional>
+                </dependency>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>openblas</artifactId>
+                    <version>${openblas.version}-${javacpp-presets.version}</version>
+                    <classifier>linux-x86_64</classifier>
+                    <optional>true</optional>
+                </dependency>
+            </dependencies>
+        </profile>
+        <profile>
+            <id>default-javacpp</id>
+            <activation>
+                <property>
+                    <name>!javacpp.platform.extension</name>
+                </property>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>javacpp</artifactId>
+                    <classifier>${dependency.platform}</classifier>
+                </dependency>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>openblas</artifactId>
+                    <version>${openblas.version}-${javacpp-presets.version}</version>
+                    <optional>true</optional>
+                </dependency>
+                <dependency>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>openblas</artifactId>
+                    <version>${openblas.version}-${javacpp-presets.version}</version>
+                    <classifier>${dependency.platform}</classifier>
+                    <optional>true</optional>
+                </dependency>
+            </dependencies>
+        </profile>
+
         <profile>
             <id>android-arm-32-output</id>
             <activation>
@@ -414,9 +675,74 @@
             </activation>
             <properties>
                 <javacpp.build.output.path>${project.build.directory}/classes/lib/arm64-v8a</javacpp.build.output.path>
+                <platform.compiler.output>-Wl,-rpath,lib/ -D__ANDROID_API__=21 -DANDROID -ffunction-sections -funwind-tables -fstack-protector-strong -march=armv8-a -Wall -nostdlib++ -fPIC -shared -Wl,--no-undefined -z text -o</platform.compiler.output>
             </properties>
-        </profile>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.bytedeco</groupId>
+                        <artifactId>javacpp</artifactId>
+                        <version>${javacpp.version}</version>
+                        <configuration>
+                            <includePaths>
+                                <includePath>${libnd4jhome}/blasbuild/cpu/flatbuffers-target-build/include</includePath>
+                                <includePath>${libnd4jhome}/blasbuild/cpu/flatbuffers-host-build/include</includePath>
+                                <includePath>${libnd4jhome}/blasbuild/cpu/include</includePath>
+                                <includePath>${libnd4jhome}/blasbuild/cpu/flatbuffers-src/include/</includePath>
+                                <includePath>${libnd4jhome}/blas</includePath>
+                                <includePath>${libnd4jhome}/include</includePath>
+                                <includePath>${libnd4jhome}/include/helpers</includePath>
+                                <includePath>${libnd4jhome}/include/array</includePath>
+                                <includePath>${libnd4jhome}/include/cnpy</includePath>
+                                <includePath>${libnd4jhome}/include/execution</includePath>
+                                <includePath>${libnd4jhome}/include/exceptions</includePath>
+                                <includePath>${libnd4jhome}/include/graph</includePath>
+                                <includePath>${libnd4jhome}/include/indexing</includePath>
+                                <includePath>${libnd4jhome}/include/memory</includePath>
+                            </includePaths>
+                            <linkPaths>
+                                <linkPath>${libnd4j.outputPath}</linkPath>
+                                <linkPath>${env.OPENBLAS_PATH}/lib</linkPath>
+                                <linkPath>${env.OPENBLAS_PATH}/</linkPath>
+                                <linkPath>${env.ANDROID_NDK}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21</linkPath>
 
+                            </linkPaths>
+
+                            <compilerOptions>
+                                <compilerOption>${compiler.flag.cpp.standard}</compilerOption>
+                                <compilerOption>${platform.linker.flag.no.undefined}</compilerOption>
+                                <compilerOption>--target=aarch64-linux-android21</compilerOption>
+                                <compilerOption>-D__ANDROID_API__=21</compilerOption>
+                                <compilerOption>-DANDROID</compilerOption>
+                            </compilerOptions>
+                            <properties>${javacpp.platform.properties}</properties>
+                            <propertyKeysAndValues>
+                                <property>
+                                    <name>platform.root</name>
+                                    <value>${javacpp.platform.root}</value>
+                                </property>
+                                <property>
+                                    <name>platform.compiler</name>
+                                    <value>${javacpp.platform.compiler}</value>
+                                </property>
+                                <property>
+                                    <name>platform.sysroot</name>
+                                    <value>${javacpp.platform.sysroot}</value>
+                                </property>
+                                <property>
+                                    <name>platform.extension</name>
+                                    <value>${javacpp.platform.extension}</value>
+                                </property>
+                                <property>
+                                    <name>platform.compiler.output</name>
+                                    <value>-Wl,-rpath,lib/ -D__ANDROID_API__=21 -DANDROID -ffunction-sections -funwind-tables -fstack-protector-strong -march=armv8-a -Wall -nostdlib++ -fPIC -shared -Wl,--no-undefined -z text -o </value>
+                                </property>
+                            </propertyKeysAndValues>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
         <profile>
             <id>android-x86-output</id>
             <activation>
@@ -429,7 +755,6 @@
                 <javacpp.build.output.path>${project.build.directory}/classes/lib/x86</javacpp.build.output.path>
             </properties>
         </profile>
-
         <profile>
             <id>android-x86_64-output</id>
             <activation>
@@ -440,33 +765,65 @@
             </activation>
             <properties>
                 <javacpp.build.output.path>${project.build.directory}/classes/lib/x86_64</javacpp.build.output.path>
+                <!-- Remove -nostartfiles since we need the CRT objects -->
+                <javacpp.compiler.crtoption></javacpp.compiler.crtoption>
+                <!-- Add sysroot configuration for android-x86_64 -->
+                <javacpp.platform.sysroot>${env.ANDROID_NDK}/toolchains/llvm/prebuilt/linux-x86_64/sysroot</javacpp.platform.sysroot>
             </properties>
-        </profile>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.bytedeco</groupId>
+                        <artifactId>javacpp</artifactId>
+                        <version>${javacpp.version}</version>
+                        <configuration>
+                            <properties>${javacpp.platform.properties}</properties>
+                            <propertyKeysAndValues>
+                                <property>
+                                    <name>platform.root</name>
+                                    <value>${javacpp.platform.root}</value>
+                                </property>
+                                <property>
+                                    <name>platform.compiler</name>
+                                    <value>${javacpp.platform.compiler}</value>
+                                </property>
+                                <property>
+                                    <name>platform.sysroot</name>
+                                    <value>${env.ANDROID_NDK}/toolchains/llvm/prebuilt/linux-x86_64/sysroot</value>
+                                </property>
+                                <property>
+                                    <name>platform.extension</name>
+                                    <value>${javacpp.platform.extension}</value>
+                                </property>
+                            </propertyKeysAndValues>
+                            <linkPaths>
+                                <linkPath>${libnd4j.outputPath}</linkPath>
+                                <linkPath>${env.OPENBLAS_PATH}/lib</linkPath>
+                                <linkPath>${env.OPENBLAS_PATH}/</linkPath>
 
-        <profile>
-            <id>mkl</id>
-            <activation>
-                <property>
-                    <name>os.arch</name>
-                    <value>x86_64</value>
-                </property>
-            </activation>
-            <dependencies>
-                <dependency>
-                    <groupId>org.bytedeco</groupId>
-                    <artifactId>mkl</artifactId>
-                    <version>${mkl.version}-${javacpp-presets.version}</version>
-                </dependency>
-                <dependency>
-                    <groupId>org.bytedeco</groupId>
-                    <artifactId>mkl</artifactId>
-                    <version>${mkl.version}-${javacpp-presets.version}</version>
-                    <classifier>${dependency.platform2}</classifier>
-                </dependency>
-            </dependencies>
-        </profile>
-        <profile>
-            <id>testresources</id>
+                                <!-- Android NDK library paths -->
+                                <linkPath>${env.ANDROID_NDK}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/x86_64-linux-android/21</linkPath>
+                                <linkPath>${env.ANDROID_NDK}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/x86_64-linux-android</linkPath>
+                                <linkPath>${env.ANDROID_NDK}/toolchains/llvm/prebuilt/linux-x86_64/lib64/clang/17/lib/linux</linkPath>
+                                <linkPath>${env.ANDROID_NDK}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib</linkPath>
+                                <linkPath>${env.ANDROID_NDK}/toolchains/llvm/prebuilt/linux-x86_64/lib</linkPath>
+                            </linkPaths>
+                            <compilerOptions>
+                                <compilerOption>${compiler.flag.cpp.standard}</compilerOption>
+                                <compilerOption>${platform.linker.flag.no.undefined}</compilerOption>
+                                <!-- Add explicit sysroot to compiler options -->
+                                <compilerOption>--sysroot=${env.ANDROID_NDK}/toolchains/llvm/prebuilt/linux-x86_64/sysroot</compilerOption>
+                                <!-- Add multiple -B flags for different possible CRT locations -->
+                                <compilerOption>-B${env.ANDROID_NDK}/toolchains/llvm/prebuilt/linux-x86_64/lib64/clang/17/lib/linux</compilerOption>
+                                <compilerOption>-B${env.ANDROID_NDK}/toolchains/llvm/prebuilt/linux-x86_64/lib64/clang/17/lib/linux/x86_64</compilerOption>
+                                <compilerOption>-B${env.ANDROID_NDK}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/x86_64-linux-android/21</compilerOption>
+                                <!-- Explicitly tell linker where to find CRT objects -->
+                                <compilerOption>-Wl,--dynamic-linker=/system/bin/linker64</compilerOption>
+                            </compilerOptions>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
         </profile>
         <profile>
             <id>avx2</id>
@@ -492,22 +849,15 @@
                 <javacpp.platform.extension>-avx512</javacpp.platform.extension>
             </properties>
         </profile>
+
         <profile>
-            <!--
-            Windows note:
-               Do NOT use the gcc compiler in usr/ always use the one in mingw/bin
-               Another note on this particular gcc: ensure the path is setup in msys2 with /c/msys64/mingw64/bin
-               prefixed. If the one in USR is used, errors like error: 'RTLD_LAZY' was not declared in this scope
-               may show up.
-            -->
             <id>mingw</id>
             <activation>
                 <os>
                     <family>windows</family>
                 </os>
                 <property>
-                    <name>!javacpp.platform</name>
-                </property>
+                    <name>!javacpp.platform</name> </property>
             </activation>
             <build>
                 <plugins>
@@ -522,13 +872,6 @@
             </build>
         </profile>
         <profile>
-            <!--
-          Windows note:
-             Do NOT use the gcc compiler in usr/ always use the one in mingw/bin
-             Another note on this particular gcc: ensure the path is setup in msys2 with /c/msys64/mingw64/bin
-             prefixed. If the one in USR is used, errors like error: 'RTLD_LAZY' was not declared in this scope
-             may show up.
-      -->
             <id>mingw-windows-platform</id>
             <activation>
                 <os>
@@ -536,8 +879,7 @@
                 </os>
                 <property>
                     <name>javacpp.platform</name>
-                    <value>windows-x86_64</value>
-                </property>
+                    <value>windows-x86_64</value> </property>
             </activation>
             <build>
                 <plugins>
@@ -550,6 +892,19 @@
                     </plugin>
                 </plugins>
             </build>
+        </profile>
+
+        <profile>
+            <id>libnd4j-set</id>
+            <activation>
+                <activeByDefault>false</activeByDefault>
+                <property>
+                    <name>env.LIBND4J_HOME</name>
+                </property>
+            </activation>
+            <properties>
+                <libnd4jhome>${env.LIBND4J_HOME}</libnd4jhome>
+            </properties>
         </profile>
         <profile>
             <id>libnd4j-assembly</id>
@@ -563,7 +918,7 @@
             </properties>
             <dependencies>
                 <dependency>
-                    <groupId>org.nd4j</groupId>
+                    <groupId>org.eclipse.deeplearning4j</groupId>
                     <artifactId>libnd4j</artifactId>
                     <version>${project.version}</version>
                     <type>zip</type>
@@ -574,48 +929,32 @@
                 <plugins>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-enforcer-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>libnd4j-checks</id>
-                                <goals>
-                                    <goal>enforce</goal>
-                                </goals>
-                                <configuration>
-                                    <skip>true</skip>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-dependency-plugin</artifactId>
-                        <version>3.1.2</version>
-                        <executions>
-                            <execution>
-                                <id>unpack</id>
-                                <phase>initialize</phase>
-                                <goals>
-                                    <goal>unpack</goal>
-                                </goals>
-                                <configuration>
-                                    <artifactItems>
-                                        <artifactItem>
-                                            <groupId>org.nd4j</groupId>
-                                            <artifactId>libnd4j</artifactId>
-                                            <version>${project.version}</version>
-                                            <type>zip</type>
-                                            <classifier>
-                                                ${javacpp.platform}${javacpp.platform.extension}
-                                            </classifier>
-                                            <overWrite>true</overWrite>
-                                            <outputDirectory>${project.build.directory}
-                                            </outputDirectory>
-                                        </artifactItem>
-                                    </artifactItems>
-                                </configuration>
-                            </execution>
-                        </executions>
+                        <version>3.1.2</version> <executions>
+                        <execution>
+                            <id>unpack</id>
+                            <phase>initialize</phase>
+                            <goals>
+                                <goal>unpack</goal>
+                            </goals>
+                            <configuration>
+                                <artifactItems>
+                                    <artifactItem>
+                                        <groupId>org.eclipse.deeplearning4j</groupId>
+                                        <artifactId>libnd4j</artifactId>
+                                        <version>${project.version}</version>
+                                        <type>zip</type>
+                                        <classifier>
+                                            ${javacpp.platform}${javacpp.platform.extension}
+                                        </classifier>
+                                        <overWrite>true</overWrite>
+                                        <outputDirectory>${project.build.directory}
+                                        </outputDirectory>
+                                    </artifactItem>
+                                </artifactItems>
+                            </configuration>
+                        </execution>
+                    </executions>
                     </plugin>
                 </plugins>
             </build>

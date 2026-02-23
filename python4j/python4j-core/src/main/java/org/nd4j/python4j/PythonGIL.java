@@ -77,16 +77,6 @@ public class PythonGIL implements AutoCloseable {
 
 
     private PythonGIL() {
-        while (acquired.get()) {
-            try {
-                log.debug("Blocking for GIL on thread " + Thread.currentThread().getId());
-                Thread.sleep(100);
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-
-        }
-
         log.debug("Acquiring GIL on " + Thread.currentThread().getId());
         acquired.set(true);
         acquiredByMe = true;
@@ -132,7 +122,7 @@ public class PythonGIL implements AutoCloseable {
             //From this thread: // PyEval_RestoreThread() should not be called if runtime is finalizing
             // See https://docs.python.org/3/c-api/init.html#c.PyEval_RestoreThread
 
-            if(_Py_IsFinalizing() != 1 && PythonConstants.releaseGilAutomatically())
+            if(Py_IsFinalizing() != 1 && PythonConstants.releaseGilAutomatically())
                 PyEval_RestoreThread(mainThreadState);
         }
     }
@@ -148,7 +138,7 @@ public class PythonGIL implements AutoCloseable {
             //From this thread: // PyEval_RestoreThread() should not be called if runtime is finalizing
             // See https://docs.python.org/3/c-api/init.html#c.PyEval_RestoreThread
 
-            if(_Py_IsFinalizing() != 1 && PythonConstants.releaseGilAutomatically())
+            if(Py_IsFinalizing() != 1 && PythonConstants.releaseGilAutomatically())
                 PyEval_RestoreThread(mainThreadState);
         }
     }

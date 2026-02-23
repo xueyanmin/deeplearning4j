@@ -27,7 +27,7 @@
 
 namespace sd {
 namespace ops {
-LIST_OP_IMPL(create_list, 1, 2, 0, -2) {
+LIST_OP_IMPL(create_list, -2, 2, 0, -2) {
   int height = 0;
   bool expandable = false;
   if (block.numI() == 2) {
@@ -43,15 +43,18 @@ LIST_OP_IMPL(create_list, 1, 2, 0, -2) {
     expandable = true;
   }
 
+
+
+
   auto list = new NDArrayList(height, expandable);
   // we receive input array for graph integrity purposes only
-  auto input = INPUT_VARIABLE(0);
+  //mainly a marker for now, representing the fixed shape the elements can be
+
   setupResultList(list, block);
-  //            OVERWRITE_RESULT(list);
   auto scalar = NDArrayFactory::create_(list->counter());
   block.pushNDArrayToVariableSpace(block.getNodeId(), 1, scalar);
 
-  return sd::Status::OK;
+  return Status::OK;
 }
 DECLARE_SYN(TensorArrayV3, create_list);
 DECLARE_SYN(tensorarrayv3, create_list);

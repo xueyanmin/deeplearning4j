@@ -20,7 +20,11 @@
 
 package org.deeplearning4j.nn.conf.layers;
 
-import lombok.*;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
+
 import org.deeplearning4j.nn.api.ParamInitializer;
 import org.deeplearning4j.nn.conf.CNN2DFormat;
 import org.deeplearning4j.nn.conf.InputPreProcessor;
@@ -34,6 +38,7 @@ import org.deeplearning4j.nn.conf.preprocessor.FeedForwardToRnnPreProcessor;
 import org.deeplearning4j.nn.params.EmptyParamInitializer;
 import org.deeplearning4j.optimize.api.TrainingListener;
 import org.deeplearning4j.util.ValidationUtils;
+import org.nd4j.enums.RnnDataFormat;
 import org.nd4j.linalg.api.buffer.DataType;
 import org.nd4j.linalg.api.ndarray.INDArray;
 
@@ -45,7 +50,7 @@ import java.util.Map;
 public class GlobalPoolingLayer extends NoParamLayer {
 
     private PoolingType poolingType;
-    private int[] poolingDimensions;
+    private long[] poolingDimensions;
     private int pnorm;
     private boolean collapseDimensions = true;
 
@@ -98,6 +103,9 @@ public class GlobalPoolingLayer extends NoParamLayer {
             case RNN:
                 InputType.InputTypeRecurrent recurrent = (InputType.InputTypeRecurrent) inputType;
                 //Return 3d activations, with shape [minibatch, timeStepSize, 1]
+                if(collapseDimensions) {
+                    return InputType.feedForward(recurrent.getSize(), recurrent.getFormat());
+                }
                 return recurrent;
             case CNN:
                 InputType.InputTypeConvolutional conv = (InputType.InputTypeConvolutional) inputType;
@@ -127,12 +135,12 @@ public class GlobalPoolingLayer extends NoParamLayer {
 
     @Override
     public void setNIn(InputType inputType, boolean override) {
-        if(inputType.getType() == InputType.Type.CNN){
+        if(inputType.getType() == InputType.Type.CNN) {
             InputType.InputTypeConvolutional c = (InputType.InputTypeConvolutional) inputType;
             if(c.getFormat() == CNN2DFormat.NCHW){
-                poolingDimensions = new int[]{2,3};
+                poolingDimensions = new long[]{2,3};
             } else {
-                poolingDimensions = new int[]{1,2};
+                poolingDimensions = new long[]{1,2};
             }
         }
     }
@@ -216,7 +224,7 @@ public class GlobalPoolingLayer extends NoParamLayer {
          * width) Default for CNN3D data: pooling dimensions 2,3,4 (depth, height and width)
          *
          */
-        private int[] poolingDimensions;
+        private long[] poolingDimensions;
 
         /**
          * P-norm constant. Only used if using {@link PoolingType#PNORM} for the pooling type
@@ -255,7 +263,7 @@ public class GlobalPoolingLayer extends NoParamLayer {
          *
          * @param poolingDimensions Pooling dimensions to use
          */
-        public Builder poolingDimensions(int... poolingDimensions) {
+        public Builder poolingDimensions(long... poolingDimensions) {
             this.setPoolingDimensions(poolingDimensions);
             return this;
         }

@@ -26,7 +26,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>org.datavec</groupId>
+        <groupId>org.eclipse.deeplearning4j</groupId>
         <artifactId>datavec-parent</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
@@ -35,9 +35,22 @@
 
     <name>datavec-arrow</name>
 
+    <properties>
+        <module.name>datavec.arrow</module.name>
+    </properties>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.moditect</groupId>
+                <artifactId>moditect-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
     <dependencies>
         <dependency>
-            <groupId>org.datavec</groupId>
+            <groupId>org.eclipse.deeplearning4j</groupId>
             <artifactId>datavec-api</artifactId>
             <version>${project.version}</version>
         </dependency>
@@ -45,36 +58,14 @@
             <groupId>org.apache.arrow</groupId>
             <artifactId>arrow-vector</artifactId>
             <version>${arrow.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.google.code.findbugs</groupId>
+                    <artifactId>jsr305</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
-        <dependency>
-            <groupId>org.apache.arrow</groupId>
-            <artifactId>arrow-memory-unsafe</artifactId>
-            <version>${arrow.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.arrow</groupId>
-            <artifactId>arrow-format</artifactId>
-            <version>${arrow.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.nd4j</groupId>
-            <artifactId>nd4j-common-tests</artifactId>
-            <version>${project.version}</version>
-            <scope>test</scope>
-        </dependency>
     </dependencies>
 
-    <profiles>
-        <profile>
-            <id>nd4j-tests-cpu</id>
-        </profile>
-        <profile>
-            <id>nd4j-tests-cuda</id>
-        </profile>
-  <profile>
-            <id>nd4j-tests-aurora</id>
-        </profile>
-    </profiles>
 </project>

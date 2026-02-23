@@ -31,20 +31,37 @@ ConstantOffsetsBuffer::ConstantOffsetsBuffer(const std::shared_ptr<PointerWrappe
 
 ConstantOffsetsBuffer::ConstantOffsetsBuffer(const std::shared_ptr<PointerWrapper> &primary,
                                              const std::shared_ptr<PointerWrapper> &special) {
+  _magic = MAGIC_VALID;  // Mark as valid/constructed
   _primaryOffsets = primary;
   _specialOffsets = special;
 }
 
-const sd::LongType *ConstantOffsetsBuffer::primary() const {
-  return reinterpret_cast<sd::LongType *>(_primaryOffsets->pointer());
+ConstantOffsetsBuffer::ConstantOffsetsBuffer() {
+  _magic = MAGIC_VALID;  // Mark default-constructed objects as valid
+  // shared_ptr members are automatically initialized to nullptr
 }
 
-const sd::LongType *ConstantOffsetsBuffer::special() const {
-  return _specialOffsets ? reinterpret_cast<sd::LongType *>(_specialOffsets->pointer()) : nullptr;
+ConstantOffsetsBuffer::~ConstantOffsetsBuffer() {
+  _magic = 0xDEADBEEF;  // Mark as destroyed - helps detect use-after-free
 }
 
-const sd::LongType *ConstantOffsetsBuffer::platform() const {
-#ifdef __CUDABLAS__
+LongType *ConstantOffsetsBuffer::primary() {
+  // Check magic number first to detect use-after-free (dangling pointers)
+  if (!isValid()) {
+    THROW_EXCEPTION("ConstantOffsetsBuffer::primary: Object has been destroyed! Use-after-free detected (magic number check failed).");
+  }
+  if (_primaryOffsets == nullptr || !_primaryOffsets) {
+    THROW_EXCEPTION("ConstantOffsetsBuffer::primary: _primaryOffsets is nullptr! Buffer was likely already destroyed.");
+  }
+  return reinterpret_cast<LongType *>(_primaryOffsets->pointer());
+}
+
+LongType *ConstantOffsetsBuffer::special() {
+  return _specialOffsets ? reinterpret_cast<LongType *>(_specialOffsets->pointer()) : nullptr;
+}
+
+LongType *ConstantOffsetsBuffer::platform() {
+#ifdef SD_CUDA
   return special();
 #else
   return primary();

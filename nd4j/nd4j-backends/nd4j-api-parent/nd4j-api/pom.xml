@@ -20,13 +20,13 @@
   -->
 
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>org.nd4j</groupId>
+        <groupId>org.eclipse.deeplearning4j</groupId>
         <artifactId>nd4j-api-parent</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
@@ -36,13 +36,31 @@
     <name>nd4j-api</name>
 
     <properties>
-        <maven.compiler.source>1.8</maven.compiler.source>
-        <maven.compiler.target>1.8</maven.compiler.target>
         <byteunits.version>0.9.1</byteunits.version>
         <neoitertools.version>1.0.0</neoitertools.version>
+        <module.name>nd4j.api</module.name>
+        <cuda.version>12.3</cuda.version>
+        <cudnn.version>8.9</cudnn.version>
+        <libnd4j.platform>${javacpp.platform}</libnd4j.platform>
+        <libnd4j.extension></libnd4j.extension>
+        <libnd4j.chip></libnd4j.chip>
+        <libnd4j.classifier>${libnd4j.platform}</libnd4j.classifier>
     </properties>
 
+
+
     <dependencies>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+        </dependency>
+        <!-- Annotation scanning for discovering UDFs -->
+        <dependency>
+            <groupId>com.dorkbox</groupId>
+            <artifactId>Annotations</artifactId>
+            <version>3.2</version>
+        </dependency>
+
         <dependency>
             <groupId>com.jakewharton.byteunits</groupId>
             <artifactId>byteunits</artifactId>
@@ -72,7 +90,7 @@
         <!-- Note that this is shaded protobuf. We use this instead of google's version mainly due ot other systems packaging
         their own older (incompatible) protobuf versions-->
         <dependency>
-            <groupId>org.nd4j</groupId>
+            <groupId>org.eclipse.deeplearning4j</groupId>
             <artifactId>protobuf</artifactId>
             <version>${project.version}</version>
         </dependency>
@@ -86,9 +104,17 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
         </dependency>
+        <!-- Thi sis to redirect jackson logging to slf4j-->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>log4j-over-slf4j</artifactId>
+        </dependency>
+
+
+
         <!-- Shaded version of Jackson -->
         <dependency>
-            <groupId>org.nd4j</groupId>
+            <groupId>org.eclipse.deeplearning4j</groupId>
             <artifactId>jackson</artifactId>
             <version>${project.version}</version>
         </dependency>
@@ -109,30 +135,241 @@
             </exclusions>
         </dependency>
         <dependency>
-            <groupId>org.nd4j</groupId>
+            <groupId>org.eclipse.deeplearning4j</groupId>
             <artifactId>nd4j-common</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <dependency>
-            <groupId>ch.qos.logback</groupId>
-            <artifactId>logback-classic</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>ch.qos.logback</groupId>
-            <artifactId>logback-core</artifactId>
-            <scope>test</scope>
-        </dependency>
+
     </dependencies>
+
+    <profiles>
+        <!-- Mirror the same profile logic from libnd4j -->
+        <profile>
+            <id>chip</id>
+            <activation>
+                <property>
+                    <name>libnd4j.chip</name>
+                </property>
+            </activation>
+            <properties>
+                <libnd4j.classifier>${libnd4j.platform}-${libnd4j.chip}-${cuda.version}</libnd4j.classifier>
+            </properties>
+        </profile>
+
+        <profile>
+            <id>extension</id>
+            <activation>
+                <property>
+                    <name>libnd4j.extension</name>
+                </property>
+            </activation>
+            <properties>
+                <libnd4j.classifier>${libnd4j.platform}-${libnd4j.extension}</libnd4j.classifier>
+            </properties>
+        </profile>
+
+        <!-- The main profile that includes libnd4j -->
+        <profile>
+            <id>cpu</id>
+            <activation>
+                <activeByDefault>false</activeByDefault>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>org.eclipse.deeplearning4j</groupId>
+                    <artifactId>libnd4j</artifactId>
+                    <version>${project.version}</version>
+                    <classifier>${libnd4j.classifier}</classifier>
+                    <type>zip</type>
+                    <optional>true</optional>
+                </dependency>
+            </dependencies>
+        </profile>
+
+
+        <profile>
+            <id>cuda</id>
+            <activation>
+                <property>
+                    <name>libnd4j.generate.flatc</name>
+                    <value>true</value>
+                </property>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>org.eclipse.deeplearning4j</groupId>
+                    <artifactId>libnd4j</artifactId>
+                    <version>${project.version}</version>
+                    <type>zip</type>
+                    <classifier>${javacpp.platform}-cuda-${cuda.version}</classifier>
+                    <optional>true</optional>
+                </dependency>
+            </dependencies>
+        </profile>
+        <profile>
+            <activation>
+                <!-- By default protoc provided binaries don't need a protocCommand. One is downloaded. Protoc plugin does not support
+                protoc yet. This means we need to use a system protoc on non intel platforms. -->
+                <os>
+                    <arch>amd64</arch>
+                </os>
+            </activation>
+            <id>protoc-provided-binaries</id>
+
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.github.os72</groupId>
+                        <artifactId>protoc-jar-maven-plugin</artifactId>
+                        <version>${protoc-jar-maven-plugin.version}</version>
+                        <executions>
+                            <execution>
+                                <id>tensorflow</id>
+                                <phase>generate-sources</phase>
+                                <goals>
+                                    <goal>run</goal>
+                                </goals>
+                                <configuration>
+                                    <protocVersion>${google.protobuf.version}</protocVersion>
+                                    <extension>.proto</extension>
+                                    <includeDirectories>
+                                        <include>src/main/protobuf/tf</include>
+                                        <include>src/main/protobuf/onnx</include>
+                                        <include>src/main/protobuf/nd4j</include>
+                                    </includeDirectories>
+                                    <inputDirectories>
+                                        <include>src/main/protobuf/tf/tensorflow</include>
+                                        <include>src/main/protobuf/onnx</include>
+                                        <include>src/main/protobuf/nd4j</include>
+                                    </inputDirectories>
+                                    <addSources>main</addSources>
+                                    <cleanOutputFolder>false</cleanOutputFolder>
+                                    <outputDirectory>src/main/java/</outputDirectory>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+
+                    <plugin>
+                        <groupId>com.google.code.maven-replacer-plugin</groupId>
+                        <artifactId>replacer</artifactId>
+                        <version>${maven-replacer-plugin.version}</version>
+                        <configuration>
+                            <includes>
+                                <include>${project.build.sourceDirectory}/org/tensorflow/**</include>
+                                <include>${project.build.sourceDirectory}/tensorflow/**</include>
+                                <include>${project.build.sourceDirectory}/onnx/**</include>
+                                <include>${project.build.sourceDirectory}/org/nd4j/ir/**</include>
+                            </includes>
+                            <token>com.google.protobuf.</token>
+                            <value>org.nd4j.shade.protobuf.</value>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>replace-imports</id>
+                                <phase>generate-sources</phase>
+                                <goals>
+                                    <goal>replace</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+
+                </plugins>
+            </build>
+
+
+        </profile>
+
+
+
+        <!-- See: https://github.com/os72/protoc-jar/issues/93 We need to use a system compiled protoc since one is not provided
+        by the plugin.-->
+        <profile>
+            <id>osx-aarch64-protoc</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.github.os72</groupId>
+                        <artifactId>protoc-jar-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>tensorflow</id>
+                                <phase>generate-sources</phase>
+                                <goals>
+                                    <goal>run</goal>
+                                </goals>
+                                <configuration>
+                                    <protocVersion>${google.protobuf.version}</protocVersion>
+                                    <extension>.proto</extension>
+                                    <includeDirectories>
+                                        <include>src/main/protobuf/tf</include>
+                                        <include>src/main/protobuf/onnx</include>
+                                        <include>src/main/protobuf/nd4j</include>
+                                    </includeDirectories>
+                                    <inputDirectories>
+                                        <include>src/main/protobuf/tf/tensorflow</include>
+                                        <include>src/main/protobuf/onnx</include>
+                                        <include>src/main/protobuf/nd4j</include>
+                                    </inputDirectories>
+                                    <addSources>main</addSources>
+                                    <cleanOutputFolder>false</cleanOutputFolder>
+                                    <outputDirectory>src/main/java/</outputDirectory>
+                                    <protocCommand>protoc</protocCommand> <!-- brew install protobuf -->
+                                </configuration>
+                            </execution>
+
+                        </executions>
+                    </plugin>
+
+                    <plugin>
+                        <groupId>com.google.code.maven-replacer-plugin</groupId>
+                        <artifactId>replacer</artifactId>
+                        <version>${maven-replacer-plugin.version}</version>
+                        <configuration>
+                            <includes>
+                                <include>${project.build.sourceDirectory}/org/tensorflow/**</include>
+                                <include>${project.build.sourceDirectory}/tensorflow/**</include>
+                                <include>${project.build.sourceDirectory}/onnx/**</include>
+                                <include>${project.build.sourceDirectory}/org/nd4j/ir/**</include>
+                            </includes>
+                            <token>com.google.protobuf.</token>
+                            <value>org.nd4j.shade.protobuf.</value>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>replace-imports</id>
+                                <phase>generate-sources</phase>
+                                <goals>
+                                    <goal>replace</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+
+                </plugins>
+            </build>
+            <activation>
+                <os>
+                    <name>mac os x</name>
+                    <arch>aarch64</arch>
+                    <family>mac</family>
+                </os>
+            </activation>
+        </profile>
+    </profiles>
 
     <build>
         <plugins>
-            <!-- AB 2019/08/24 This plugin is to be added TEMPORARILY due to a change in the filenames of the generated ONNX -->
-            <!-- Normal "mvn clean" etc won't delete these files, and any users who have built ND4J even once before the
-                 change will run into a compilation error. This can be removed after a few weeks.-->
+            <plugin>
+                <groupId>org.moditect</groupId>
+                <artifactId>moditect-maven-plugin</artifactId>
+            </plugin>
+
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-antrun-plugin</artifactId>
+                <version>${maven-antrun-plugin.version}</version>
                 <executions>
                     <execution>
                         <phase>generate-sources</phase>
@@ -142,47 +379,17 @@
                         <configuration>
                             <target>
                                 <delete
-                                    file="${project.build.sourceDirectory}/onnx/OnnxMlProto3.java"/>
+                                        file="${project.build.sourceDirectory}/onnx/OnnxMlProto3.java"/>
                                 <delete
-                                    file="${project.build.sourceDirectory}/onnx/OnnxOperatorsProto3.java"/>
+                                        file="${project.build.sourceDirectory}/onnx/OnnxOperatorsProto3.java"/>
                                 <delete
-                                    file="${project.build.sourceDirectory}/onnx/OnnxProto3.java"/>
+                                        file="${project.build.sourceDirectory}/onnx/OnnxProto3.java"/>
                             </target>
                         </configuration>
                     </execution>
                 </executions>
             </plugin>
-            <plugin>
-                <groupId>com.github.os72</groupId>
-                <artifactId>protoc-jar-maven-plugin</artifactId>
-                <version>${protoc-jar-maven-plugin.version}</version>
-                <executions>
-                    <execution>
-                        <id>tensorflow</id>
-                        <phase>generate-sources</phase>
-                        <goals>
-                            <goal>run</goal>
-                        </goals>
-                        <configuration>
-                            <protocVersion>${protoc-jar-maven-plugin.version}</protocVersion>
-                            <extension>.proto</extension>
-                            <includeDirectories>
-                                <include>src/main/protobuf/tf</include>
-                                <include>src/main/protobuf/onnx</include>
-                                <include>src/main/protobuf/nd4j</include>
-                            </includeDirectories>
-                            <inputDirectories>
-                                <include>src/main/protobuf/tf/tensorflow</include>
-                                <include>src/main/protobuf/onnx</include>
-                                <include>src/main/protobuf/nd4j</include>
-                            </inputDirectories>
-                            <addSources>main</addSources>
-                            <cleanOutputFolder>false</cleanOutputFolder>
-                            <outputDirectory>src/main/java/</outputDirectory>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
+
             <plugin>
                 <groupId>com.google.code.maven-replacer-plugin</groupId>
                 <artifactId>replacer</artifactId>
@@ -207,33 +414,8 @@
                     </execution>
                 </executions>
             </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-jar-plugin</artifactId>
-                <version>3.2.0</version>
-                <configuration>
-                    <archive>
-                        <manifest>
-                            <addDefaultImplementationEntries>
-                                true
-                            </addDefaultImplementationEntries>
-                        </manifest>
-                    </archive>
-                </configuration>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>test-jar</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
         </plugins>
     </build>
 
-    <profiles>
-        <profile>
-            <id>testresources</id>
-        </profile>
-    </profiles>
+
 </project>

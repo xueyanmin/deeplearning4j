@@ -20,8 +20,15 @@
 
 package org.nd4j.autodiff.samediff;
 
-import lombok.*;
+import lombok.AccessLevel;
+import lombok.Data;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.NonNull;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import lombok.val;
+
 import org.nd4j.autodiff.functions.DifferentialFunction;
 import org.nd4j.autodiff.samediff.internal.SameDiffOp;
 import org.nd4j.autodiff.samediff.internal.Variable;
@@ -29,8 +36,13 @@ import org.nd4j.common.base.Preconditions;
 import org.nd4j.linalg.api.blas.params.MMulTranspose;
 import org.nd4j.linalg.api.buffer.DataType;
 import org.nd4j.linalg.api.ndarray.INDArray;
+import org.nd4j.linalg.api.ops.BaseOp;
+import org.nd4j.linalg.api.ops.CustomOp;
+import org.nd4j.linalg.api.ops.DynamicCustomOp;
+import org.nd4j.linalg.api.ops.impl.shape.CreateView;
 import org.nd4j.linalg.api.shape.LongShapeDescriptor;
 import org.nd4j.common.util.ArrayUtil;
+import org.nd4j.linalg.factory.Nd4j;
 import org.nd4j.weightinit.WeightInitScheme;
 
 import java.io.Serializable;
@@ -60,14 +72,13 @@ public class SDVariable implements Serializable {
 
     private DifferentialFunction creator;
 
-    // autogen_tag::sdvars::start
 
 
     public SDVariable(@NonNull String varName, @NonNull VariableType varType, @NonNull SameDiff sameDiff, long[] shape, DataType dataType){
         if(varType != VariableType.PLACEHOLDER)
             Preconditions.checkState(dataType != DataType.UNKNOWN, "Unknown datatype is not allowed for SDVariables (variable name: %s)", varName);
-
-        varName = sameDiff.generateNewVarName(varName, 0, true);
+        if(varName == null)
+            varName = sameDiff.generateNewVarName(varName, 0, true);
 
         this.sameDiff = sameDiff;
         this.varName = varName;
@@ -122,7 +133,6 @@ public class SDVariable implements Serializable {
     }
 
 
-    // autogen_tag::sdvars::end
     /**
      * A getter for the allocated ndarray with this {@link SDVariable}.
      *
@@ -135,22 +145,72 @@ public class SDVariable implements Serializable {
      * @return the {@link INDArray} associated with this variable.
      */
     public INDArray getArr(boolean enforceExistence) {
+        // First check if array already exists in any holder
         if(sameDiff.arrayAlreadyExistsForVarName(getVarName()))
             return sameDiff.getArrForVarName(getVarName());
+
         if(variableType == VariableType.ARRAY && enforceExistence) {
-            throw new UnsupportedOperationException("Cannot get array for ARRAY type SDVariable - use SDVariable.exec or SameDiff.output instead");
-        } else if(variableType == VariableType.ARRAY) {
+            // For ARRAY types in eager mode, try to compute if inputs are ready
             if(sameDiff.isEagerMode()) {
+                Variable varMeta = sameDiff.getVariables().get(getVarName());
+                if(varMeta != null && varMeta.getOutputOfOp() != null) {
+                    if(areInputsReady(varMeta)) {
+                        return computeArrayEagerly();
+                    }
+                }
+            }
+            throw new UnsupportedOperationException("Cannot get array for ARRAY type SDVariable - use SDVariable.exec or SameDiff.output instead");
+        }else if(variableType == VariableType.ARRAY) {
+            if(sameDiff.isEagerMode()) {
+                Variable varMeta = sameDiff.getVariables().get(getVarName());
+                if(varMeta != null && varMeta.getOutputOfOp() != null) {
+                    // Add import detection here
+                    if(sameDiff.isInGraphBuildingMode()) {
+                        return null; // Don't compute during import
+                    }
+
+                    if(areInputsReady(varMeta)) {
+                        return computeArrayEagerly();
+                    }
+                }
                 return sameDiff.getEagerArrForVarName(name());
             }
             return null;
         }
 
         INDArray ret = sameDiff.getArrForVarName(getVarName());
-        if(enforceExistence && ret == null){
+        if(enforceExistence && ret == null) {
             throw new IllegalStateException("No array exists for variable \"" + name() + "\"");
         }
         return ret;
+    }
+
+    public INDArray computeArrayEagerly() {
+        if (variableType != VariableType.ARRAY) {
+            return null;
+        }
+
+        Variable varMeta = sameDiff.getVariables().get(varName);
+        if (varMeta == null || varMeta.getOutputOfOp() == null) {
+            return null;
+        }
+
+        // Delegate everything to operation-level execution
+        return sameDiff.computeOperationEagerly(varMeta.getOutputOfOp(), varName);
+    }
+
+    private boolean areInputsReady(Variable varMeta) {
+        if(varMeta.getOutputOfOp() == null) return false;
+
+        SameDiffOp op = sameDiff.getOps().get(varMeta.getOutputOfOp());
+        if(op == null || op.getInputsToOp() == null) return false;
+
+        for(String inputName : op.getInputsToOp()) {
+            if(!sameDiff.arrayAlreadyExistsForVarName(inputName)) {
+                return false;
+            }
+        }
+        return true;
     }
 
 
@@ -176,8 +236,6 @@ public class SDVariable implements Serializable {
      * created automatically when training is performed.
      */
     public SDVariable getGradient() {
-        Preconditions.checkState(dataType().isFPType(), "Cannot get gradient of %s datatype variable \"%s\": only floating" +
-                " point variables have gradients", dataType(), getVarName());
         return sameDiff.getGradForVariable(getVarName());
     }
 
@@ -187,7 +245,7 @@ public class SDVariable implements Serializable {
      * @return Shape of the variable
      */
     public long[] getShape() {
-        if (variableType == VariableType.PLACEHOLDER  || sameDiff.isEagerMode() && shape != null) {
+        if (variableType == VariableType.PLACEHOLDER  || shape != null) {
             return shape;
         } else if(variableType == VariableType.VARIABLE || variableType == VariableType.CONSTANT) {
             if(getArr() != null)
@@ -197,7 +255,7 @@ public class SDVariable implements Serializable {
         return null;
     }
 
-    public void setShape(long... shape){
+    public void setShape(long... shape) {
         this.shape = shape;
     }
 
@@ -210,15 +268,64 @@ public class SDVariable implements Serializable {
     }
 
     public DataType dataType() {
-        if(this.dataType == null){
+        if(this.dataType == null) {
             //Try to infer datatype instead of returning null
-            if(variableType != VariableType.ARRAY && getArr() != null){
+            if(variableType != VariableType.ARRAY && getArr() != null) {
                 this.dataType = getArr().dataType();
+            }  else {
+                this.dataType = DataType.UNKNOWN;
             }
         }
 
         return this.dataType;
     }
+
+
+    // Add this helper method inside the SDVariable class
+    private SDVariable handleRename(SDVariable resultVariable, String requestedName) {
+        // No rename needed if name is null or already matches
+        if (requestedName == null || requestedName.equals(resultVariable.name())) {
+            return resultVariable;
+        }
+
+        // Ensure the result variable and its metadata exist in the associated SameDiff instance
+        Variable resultVarMeta = this.sameDiff.getVariables().get(resultVariable.name());
+        if (resultVarMeta == null) {
+            // This might happen if the variable wasn't properly added to the map initially
+            log.warn("Internal metadata for result variable '{}' not found during potential rename to '{}'. " +
+                            "Returning variable with default name '{}'. Graph state might be inconsistent.",
+                    resultVariable.name(), requestedName, resultVariable.name());
+            return resultVariable;
+        }
+
+        // Find the operation that produced this result variable
+        String producingOpName = resultVarMeta.getOutputOfOp();
+        if (producingOpName == null) {
+            // Variables like placeholders or constants might not have a producing op
+            log.warn("Result variable '{}' does not have a producing op recorded. Cannot perform graph-aware rename to '{}'. " +
+                            "Returning variable with default name '{}'.",
+                    resultVariable.name(), requestedName, resultVariable.name());
+            // Attempting a basic rename without full context might be possible but risky.
+            // For safety, we return without renaming if the producing op isn't known.
+            return resultVariable;
+        }
+
+        // Get the SameDiffOp instance for the producer
+        SameDiffOp producingOp = this.sameDiff.getOps().get(producingOpName);
+        if (producingOp == null) {
+            // The op that supposedly produced the variable isn't in the ops map - inconsistency!
+            log.warn("Could not find the producing op instance '{}' (referenced by variable '{}') during potential rename to '{}'. " +
+                            "Returning variable with default name '{}'. Graph state might be inconsistent.",
+                    producingOpName, resultVariable.name(), requestedName, resultVariable.name());
+            return resultVariable;
+        }
+
+        // Perform the rename using the specific overload that takes the producing op
+        // The 'false' argument means 'exactName=false', allowing generation of unique names if 'requestedName' clashes
+        log.debug("Renaming variable '{}' produced by op '{}' to requested name '{}'", resultVariable.name(), producingOpName, requestedName);
+        return this.sameDiff.updateVariableNameAndReference(producingOp, resultVariable, requestedName, false);
+    }
+
 
     public LongShapeDescriptor getShapeDescriptor() {
         return LongShapeDescriptor.fromShape(getShape(), this.dataType());
@@ -547,9 +654,9 @@ public class SDVariable implements Serializable {
 
 
     /**
-     * See {@link #dot(String, SDVariable, int...)}
+     * See {@link #dot(String, SDVariable, long...)}
      */
-    public SDVariable dot(SDVariable other, int... dimensions){
+    public SDVariable dot(SDVariable other, long... dimensions){
         return dot(null, other, dimensions);
     }
 
@@ -560,7 +667,7 @@ public class SDVariable implements Serializable {
      * @param other Other variable to perform matrix multiplication with
      * @return Output variable (result of mmul)
      */
-    public SDVariable dot(String name, SDVariable other, int... dimensions){
+    public SDVariable dot(String name, SDVariable other, long... dimensions){
         return sameDiff.dot(name, this, other, dimensions);
     }
 
@@ -928,23 +1035,23 @@ public class SDVariable implements Serializable {
     }
 
     /**
-     * See {@link #sum(String, boolean, int...)}
+     * See {@link #sum(String, boolean, long...)}
      */
-    public SDVariable sum(int... dimensions){
+    public SDVariable sum(long... dimensions){
         return sum(null, dimensions);
     }
 
     /**
-     * See {@link #sum(String, boolean, int...)}
+     * See {@link #sum(String, boolean, long...)}
      */
-    public SDVariable sum(boolean keepDims, int... dimensions){
+    public SDVariable sum(boolean keepDims, long... dimensions){
         return sum(null, keepDims, dimensions);
     }
 
     /**
-     * See {@link #sum(String, boolean, int...)}
+     * See {@link #sum(String, boolean, long...)}
      */
-    public SDVariable sum(String name, int... dimensions){
+    public SDVariable sum(String name, long... dimensions){
         return sum(name, false, dimensions);
     }
 
@@ -963,28 +1070,28 @@ public class SDVariable implements Serializable {
      * @return Output variable: reduced array of rank (input rank - num dimensions) if keepDims = false, or
      * of rank (input rank) if keepdims = true
      */
-    public SDVariable sum(String name, boolean keepDims, int... dimensions){
+    public SDVariable sum(String name, boolean keepDims, long... dimensions){
         return sameDiff.sum(name, this, keepDims, dimensions);
     }
 
     /**
-     * See {@link #mean(String, boolean, int...)}
+     * See {@link #mean(String, boolean, long...)}
      */
-    public SDVariable mean(boolean keepDims, int... dimensions){
+    public SDVariable mean(boolean keepDims, long... dimensions){
         return mean(null, keepDims, dimensions);
     }
 
     /**
-     * See {@link #mean(String, boolean, int...)}
+     * See {@link #mean(String, boolean, long...)}
      */
-    public SDVariable mean(String name, int... dimensions){
+    public SDVariable mean(String name, long... dimensions){
         return mean(name, false, dimensions);
     }
 
     /**
-     * See {@link #mean(String, boolean, int...)}
+     * See {@link #mean(String, boolean, long...)}
      */
-    public SDVariable mean(int... dimensions){
+    public SDVariable mean(long... dimensions){
         return mean(null, false, dimensions);
     }
 
@@ -1003,21 +1110,21 @@ public class SDVariable implements Serializable {
      * @param dimensions Dimensions to reduce over. If dimensions are not specified, full array reduction is performed
      * @return Reduced array of rank (input rank - num dimensions)
      */
-    public SDVariable mean(String name, boolean keepDims, int... dimensions){
+    public SDVariable mean(String name, boolean keepDims, long... dimensions){
         return sameDiff.mean(name, this, keepDims, dimensions);
     }
 
     /**
-     * See {@link #std(String, boolean, boolean, int...)}
+     * See {@link #std(String, boolean, boolean, long...)}
      */
-    public SDVariable std(boolean biasCorrected, int... dimensions){
+    public SDVariable std(boolean biasCorrected, long... dimensions){
         return std(null, biasCorrected, dimensions);
     }
 
     /**
-     * See {@link #std(String, boolean, boolean, int...)}
+     * See {@link #std(String, boolean, boolean, long...)}
      */
-    public SDVariable std(String name, boolean biasCorrected, int... dimensions){
+    public SDVariable std(String name, boolean biasCorrected, long... dimensions){
         return sameDiff.standardDeviation(name, this, biasCorrected, dimensions);
     }
 
@@ -1035,28 +1142,28 @@ public class SDVariable implements Serializable {
      * @param dimensions    Dimensions to reduce over. If dimensions are not specified, full array reduction is performed
      * @return Output variable: reduced array of rank (input rank - num dimensions)
      */
-    public SDVariable std(String name, boolean biasCorrected, boolean keepDims, int... dimensions){
+    public SDVariable std(String name, boolean biasCorrected, boolean keepDims, long... dimensions){
         return sameDiff.standardDeviation(name, this, biasCorrected, keepDims, dimensions);
     }
 
     /**
-     * See {@link #prod(String, boolean, int...)}
+     * See {@link #prod(String, boolean, long...)}
      */
-    public SDVariable prod(int... dimensions){
+    public SDVariable prod(long... dimensions){
         return prod(null, dimensions);
     }
 
     /**
-     * See {@link #prod(String, boolean, int...)}
+     * See {@link #prod(String, boolean, long...)}
      */
-    public SDVariable prod(boolean keepDims, int... dimensions){
+    public SDVariable prod(boolean keepDims, long... dimensions){
         return prod(null, keepDims, dimensions);
     }
 
     /**
-     * See {@link #prod(String, boolean, int...)}
+     * See {@link #prod(String, boolean, long...)}
      */
-    public SDVariable prod(String name, int... dimensions){
+    public SDVariable prod(String name, long... dimensions){
         return sameDiff.prod(name, this, dimensions);
     }
 
@@ -1074,28 +1181,28 @@ public class SDVariable implements Serializable {
      * @param dimensions Dimensions to reduce over. If dimensions are not specified, full array reduction is performed
      * @return Output variable: reduced array of rank (input rank - num dimensions)
      */
-    public SDVariable prod(String name, boolean keepDims, int... dimensions){
+    public SDVariable prod(String name, boolean keepDims, long... dimensions){
         return sameDiff.prod(name, this, keepDims, dimensions);
     }
 
     /**
-     * See {@link #min(String, boolean, int...)}
+     * See {@link #min(String, boolean, long...)}
      */
-    public SDVariable min(int... dimensions){
+    public SDVariable min(long... dimensions){
         return min(null, dimensions);
     }
 
     /**
-     * See {@link #min(String, boolean, int...)}
+     * See {@link #min(String, boolean, long...)}
      */
-    public SDVariable min(boolean keepDims, int... dimensions){
+    public SDVariable min(boolean keepDims, long... dimensions){
         return min(null, keepDims, dimensions);
     }
 
     /**
-     * See {@link #min(String, boolean, int...)}
+     * See {@link #min(String, boolean, long...)}
      */
-    public SDVariable min(String name, int... dimensions){
+    public SDVariable min(String name, long... dimensions){
         return min(name, false, dimensions);
     }
 
@@ -1113,28 +1220,28 @@ public class SDVariable implements Serializable {
      * @param dimensions Dimensions to reduce over. If dimensions are not specified, full array reduction is performed
      * @return Reduced array of rank (input rank - num dimensions)
      */
-    public SDVariable min(String name, boolean keepDims, int... dimensions){
+    public SDVariable min(String name, boolean keepDims, long... dimensions){
         return sameDiff.min(name, this, keepDims, dimensions);
     }
 
     /**
-     * See {@link #max(String, boolean, int...)}
+     * See {@link #max(String, boolean, long...)}
      */
-    public SDVariable max(int... dimensions) {
+    public SDVariable max(long... dimensions) {
         return max(null, dimensions);
     }
 
     /**
-     * See {@link #max(String, boolean, int...)}
+     * See {@link #max(String, boolean, long...)}
      */
-    public SDVariable max(String name, int... dimensions) {
+    public SDVariable max(String name, long... dimensions) {
         return max(name, false, dimensions);
     }
 
     /**
-     * See {@link #max(String, boolean, int...)}
+     * See {@link #max(String, boolean, long...)}
      */
-    public SDVariable max(boolean keepDims, int... dimensions) {
+    public SDVariable max(boolean keepDims, long... dimensions) {
         return max(null, keepDims, dimensions);
     }
 
@@ -1152,28 +1259,28 @@ public class SDVariable implements Serializable {
      * @param dimensions Dimensions to reduce over. If dimensions are not specified, full array reduction is performed
      * @return Reduced array of rank (input rank - num dimensions)
      */
-    public SDVariable max(String name, boolean keepDims, int... dimensions) {
+    public SDVariable max(String name, boolean keepDims, long... dimensions) {
         return sameDiff.max(name, this, keepDims, dimensions);
     }
 
     /**
-     * See {@link #norm1(String, boolean, int...)}
+     * See {@link #norm1(String, boolean, long...)}
      */
-    public SDVariable norm1(int... dimensions){
+    public SDVariable norm1(long... dimensions){
         return norm1(null, dimensions);
     }
 
     /**
-     * See {@link #norm1(String, boolean, int...)}
+     * See {@link #norm1(String, boolean, long...)}
      */
-    public SDVariable norm1(boolean keepDims, int... dimensions){
+    public SDVariable norm1(boolean keepDims, long... dimensions){
         return norm1(null, keepDims, dimensions);
     }
 
     /**
-     * See {@link #norm1(String, boolean, int...)}
+     * See {@link #norm1(String, boolean, long...)}
      */
-    public SDVariable norm1(String name, int... dimensions){
+    public SDVariable norm1(String name, long... dimensions){
         return norm1(name, false, dimensions);
     }
 
@@ -1192,28 +1299,28 @@ public class SDVariable implements Serializable {
      * @param dimensions dimensions to reduce over
      * @return Output variable
      */
-    public SDVariable norm1(String name, boolean keepDims, int... dimensions) {
+    public SDVariable norm1(String name, boolean keepDims, long... dimensions) {
         return sameDiff.norm1(name, this, keepDims, dimensions);
     }
 
     /**
-     * See {@link #norm2(String, boolean, int...)}
+     * See {@link #norm2(String, boolean, long...)}
      */
-    public SDVariable norm2(int... dimensions){
+    public SDVariable norm2(long... dimensions){
         return norm2(null, dimensions);
     }
 
     /**
-     * See {@link #norm2(String, boolean, int...)}
+     * See {@link #norm2(String, boolean, long...)}
      */
-    public SDVariable norm2(boolean keepDims, int... dimensions){
+    public SDVariable norm2(boolean keepDims, long... dimensions){
         return norm2(null, keepDims, dimensions);
     }
 
     /**
-     * See {@link #norm2(String, boolean, int...)}
+     * See {@link #norm2(String, boolean, long...)}
      */
-    public SDVariable norm2(String name, int... dimensions){
+    public SDVariable norm2(String name, long... dimensions){
         return norm2(name, false, dimensions);
     }
 
@@ -1232,28 +1339,28 @@ public class SDVariable implements Serializable {
      * @param dimensions dimensions to reduce over
      * @return Output variable
      */
-    public SDVariable norm2(String name, boolean keepDims, int... dimensions){
+    public SDVariable norm2(String name, boolean keepDims, long... dimensions){
         return sameDiff.norm2(name, this, keepDims, dimensions);
     }
 
     /**
-     * See {@link #normmax(String, boolean, int...)}
+     * See {@link #normmax(String, boolean, long...)}
      */
-    public SDVariable normmax(int... dimensions){
+    public SDVariable normmax(long... dimensions){
         return normmax(null, dimensions);
     }
 
     /**
-     * See {@link #normmax(String, boolean, int...)}
+     * See {@link #normmax(String, boolean, long...)}
      */
-    public SDVariable normmax(boolean keepDims, int... dimensions){
+    public SDVariable normmax(boolean keepDims, long... dimensions){
         return normmax(null, keepDims, dimensions);
     }
 
     /**
-     * See {@link #normmax(String, boolean, int...)}
+     * See {@link #normmax(String, boolean, long...)}
      */
-    public SDVariable normmax(String name, int... dimensions){
+    public SDVariable normmax(String name, long... dimensions){
         return normmax(name, false, dimensions);
     }
 
@@ -1273,21 +1380,21 @@ public class SDVariable implements Serializable {
      * @param dimensions dimensions to reduce over
      * @return Output variable
      */
-    public SDVariable normmax(String name, boolean keepDims, int... dimensions){
+    public SDVariable normmax(String name, boolean keepDims, long... dimensions){
         return sameDiff.normmax(name, this, keepDims, dimensions);
     }
 
     /**
-     * See {@link #argmax(String, boolean, int...)}
+     * See {@link #argmax(String, boolean, long...)}
      */
-    public SDVariable argmax(int... dimensions){
+    public SDVariable argmax(long... dimensions){
         return argmax(null, dimensions);
     }
 
     /**
-     * See {@link #argmax(String, boolean, int...)}
+     * See {@link #argmax(String, boolean, long...)}
      */
-    public SDVariable argmax(String name, int... dimensions){
+    public SDVariable argmax(String name, long... dimensions){
         return sameDiff.argmax(name, this, dimensions);
     }
 
@@ -1308,21 +1415,21 @@ public class SDVariable implements Serializable {
      * @return Output variable: reduced array of rank (input rank - num dimensions) if keepDims = false, or
      * of rank (input rank) if keepdims = true
      */
-    public SDVariable argmax(String name, boolean keepDims, int... dimensions) {
+    public SDVariable argmax(String name, boolean keepDims, long... dimensions) {
         return sameDiff.argmax(name, this, keepDims, dimensions);
     }
 
     /**
-     * See {@link #argmin(String, boolean, int...)}
+     * See {@link #argmin(String, boolean, long...)}
      */
-    public SDVariable argmin(int... dimensions){
+    public SDVariable argmin(long... dimensions){
         return argmin(null, dimensions);
     }
 
     /**
-     * See {@link #argmin(String, boolean, int...)}
+     * See {@link #argmin(String, boolean, long...)}
      */
-    public SDVariable argmin(String name, int... dimensions){
+    public SDVariable argmin(String name, long... dimensions){
         return sameDiff.argmin(name, this, dimensions);
     }
 
@@ -1343,15 +1450,24 @@ public class SDVariable implements Serializable {
      * @return Output variable: reduced array of rank (input rank - num dimensions) if keepDims = false, or
      * of rank (input rank) if keepdims = true
      */
-    public SDVariable argmin(String name, boolean keepDims, int... dimensions) {
+    public SDVariable argmin(String name, boolean keepDims, long... dimensions) {
         return sameDiff.argmax(name, this, keepDims, dimensions);
+    }
+
+
+    /**
+     * Return the total number of elements in this array
+     * @return
+     */
+    public SDVariable length() {
+        return sameDiff.prod(shape());
     }
 
     /**
      * Get the shape of the array as a dynamic SDVariable
      * @return Shape SDVariable
      */
-    public SDVariable shape(){
+    public SDVariable shape() {
         return sameDiff.shape(this);
     }
 
@@ -1371,8 +1487,20 @@ public class SDVariable implements Serializable {
      * @param newShape New shape for variable
      * @return Output variable
      */
-    public SDVariable reshape(SDVariable newShape){
+    public SDVariable reshape(SDVariable newShape) {
         return sameDiff.reshape(this, newShape);
+    }
+
+    /**
+     * Reshape the current variable to the specified (dynamic) shape. The output variable will have the same values as the
+     * input, but with the specified shape.<br>
+     * Note that prod(shape) must match length(input) == prod(input.shape)
+     *
+     * @param newShape New shape for variable
+     * @return Output variable
+     */
+    public SDVariable reshape(String name,SDVariable newShape) {
+        return sameDiff.reshape(name,this, newShape);
     }
 
     /**
@@ -1406,7 +1534,7 @@ public class SDVariable implements Serializable {
      * @param dimensions The new dimension order
      * @return Output variable (permuted input)
      */
-    public SDVariable permute(int... dimensions){
+    public SDVariable permute(long... dimensions){
         return sameDiff.permute(this, dimensions);
     }
 
@@ -1470,12 +1598,12 @@ public class SDVariable implements Serializable {
             SameDiffOp oCD = sameDiff.getOps().get(vCD.getOutputOfOp());
 
             if(oThis.getControlDeps() == null)
-                oThis.setControlDeps(new ArrayList<String>());
+                oThis.setControlDeps(new ArrayList<>());
             if(!oThis.getControlDeps().contains(oCD.getName()))
                 oThis.getControlDeps().add(oCD.getName());
 
             if(oCD.getControlDepFor() == null)
-                oCD.setControlDepFor(new ArrayList<String>());
+                oCD.setControlDepFor(new ArrayList<>());
             if(!oCD.getControlDepFor().contains(oThis.getName()))
                 oCD.getControlDepFor().add(oThis.getName());
         } else {
@@ -1484,29 +1612,71 @@ public class SDVariable implements Serializable {
                 SameDiffOp oThis = sameDiff.getOps().get(vThis.getOutputOfOp());
 
                 if(oThis.getVarControlDeps() == null)
-                    oThis.setVarControlDeps(new ArrayList<String>());
+                    oThis.setVarControlDeps(new ArrayList<>());
 
                 if(!oThis.getVarControlDeps().contains(vCD.getName()))
                     oThis.getVarControlDeps().add(vCD.getName());
 
                 if(vCD.getControlDepsForOp() == null)
-                    vCD.setControlDepsForOp(new ArrayList<String>());
+                    vCD.setControlDepsForOp(new ArrayList<>());
                 if(!vCD.getControlDepsForOp().contains(oThis.getName()))
                     vCD.getControlDepsForOp().add(oThis.getName());
             } else {
                 //const/ph -> const/ph case
                 if(vThis.getControlDeps() == null)
-                    vThis.setControlDeps(new ArrayList<String>());
+                    vThis.setControlDeps(new ArrayList<>());
                 if(!vThis.getControlDeps().contains(vCD.getName()))
                     vThis.getControlDeps().add(vCD.getName());
 
                 if(vCD.getControlDepsForVar() == null)
-                    vCD.setControlDepsForVar(new ArrayList<String>());
+                    vCD.setControlDepsForVar(new ArrayList<>());
                 if(!vCD.getControlDepsForVar().contains(vThis.getName()))
                     vCD.getControlDepsForVar().add(vThis.getName());
             }
         }
     }
+
+
+
+    /**
+     * Get a variable with content equal to a specified sub-array of this variable.<br>
+     * Can be used (for example) to get rows, columns, sub-matrices, etc.
+     * @param indices Indices to get
+     * @return Sub-array variable
+     */
+    public SDVariable getView(SDIndex... indices) {
+        //copy because we can mutate this internally
+        SDVariable[] indicesVars = new SDVariable[indices.length];
+        for(int i = 0; i < indices.length; i++) {
+            //convert indices to SDVariable based indices
+            switch(indices[i].getIndexType()) {
+                case INTERVAL:
+                    indicesVars[i] = CreateView.createInterval(sameDiff,indices[i].getIntervalBegin(),indices[i].getIntervalEnd(),indices[i].getIntervalStrides(),indices[i].isInclusive()  ? 1 : 0);
+                    break;
+                case POINT:
+                    indicesVars[i] = CreateView.createPoint(sameDiff,indices[i].getPointIndex());
+                    break;
+                case POINT_INPUT:
+                    indicesVars[i] = CreateView.createPoint(sameDiff,indices[i].getPointVar());
+                    break;
+                case INTERVAL_INPUT:
+                    indicesVars[i] = CreateView.createInterval(sameDiff,indices[i].getIntervalInputBegin(),indices[i].getIntervalInputEnd(),indices[i].getIntervalStrideInput(), indices[i].getInclusiveInput());
+                    break;
+                case ALL:
+                    indicesVars[i] = CreateView.createAll(sameDiff);
+                    break;
+
+                default:
+                    throw new IllegalArgumentException("Illegal type " + indices[i].getIndexType());
+
+            }
+
+        }
+
+        return sameDiff.createView(this,indicesVars);
+
+    }
+
 
     /**
      * Get a variable with content equal to a specified sub-array of this variable.<br>
@@ -1516,12 +1686,40 @@ public class SDVariable implements Serializable {
      */
     public SDVariable get(SDIndex... indices) {
         int ndims = indices.length;
+        boolean variableIndices = false;
+        //copy because we can mutate this internally
+        SDIndex[] inputIndices = Arrays.copyOf(indices,indices.length);
+        indices = inputIndices;
+        for(int i = 0; i < indices.length; i++) {
+            if(indices[i].getIndexType() == SDIndex.IndexType.POINT_INPUT || indices[i].getIndexType() == SDIndex.IndexType.INTERVAL_INPUT) {
+                variableIndices = true;
+            }
+
+            //convert indices to SDVariable based indices
+            if(variableIndices && (indices[i].getIndexType() == SDIndex.IndexType.INTERVAL || indices[i].getIndexType() == SDIndex.IndexType.POINT)) {
+                switch(indices[i].getIndexType()) {
+                    case INTERVAL:
+                        indices[i] = SDIndex.interval(sameDiff.constant(indices[i].getIntervalBegin()),sameDiff.constant(indices[i].getIntervalEnd()),sameDiff.constant(indices[i].getIntervalStrides()));
+                        break;
+                    case POINT:
+                        indices[i] = SDIndex.point(sameDiff.constant(indices[i].getPointIndex()),indices[i].isPointKeepDim());
+                        break;
+                }
+            }
+        }
+
         long[] begin = new long[ndims];
         long[] end = new long[ndims];
         long[] strides = new long[ndims];
         int[] begin_mask_arr = new int[ndims];
         int[] end_mask_arr = new int[ndims];
         int[] shrink_axis_mask_arr = new int[ndims];
+
+        // Build complete arrays for variable indices
+        SDVariable[] beginParts = new SDVariable[ndims];
+        SDVariable[] endParts = new SDVariable[ndims];
+        SDVariable[] stridesParts = new SDVariable[ndims];
+
         for (int i = 0; i < ndims; i++) {
             strides[i] = 1;
             SDIndex index = indices[i];
@@ -1529,28 +1727,78 @@ public class SDVariable implements Serializable {
             if (indexType == SDIndex.IndexType.ALL) {
                 begin_mask_arr[i] = 1;
                 end_mask_arr[i] = 1;
-            } else if (indexType == SDIndex.IndexType.POINT) {
-                long pointIndex = index.getPointIndex();
-                begin[i] = pointIndex;
-                end[i] = pointIndex + 1;
+
+                // For variable indices, we need to provide values even for ALL dimensions
+                if(variableIndices) {
+                    beginParts[i] = sameDiff.constant(0L);
+                    endParts[i] = sameDiff.sizeAt(this, i);
+                    stridesParts[i] = sameDiff.constant(1L);
+                }
+            } else if (indexType == SDIndex.IndexType.POINT || indexType == SDIndex.IndexType.POINT_INPUT) {
+                if(indexType == SDIndex.IndexType.POINT) {
+                    long pointIndex = index.getPointIndex();
+                    begin[i] = pointIndex;
+                    end[i] = pointIndex + 1;
+
+                    if(variableIndices) {
+                        beginParts[i] = sameDiff.constant(pointIndex);
+                        endParts[i] = sameDiff.constant(pointIndex + 1);
+                        stridesParts[i] = sameDiff.constant(1L);
+                    }
+                } else if(indexType == SDIndex.IndexType.POINT_INPUT) {
+                    beginParts[i] = index.getPointVar();
+                    endParts[i] = index.getPointVar().add(1.0);
+                    stridesParts[i] = sameDiff.constant(1L);
+                }
+
                 if(!index.isPointKeepDim()) {
                     shrink_axis_mask_arr[i] = 1;
                 }
-            } else if (indexType == SDIndex.IndexType.INTERVAL) {
-                if (index.getIntervalBegin() == null) {
+            } else if (indexType == SDIndex.IndexType.INTERVAL || indexType == SDIndex.IndexType.INTERVAL_INPUT) {
+                if (index.getIntervalBegin() == null && indexType != SDIndex.IndexType.INTERVAL_INPUT) {
                     begin_mask_arr[i] = 1;
+                } else if(indexType == SDIndex.IndexType.INTERVAL_INPUT) {
+                    if(index.getIntervalInputBegin() != null) {
+                        beginParts[i] = index.getIntervalInputBegin();
+                    } else {
+                        beginParts[i] = sameDiff.constant(0L);
+                        begin_mask_arr[i] = 1;
+                    }
                 } else {
                     begin[i] = index.getIntervalBegin();
+                    if(variableIndices) {
+                        beginParts[i] = sameDiff.constant(index.getIntervalBegin());
+                    }
                 }
-                if (index.getIntervalEnd() == null) {
+
+                if (index.getIntervalEnd() == null && indexType != SDIndex.IndexType.INTERVAL_INPUT) {
                     end_mask_arr[i] = 1;
+                } else if(indexType == SDIndex.IndexType.INTERVAL_INPUT) {
+                    if(index.getIntervalInputEnd() != null) {
+                        endParts[i] = index.getIntervalInputEnd();
+                    } else {
+                        endParts[i] = sameDiff.sizeAt(this, i);
+                        end_mask_arr[i] = 1;
+                    }
                 } else {
                     end[i] = index.getIntervalEnd();
+                    if(variableIndices) {
+                        endParts[i] = sameDiff.constant(index.getIntervalEnd());
+                    }
                 }
-                if (index.getIntervalStrides() == null) {
+
+                if (index.getIntervalStrides() == null && indexType != SDIndex.IndexType.INTERVAL_INPUT) {
                     strides[i] = 1;
+                    if(variableIndices) {
+                        stridesParts[i] = sameDiff.constant(1L);
+                    }
+                } else if(indexType == SDIndex.IndexType.INTERVAL_INPUT && index.getIntervalStrideInput() != null) {
+                    stridesParts[i] = index.getIntervalStrideInput();
                 } else {
                     strides[i] = index.getIntervalStrides();
+                    if(variableIndices) {
+                        stridesParts[i] = sameDiff.constant(index.getIntervalStrides());
+                    }
                 }
             }
         }
@@ -1560,8 +1808,275 @@ public class SDVariable implements Serializable {
         int end_mask = binArrToInt(end_mask_arr);
         int shrink_axis = binArrToInt(shrink_axis_mask_arr);
 
-        return this.sameDiff.stridedSlice(this, begin, end, strides,
-                begin_mask, end_mask, 0, 0, shrink_axis);
+        if(variableIndices) {
+            // Stack the parts to create complete begin/end/stride tensors
+            SDVariable beginVar = sameDiff.concat(0, beginParts);
+            SDVariable endVar = sameDiff.concat(0, endParts);
+            SDVariable stridesVar = sameDiff.concat(0, stridesParts);
+
+            return this.sameDiff.stridedSlice(this, beginVar, endVar, stridesVar,
+                    begin_mask, end_mask, 0, 0, shrink_axis);
+        } else  {
+            return this.sameDiff.stridedSlice(this, begin, end, strides,
+                    begin_mask, end_mask, 0, 0, shrink_axis);
+        }
+    }
+
+
+    public static  SDVariable sliceEnd(SDVariable input,SDVariable sliceIndexInput) {
+        SameDiff sameDiff = input.getSameDiff();
+        SDVariable range = sameDiff.range(sameDiff.constant(0), input.rank(), sameDiff.constant(1), DataType.INT64);
+        //0 1 1
+        SDVariable mask = range.gt(0.0).castTo(DataType.INT64);
+
+        SDVariable sliceMask = range.eq(0).castTo(DataType.INT64);
+
+
+        SDVariable sliceIndex = sliceMask.mul(sliceIndexInput);
+
+        SDVariable outputShape = input.shape().mul(mask).add(sliceIndex);
+        return outputShape;
+    }
+
+
+    /**
+     * Get a variable with content equal to a specified sub-array of this variable.<br>
+     * Can be used (for example) to get rows, columns, sub-matrices, etc.
+     *
+     * This will loop over the indices (think of it as a list) and concatenate
+     * each slice of the input array to the final result.
+     *
+     * Expected input for indices would be a vector with indices such as 0,1,2,3,4.
+     * For each element in the index we then concatenate the result to the previous iteration.
+     *
+     * Note that this is slow and should only be used in very specific circumstances.
+     * Otherwise {@link org.nd4j.linalg.api.ops.impl.shape.StridedSlice} will be more performant
+     * for creating views. Many times {@link org.nd4j.linalg.api.ops.impl.shape.StridedSlice} avoids
+     * this slower approach by directly calculating the strides of a view.
+     *
+     * @param indices Indices to get
+     * @return Sub-array variable
+     */
+    public SDVariable get(SDVariable indices) {
+        SDVariable initialSize = sameDiff.zerosLike(shape()).castTo(DataType.INT64);
+        //pull from the first slice as the starting point and concatenate each result together
+        SDVariable startResult = sameDiff.slice(this, initialSize.castTo(DataType.INT64), sliceEnd(this,
+                sameDiff.onesLike(shape()).castTo(DataType.INT64)));
+        //start at 1 because we start with the initial output (basically the item at the first element in the indices)
+        SDVariable currIteration = sameDiff.var(Nd4j.ones(1).castTo(DataType.INT32));
+        //this condition is normally used when you want to toss in an extra condition to terminate early
+        SDVariable cond = sameDiff.constant("curr_cond",true);
+        //the total length of the indices to loop till
+        SDVariable indicesLength = indices.length();
+        //sub graph that uses invoke
+        SameDiff loop = createLoopConcat(this,indices);
+        //collect slices along the first dimension concatenating the result along the way
+        return this.sameDiff.loopWithConditions(ControlFlow.LoopParams.builder()
+                .functionBody(loop)
+                .loopVars(new SDVariable[] {
+                        currIteration,
+                        indicesLength,
+                        cond,
+                        startResult,
+                        this,
+                        indices
+                }).functionBodyInputs(new String[] {
+                        //note here all inputs are the same as the outputs, and we return the original
+                        //input concatenated with the starting input (the first slice at index 0)
+                        //and then loop over each index in the list till we get the specific result
+                        "index",
+                        "max",
+                        "cond",
+                        "input",
+                        "pullFrom",
+                        "indices"
+                })
+                .functionBodyOutputs(new String[]{
+                        "index",
+                        "max",
+                        "cond",
+                        "output",
+                        "pullFrom",
+                        "indices"})
+                .functionName("slices")
+                .loopName("outputs")
+                //note the ordering here is important. Output is the accumulated output of each iteration appending
+                //a result to the previous iteration. We start with the initial input and add more overtime.
+                .build())[3];
+
+    }
+
+
+
+    /**
+     * Get a variable with content equal to a specified sub-array of this variable.<br>
+     * Can be used (for example) to get rows, columns, sub-matrices, etc.
+     *
+     * This will loop over the indices (think of it as a list) and add each slice
+     * specified by the indices from the source to the new array.
+     *
+     * The end result will be this variable but with the new updated results.
+     *
+     * Note that this is slow and should only be used in very specific circumstances.
+     * Otherwise {@link org.nd4j.linalg.api.ops.impl.shape.StridedSlice} will be more performant
+     * for creating views. Many times {@link org.nd4j.linalg.api.ops.impl.shape.StridedSlice} avoids
+     * this slower approach by directly calculating the strides of a view.
+     *
+     * @param indices Indices to get
+     * @param toPut  the source array to pull results from to put in to this array
+     * @param putIndices  the equivalent indices for the other array
+     * @return the updated array with the elements from the toPut array put in to this new array
+     */
+    public SDVariable put(SDVariable indices,SDVariable toPut,SDVariable putIndices) {
+        //start at 1 because we start with the initial output (basically the item at the first element in the indices)
+        SDVariable currIteration = sameDiff.var(Nd4j.zeros(1).castTo(DataType.INT32));
+        //this condition is normally used when you want to toss in an extra condition to terminate early
+        SDVariable cond = sameDiff.constant(true);
+        //the total length of the indices to loop till
+        SDVariable indicesLength = indices.length();
+        //sub graph that uses invoke
+        SameDiff loop = createLoopPut(this,indices);
+        loop.setEnableCache(false);
+        //collect slices along the first dimension concatenating the result along the way
+        return this.sameDiff.loopWithConditions(ControlFlow.LoopParams.builder()
+                .functionBody(loop)
+                .loopVars(new SDVariable[] {
+                        currIteration,
+                        indicesLength,
+                        cond,
+                        this,
+                        toPut,
+                        indices,
+                        putIndices
+                }).functionBodyInputs(new String[] {
+                        //note here all inputs are the same as the outputs, and we return the original
+                        //the default  3 values (current iteration, max index to loop to and optional condition)
+                        //index,max,cond,assignTo,putIn,indices,indicesPut
+                        "index",
+                        "max",
+                        "cond",
+                        "assignTo",
+                        "toPut",
+                        "indices",
+                        "indicesPut"
+                })
+                .functionBodyOutputs(new String[]{
+                        "index",
+                        "max",
+                        "cond",
+                        "assignOutput",
+                        "toPut",
+                        "indices",
+                        "indicesPut"})
+                .functionName("sliceputs")
+                .loopName("outputs")
+                //note the ordering here is important. Output is the original array where we assigned values.
+                .build())[3];
+
+
+
+    }
+
+
+
+    /**
+     * Create a graph that takes in the indices as a placeholder, loops over each element in the index vector
+     * and appends the slice to the end result. This graph is equivalent to something like:
+     * INDArray input = ....;
+     * INDArray indices = ...;
+     * INDArray result = input.get(NDArrayIndex.point(indices.getInt(0));
+     * for(int i = i; i < maxIndex && customInputResult; i++) {
+     * result = Nd4j.concat(0,input.get(NDArrayIndex.point(i)));
+     * }
+     * return result
+     * <p>
+     * Note this is similar to {@link INDArray#get(INDArray)}
+     *
+     * @param relative the expected target input variable. We use this to pull expected
+     *                 return data type for the result
+     * @param indices  the indices to get
+     * @return the graph for dynamically creating a result graph
+     */
+    public static SameDiff createLoopPut(SDVariable relative,SDVariable indices) {
+        //standard loop body for loopWithConditions
+        SameDiff loop = SameDiff.create();
+        //curr index
+        SDVariable index = loop.placeHolder("index",DataType.INT32);
+        //loop until
+        SDVariable maxIndex = loop.placeHolder("max",DataType.INT32);
+        //constant condition of true for custom,  just loop till max iterations hit
+        SDVariable currCondition = loop.placeHolder("cond",DataType.BOOL);
+        //the actual variable to pull from
+        SDVariable assignTo = loop.placeHolder("assignTo",relative.dataType());
+
+        SDVariable toPut = loop.placeHolder("toPut",relative.dataType());
+
+        //the indices to loop over (the input variable
+        SDVariable indicesLoop = loop.placeHolder("indices",indices.dataType());
+        //standardize indices to length 1
+        indicesLoop = indicesLoop.reshape("indicesReshape",indicesLoop.length());
+
+        SDVariable indicesPut = loop.placeHolder("indicesPut",indices.dataType());
+        indicesPut =  indicesPut.reshape("indicesPutReshape",indicesPut.length());
+
+        //the current index to retrieve
+        SDVariable indexToRetrieve = indicesLoop.getView(SDIndex.point(index)).reshape(1).castTo("indexToReceive",DataType.INT64);
+        SDVariable indexToPut = indicesPut.getView(SDIndex.point(index)).reshape(1).castTo("indexToPut",DataType.INT64);
+        SDVariable toAssign = toPut.getView(SDIndex.point(indexToPut));
+
+        SDVariable sliceOutput = assignTo.getView(SDIndex.point(indexToRetrieve));
+        SDVariable assignOutput = loop.assign(sliceOutput,toAssign);
+        SDVariable outputIdentity = loop.identity("assignOutput",assignTo);
+        //ensure the output depends on the final assign so it gets executed, return the final output as a view
+
+        outputIdentity.addControlDependency(assignOutput);
+        return loop;
+
+    }
+
+
+    /**
+     * Create a graph that takes in the indices as a placeholder, loops over each element in the index vector
+     * and appends the slice to the end result. This graph is equivalent to something like:
+     * INDArray input = ....;
+     * INDArray indices = ...;
+     * INDArray result = input.get(NDArrayIndex.point(indices.getInt(0));
+     * for(int i = i; i < maxIndex && customInputResult; i++) {
+     *      result = Nd4j.concat(0,input.get(NDArrayIndex.point(i)));
+     * }
+     * return result
+     *
+     * Note this is similar to {@link INDArray#get(INDArray)}
+     * @param relative the expected target input variable. We use this to pull expected
+     *                 return data type for the result
+     * @param indices the indices to get
+     * @return the graph for dynamically creating a result graph
+     */
+    public static SameDiff createLoopConcat(SDVariable relative,SDVariable indices) {
+        //standard loop body for loopWithConditions
+        SameDiff loop = SameDiff.create();
+        //curr index
+        SDVariable index = loop.placeHolder("index",DataType.INT32);
+        //loop until
+        SDVariable maxIndex = loop.placeHolder("max",DataType.INT32);
+        //constant condition of true for custom,  just loop till max iterations hit
+        SDVariable currCondition = loop.placeHolder("cond",DataType.BOOL);
+        //the input to pull from (in this case this)
+        SDVariable input = loop.placeHolder("input", relative.dataType());
+        //the actual variable to pull from
+        SDVariable pullFrom = loop.placeHolder("pullFrom",relative.dataType());
+        //the indices to loop over (the input variable
+        SDVariable indicesLoop = loop.placeHolder("indices",indices.dataType());
+        //standardize indices to length 1
+        indicesLoop = indicesLoop.reshape("indicesReshape",indicesLoop.length());
+        //the current index to retrieve
+        SDVariable indexToRetrieve = indicesLoop.get(SDIndex.point(index)).reshape(1).castTo("indexToReceive",DataType.INT64);
+
+        //the final concatenated output
+        SDVariable sliceOutput = loop.expandDims("outputSlice",pullFrom.get(SDIndex.point(indexToRetrieve)),0);
+        SDVariable output = loop.concat("output",0,input,sliceOutput);
+        return loop;
+
     }
 
     /**
@@ -1644,7 +2159,18 @@ public class SDVariable implements Serializable {
         return result;
     }
 
-    public SDVariable clone(SameDiff sd){
+
+    public SDVariable clone(String name,SameDiff sd) {
+        SDVariable v = new SDVariable();
+        v.varName = name;
+        v.variableType = variableType;
+        v.shape = shape == null ? null : shape.clone();
+        v.dataType = dataType;
+        v.sameDiff = sd;
+        return v;
+    }
+
+    public SDVariable clone(SameDiff sd) {
         SDVariable v = new SDVariable();
         v.varName = varName;
         v.variableType = variableType;
@@ -1675,4 +2201,6 @@ public class SDVariable implements Serializable {
         }
         return true;
     }
+
+
 }

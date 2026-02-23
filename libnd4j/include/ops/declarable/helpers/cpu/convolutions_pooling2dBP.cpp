@@ -27,9 +27,9 @@ namespace ops {
 
 //////////////////////////////////////////////////////////////////////////
 template <typename T>
-static void pooling2dBP_(sd::graph::Context& block, const NDArray& input, const NDArray& gradO, NDArray& gradI,
-                         const int kH, const int kW, const int sH, const int sW, const int pH, const int pW,
-                         const int dH, const int dW, const int poolingMode, const int extraParam0) {
+static void pooling2dBP_(sd::graph::Context& block, NDArray& input, NDArray& gradO, NDArray& gradI,
+                         const LongType kH, const LongType kW, const LongType sH, const LongType sW, const LongType pH, const LongType pW,
+                         const LongType dH, const LongType dW, const int poolingMode, const int extraParam0) {
   // input [bS, iC, iH, iW]
   // gradI [bS, iC, iH, iW] -> gradI is output in this function
   // gradO [bS, iC, oH, oW]
@@ -94,19 +94,19 @@ static void pooling2dBP_(sd::graph::Context& block, const NDArray& input, const 
               if (hstart < 0)
                 hstart +=
                     dH * ((-hstart + dH - 1) /
-                          dH);  // (sd::LongType)sd::math::sd_ceil<T,T>(static_cast<T>(-hstart) / static_cast<T>(dH));
+                          dH);
               if (wstart < 0)
                 wstart +=
                     dW * ((-wstart + dW - 1) /
-                          dW);  //(sd::LongType)sd::math::sd_ceil<T,T>(static_cast<T>(-wstart) / static_cast<T>(dW));
+                          dW);
               if (hend > iH)
                 hend -=
                     dH * ((hend - iH + dH - 1) /
-                          dH);  //(sd::LongType)sd::math::sd_ceil<T,T>(static_cast<T>(hend-iH) / static_cast<T>(dH));
+                          dH);
               if (wend > iW)
                 wend -=
                     dW * ((wend - iW + dW - 1) /
-                          dW);  //(sd::LongType)sd::math::sd_ceil<T,T>(static_cast<T>(wend-iW) / static_cast<T>(dW));
+                          dW);
 
               sum = -DataTypeUtils::max<T>();
               valO = gO[b * oStride0 + c * oStride1 + oh * oStride2 + ow * oStride3];
@@ -262,20 +262,20 @@ static void pooling2dBP_(sd::graph::Context& block, const NDArray& input, const 
 
                 for (sd::LongType kh = hstart; kh < hend; kh += iStep2)
                   for (sd::LongType kw = wstart; kw < wend; kw += iStep3)
-                    sum += sd::math::sd_pow<T, T, T>(sd::math::sd_abs<T>(pIn[kh + kw]), extraParam0);
+                    sum += sd::math::sd_pow<T, T, T>(sd::math::sd_abs<T,T>(pIn[kh + kw]), static_cast<T>(extraParam0));
 
                 valO *= sd::math::sd_pow<T, T, T>(sum, ((T)1. - extraParam0) / extraParam0);
 
                 for (sd::LongType kh = hstart; kh < hend; kh += iStep2)
                   for (sd::LongType kw = wstart; kw < wend; kw += iStep3)
                     pgI[kh + kw] += valO *
-                                    sd::math::sd_pow<T, T, T>(sd::math::sd_abs<T>(pIn[kh + kw]), extraParam0 - 1.f) *
+                                    sd::math::sd_pow<T, T, T>(sd::math::sd_abs<T,T>(pIn[kh + kw]), static_cast<T>(extraParam0) - 1.f) *
                                     sd::math::sd_sgn<T, T>(pIn[kh + kw]);
               } else {
                 for (sd::LongType kh = hstart; kh < hend; kh += dH)
                   for (sd::LongType kw = wstart; kw < wend; kw += dW)
                     sum +=
-                        sd::math::sd_pow<T, T, T>(sd::math::sd_abs<T>(pIn[kh * iStride2 + kw * iStride3]), extraParam0);
+                        sd::math::sd_pow<T, T, T>(sd::math::sd_abs<T,T>(pIn[kh * iStride2 + kw * iStride3]), static_cast<T>(extraParam0));
 
                 valO *= sd::math::sd_pow<T, T, T>(sum, ((T)1. - extraParam0) / extraParam0);
 
@@ -283,7 +283,7 @@ static void pooling2dBP_(sd::graph::Context& block, const NDArray& input, const 
                   for (sd::LongType kw = wstart; kw < wend; kw += dW) {
                     const auto inVal = pIn[kh * iStride2 + kw * iStride3];
                     pgI[kh * gIStride2 + kw * gIStride3] +=
-                        valO * sd::math::sd_pow<T, T, T>(sd::math::sd_abs<T>(inVal), extraParam0 - 1.f) *
+                        valO * sd::math::sd_pow<T, T, T>(sd::math::sd_abs<T,T>(inVal), static_cast<T>(extraParam0) - static_cast<T>(1.f)) *
                         sd::math::sd_sgn<T, T>(inVal);
                   }
                 }
@@ -300,13 +300,13 @@ static void pooling2dBP_(sd::graph::Context& block, const NDArray& input, const 
         "ConvolutionUtils::pooling2dBP: pooling mode argument can take three values only: 0, 1, 2, but got %i instead "
         "!\n",
         poolingMode);
-    throw std::runtime_error("Incorrect pooling2dBP mode");
+    THROW_EXCEPTION("Incorrect pooling2dBP mode");
   }
 }
 
-void ConvolutionUtils::pooling2dBP(sd::graph::Context& block, const NDArray& input, const NDArray& gradO,
-                                   NDArray& gradI, const int kH, const int kW, const int sH, const int sW, const int pH,
-                                   const int pW, const int dH, const int dW, const int poolingMode,
+void ConvolutionUtils::pooling2dBP(sd::graph::Context& block, NDArray& input, NDArray& gradO,
+                                   NDArray& gradI, const LongType kH, const LongType kW, const LongType sH, const LongType sW, const LongType pH,
+                                   const LongType pW, const LongType dH, const LongType dW, const int poolingMode,
                                    const int extraParam0) {
   BUILD_SINGLE_SELECTOR(input.dataType(), pooling2dBP_,
                         (block, input, gradO, gradI, kH, kW, sH, sW, pH, pW, dH, dW, poolingMode, extraParam0),

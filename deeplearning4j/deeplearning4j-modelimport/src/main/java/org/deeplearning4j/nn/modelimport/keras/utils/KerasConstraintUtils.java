@@ -21,14 +21,14 @@
 package org.deeplearning4j.nn.modelimport.keras.utils;
 
 import lombok.extern.slf4j.Slf4j;
+import org.deeplearning4j.nn.modelimport.keras.config.KerasLayerConfiguration;
+import org.deeplearning4j.nn.modelimport.keras.exceptions.InvalidKerasConfigurationException;
+import org.deeplearning4j.nn.modelimport.keras.exceptions.UnsupportedKerasConfigurationException;
 import org.deeplearning4j.nn.api.layers.LayerConstraint;
 import org.deeplearning4j.nn.conf.constraint.MaxNormConstraint;
 import org.deeplearning4j.nn.conf.constraint.MinMaxNormConstraint;
 import org.deeplearning4j.nn.conf.constraint.NonNegativeConstraint;
 import org.deeplearning4j.nn.conf.constraint.UnitNormConstraint;
-import org.deeplearning4j.nn.modelimport.keras.config.KerasLayerConfiguration;
-import org.deeplearning4j.nn.modelimport.keras.exceptions.InvalidKerasConfigurationException;
-import org.deeplearning4j.nn.modelimport.keras.exceptions.UnsupportedKerasConfigurationException;
 
 import java.util.HashMap;
 import java.util.Map;

@@ -23,6 +23,8 @@ package org.deeplearning4j.nn.modelimport.keras;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.deeplearning4j.nn.modelimport.keras.exceptions.InvalidKerasConfigurationException;
+import org.deeplearning4j.nn.modelimport.keras.exceptions.UnsupportedKerasConfigurationException;
 import org.deeplearning4j.nn.conf.InputPreProcessor;
 import org.deeplearning4j.nn.conf.graph.GraphVertex;
 import org.deeplearning4j.nn.conf.inputs.InputType;
@@ -31,9 +33,6 @@ import org.deeplearning4j.nn.conf.layers.Layer;
 import org.deeplearning4j.nn.conf.layers.samediff.SameDiffLambdaLayer;
 import org.deeplearning4j.nn.modelimport.keras.config.KerasLayerConfiguration;
 import org.deeplearning4j.nn.modelimport.keras.config.KerasLayerConfigurationFactory;
-import org.deeplearning4j.nn.modelimport.keras.exceptions.InvalidKerasConfigurationException;
-import org.deeplearning4j.nn.modelimport.keras.exceptions.UnsupportedKerasConfigurationException;
-import org.deeplearning4j.nn.modelimport.keras.layers.convolutional.KerasConvolutionUtils;
 import org.deeplearning4j.nn.modelimport.keras.utils.KerasLayerUtils;
 import org.deeplearning4j.nn.modelimport.keras.utils.KerasRegularizerUtils;
 import org.nd4j.common.util.ArrayUtil;
@@ -321,11 +320,6 @@ public class KerasLayer {
 
             /* Check for parameters in layer for which we don't have weights. */
             paramsInLayer.removeAll(paramsInKerasLayer);
-            if (!paramsInLayer.isEmpty()) {
-                String joinedParamsInLayer = StringUtils.join(paramsInLayer, ", ");
-                throw new InvalidKerasConfigurationException(
-                        msg + "(no stored weights for parameters: " + joinedParamsInLayer + ")");
-            }
 
             /* Check for parameters NOT in layer for which we DO have weights. */
             paramsInKerasLayer.removeAll(layer.paramTable().keySet());
@@ -339,6 +333,9 @@ public class KerasLayer {
             for (String paramName : layer.paramTable().keySet()) {
                 try {
                     long[] dl4jWeights = layer.paramTable().get(paramName).shape();
+                    if(!weights.containsKey(paramName)) {
+                        throw new IllegalArgumentException("No weights found for parameter " + paramName + " in layer " + kerasLayerName);
+                    }
                     long[] kerasWeights = weights.get(paramName).shape();
                     INDArray variable = this.weights.get(paramName);
                     if(!Arrays.equals(dl4jWeights,kerasWeights) &&
@@ -484,6 +481,7 @@ public class KerasLayer {
             }
             else
                 preprocessor = this.layer.getPreProcessorForInputType(inputType[0]);
+
         }
         return preprocessor;
     }

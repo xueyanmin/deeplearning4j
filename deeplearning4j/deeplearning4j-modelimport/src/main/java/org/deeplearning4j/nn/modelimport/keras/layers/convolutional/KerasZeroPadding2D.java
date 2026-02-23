@@ -23,16 +23,17 @@ package org.deeplearning4j.nn.modelimport.keras.layers.convolutional;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.extern.slf4j.Slf4j;
+import org.deeplearning4j.nn.modelimport.keras.exceptions.InvalidKerasConfigurationException;
+import org.deeplearning4j.nn.modelimport.keras.exceptions.UnsupportedKerasConfigurationException;
 import org.deeplearning4j.nn.conf.CNN2DFormat;
 import org.deeplearning4j.nn.conf.inputs.InputType;
 import org.deeplearning4j.nn.conf.layers.ZeroPaddingLayer;
 import org.deeplearning4j.nn.modelimport.keras.KerasLayer;
-import org.deeplearning4j.nn.modelimport.keras.exceptions.InvalidKerasConfigurationException;
-import org.deeplearning4j.nn.modelimport.keras.exceptions.UnsupportedKerasConfigurationException;
 
 import java.util.Map;
 
 import static org.deeplearning4j.nn.modelimport.keras.layers.convolutional.KerasConvolutionUtils.getPaddingFromConfig;
+import static org.deeplearning4j.nn.modelimport.keras.layers.convolutional.KerasConvolutionUtils.getPaddingFromConfigLong;
 
 /**
  * Imports a Keras ZeroPadding 2D layer.
@@ -70,7 +71,7 @@ public class KerasZeroPadding2D extends KerasLayer {
         super(layerConfig, enforceTrainingConfig);
         String paddingField = conf.getLAYER_FIELD_ZERO_PADDING();
         ZeroPaddingLayer.Builder builder = new ZeroPaddingLayer.Builder(
-                getPaddingFromConfig(layerConfig, conf, paddingField, 2))
+                getPaddingFromConfigLong(layerConfig, conf, paddingField, 2))
                 .dataFormat(dimOrder == DimOrder.TENSORFLOW ? CNN2DFormat.NHWC : CNN2DFormat.NCHW)
                 .name(this.layerName).dropOut(this.dropout);
         this.layer = builder.build();

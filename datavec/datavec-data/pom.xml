@@ -26,7 +26,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>org.datavec</groupId>
+        <groupId>org.eclipse.deeplearning4j</groupId>
         <artifactId>datavec-parent</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
@@ -43,7 +43,7 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
-                <groupId>org.datavec</groupId>
+                <groupId>org.eclipse.deeplearning4j</groupId>
                 <artifactId>datavec-api</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -52,20 +52,9 @@
 
     <dependencies>
         <dependency>
-            <groupId>org.nd4j</groupId>
+            <groupId>org.eclipse.deeplearning4j</groupId>
             <artifactId>nd4j-api</artifactId>
         </dependency>
     </dependencies>
 
-    <profiles>
-        <profile>
-            <id>nd4j-tests-cpu</id>
-        </profile>
-        <profile>
-            <id>nd4j-tests-cuda</id>
-        </profile>
-  <profile>
-            <id>nd4j-tests-aurora</id>
-        </profile>
-    </profiles>
 </project>

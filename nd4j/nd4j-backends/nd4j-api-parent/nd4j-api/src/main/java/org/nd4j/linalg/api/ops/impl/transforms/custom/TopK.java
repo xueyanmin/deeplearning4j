@@ -23,7 +23,6 @@ package org.nd4j.linalg.api.ops.impl.transforms.custom;
 import org.nd4j.autodiff.samediff.SDVariable;
 import org.nd4j.autodiff.samediff.SameDiff;
 import org.nd4j.common.base.Preconditions;
-import org.nd4j.imports.graphmapper.tf.TFGraphMapper;
 import org.nd4j.linalg.api.buffer.DataType;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.api.ops.DynamicCustomOp;
@@ -43,11 +42,23 @@ public class TopK extends DynamicCustomOp {
 
     public TopK(){ }
 
-    public TopK(SameDiff sd, SDVariable in, int k, boolean sorted){
+    public TopK(SameDiff sd, SDVariable in, int k, boolean sorted) {
         super(sd, new SDVariable[]{in}, false);
         this.k = k;
         this.sorted = sorted;
         addIArgument(ArrayUtil.fromBoolean(sorted), k);
+    }
+
+
+    public TopK(INDArray input, double k, boolean sorted) {
+        super(null,new INDArray[]{input},null);
+        this.k = (int) k;
+        this.sorted = sorted;
+        addIArgument(ArrayUtil.fromBoolean(sorted),this.k);
+    }
+
+    public TopK(SameDiff sd, SDVariable input, double k, boolean sorted) {
+        this(sd,input,(int) k,sorted);
     }
 
     @Override
@@ -62,30 +73,8 @@ public class TopK extends DynamicCustomOp {
 
     @Override
     public void initFromTensorFlow(NodeDef nodeDef, SameDiff initWith, Map<String, AttrValue> attributesForNode, GraphDef graph) {
+        throw new UnsupportedOperationException("Use the new Tensorflow Importer instead. This method is now removed.");
 
-        String thisName = nodeDef.getName();
-
-        // FIXME: ????
-        String inputName = thisName + "/k";
-        NodeDef kNode = null;
-        for(int i = 0; i < graph.getNodeCount(); i++) {
-            if(graph.getNode(i).getName().equals(inputName)){
-                kNode = graph.getNode(i);
-                break;
-            }
-        }
-
-        this.sorted = nodeDef.getAttrOrThrow("sorted").getB();
-
-        if (kNode != null) {
-            Preconditions.checkState(kNode != null, "Could not find 'k' parameter node for op: %s", thisName);
-
-            INDArray arr = TFGraphMapper.getNDArrayFromTensor(kNode);
-            this.k = arr.getInt(0);
-
-            addIArgument(ArrayUtil.fromBoolean(sorted), k);
-        } else
-            addIArgument(ArrayUtil.fromBoolean(sorted));
     }
 
     @Override
@@ -94,9 +83,21 @@ public class TopK extends DynamicCustomOp {
     }
 
     @Override
-    public List<DataType> calculateOutputDataTypes(List<DataType> dataTypes){
+    public void setPropertiesForFunction(Map<String, Object> properties) {
+        if(properties.containsKey("sorted")) {
+            this.sorted = getBooleanFromProperty("sorted",properties);
+        }
+
+        if(properties.containsKey("k")) {
+            this.k = getIntValueFromProperty("k",properties);
+        }
+
+    }
+
+    @Override
+    public List<DataType> calculateOutputDataTypes(List<DataType> dataTypes) {
         //2 outputs: values and indices
-        //TODO make thit configurable
+        //TODO make this configurable
         return Arrays.asList(dataTypes.get(0), DataType.INT);
     }
 }

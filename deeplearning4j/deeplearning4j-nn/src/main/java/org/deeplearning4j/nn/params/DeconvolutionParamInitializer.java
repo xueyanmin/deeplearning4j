@@ -49,8 +49,8 @@ public class DeconvolutionParamInitializer extends ConvolutionParamInitializer {
         org.deeplearning4j.nn.conf.layers.Deconvolution2D layerConf =
                 (org.deeplearning4j.nn.conf.layers.Deconvolution2D) conf.getLayer();
         if (initializeParams) {
-            int[] kernel = layerConf.getKernelSize();
-            int[] stride = layerConf.getStride();
+            long[] kernel = layerConf.getKernelSize();
+            long[] stride = layerConf.getStride();
 
             val inputDepth = layerConf.getNIn();
             val outputDepth = layerConf.getNOut();
@@ -65,7 +65,7 @@ public class DeconvolutionParamInitializer extends ConvolutionParamInitializer {
 
             return weights;
         } else {
-            int[] kernel = layerConf.getKernelSize();
+            long[] kernel = layerConf.getKernelSize();
 
             INDArray weights =  WeightInitUtil.reshapeWeights(
                     new long[] {layerConf.getNIn(), layerConf.getNOut(), kernel[0],
@@ -81,15 +81,16 @@ public class DeconvolutionParamInitializer extends ConvolutionParamInitializer {
         org.deeplearning4j.nn.conf.layers.Deconvolution2D layerConf =
                 (org.deeplearning4j.nn.conf.layers.Deconvolution2D) conf.getLayer();
 
-        int[] kernel = layerConf.getKernelSize();
+        long[] kernel = layerConf.getKernelSize();
         val nIn = layerConf.getNIn();
         val nOut = layerConf.getNOut();
 
+        INDArray gradientViewReshape = gradientView.reshape(gradientView.length());
         Map<String, INDArray> out = new LinkedHashMap<>();
         if(layerConf.hasBias()){
-            INDArray biasGradientView = gradientView.get(NDArrayIndex.interval(0,0,true), NDArrayIndex.interval(0, nOut));
+            INDArray biasGradientView = gradientViewReshape.get(NDArrayIndex.interval(0, nOut));
             INDArray weightGradientView =
-                    gradientView.get(NDArrayIndex.interval(0,0,true), NDArrayIndex.interval(nOut, numParams(conf)))
+                    gradientViewReshape.get(NDArrayIndex.interval(nOut, numParams(conf)))
                             .reshape('c', nIn, nOut, kernel[0], kernel[1]);
             out.put(BIAS_KEY, biasGradientView);
             out.put(WEIGHT_KEY, weightGradientView);

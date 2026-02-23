@@ -49,10 +49,10 @@ namespace ops {
 namespace helpers {
 
 /////////////////////////////////////////////////////////////////////////////
-void lstmBlockTimeLoop(const NDArray* maxSeqLength, const NDArray* xSeq, const NDArray* c0, const NDArray* y0,
-                       const NDArray* W, const NDArray* Wci, const NDArray* Wcf, const NDArray* Wco, const NDArray* b,
-                       const NDArray* iSeq, const NDArray* cSeq, const NDArray* fSeq, const NDArray* oSeq,
-                       const NDArray* zSeq, const NDArray* hSeq, const NDArray* ySeq, const std::vector<double>& params,
+void lstmBlockTimeLoop(NDArray* maxSeqLength, NDArray* xSeq, NDArray* c0, NDArray* y0,
+                       NDArray* W, NDArray* Wci, NDArray* Wcf, NDArray* Wco, NDArray* b,
+                       NDArray* iSeq, NDArray* cSeq, NDArray* fSeq, NDArray* oSeq,
+                       NDArray* zSeq, NDArray* hSeq, NDArray* ySeq, const std::vector<double>& params,
                        const int dataFormat) {
   int seqLen, bS, nIn, nOut;
 
@@ -91,7 +91,7 @@ void lstmBlockTimeLoop(const NDArray* maxSeqLength, const NDArray* xSeq, const N
     auto ht = timeSubset(hSeq, t, dataFormat);
     auto yt = timeSubset(ySeq, t, dataFormat);
 
-    helpers::lstmBlockCell(&xt, c_t1, y_t1, W, Wci, Wcf, Wco, b, &it, &ct, &ft, &ot, &zt, &ht, &yt, params);
+    helpers::lstmBlockCell(xt, c_t1, y_t1, W, Wci, Wcf, Wco, b, it, ct, ft, ot, zt, ht, yt, params);
 
     if (t != 0) {
       delete c_t1;
@@ -99,15 +99,25 @@ void lstmBlockTimeLoop(const NDArray* maxSeqLength, const NDArray* xSeq, const N
     }
 
     if (t < seqLen - 1) {
-      c_t1 = new NDArray(std::move(ct));
-      y_t1 = new NDArray(std::move(yt));
+      c_t1 = ct;
+      y_t1 = yt;
+    } else {
+      delete ct;
+      delete yt;
     }
+
+
+    delete it;
+    delete ft;
+    delete ot;
+    delete zt;
+    delete ht;
   }
 }
 
 //////////////////////////////////////////////////////////////////////////
-void lstmTimeLoop(sd::LaunchContext* context, const NDArray* x, const NDArray* h0, const NDArray* c0, const NDArray* Wx,
-                  const NDArray* Wh, const NDArray* Wc, const NDArray* Wp, const NDArray* b, NDArray* h, NDArray* c,
+void lstmTimeLoop(sd::LaunchContext* context, NDArray* x, NDArray* h0, NDArray* c0, NDArray* Wx,
+                  NDArray* Wh, NDArray* Wc, NDArray* Wp, NDArray* b, NDArray* h, NDArray* c,
                   const std::vector<double>& params) {
   // x  input [time x bS x nIn]
   // h0 initial cell output (at time step = 0) [bS x numProj], in case of projection=false -> numProj == numUnits !!!
@@ -133,9 +143,11 @@ void lstmTimeLoop(sd::LaunchContext* context, const NDArray* x, const NDArray* h
     auto ht = (*h)({t, t + 1, 0, 0, 0, 0});
     auto ct = (*c)({t, t + 1, 0, 0, 0, 0});
 
-    helpers::lstmCell(context, &xt, &currentH, &currentC, Wx, Wh, Wc, Wp, b, &ht, &ct, params);
+    helpers::lstmCell(context, xt, &currentH, &currentC, Wx, Wh, Wc, Wp, b, ht, ct, params);
     currentH.assign(ht);
     currentC.assign(ct);
+    delete ht;
+    delete ct;
   }
 }
 

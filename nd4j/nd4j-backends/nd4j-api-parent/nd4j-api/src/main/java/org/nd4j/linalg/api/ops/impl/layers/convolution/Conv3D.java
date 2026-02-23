@@ -33,7 +33,6 @@ import org.nd4j.imports.converters.DifferentialFunctionClassHolder;
 import org.nd4j.imports.descriptors.properties.AttributeAdapter;
 import org.nd4j.imports.descriptors.properties.PropertyMapping;
 import org.nd4j.imports.descriptors.properties.adapters.*;
-import org.nd4j.imports.graphmapper.tf.TFGraphMapper;
 import org.nd4j.linalg.api.buffer.DataType;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.api.ops.DynamicCustomOp;
@@ -188,6 +187,8 @@ public class Conv3D extends DynamicCustomOp {
     }
 
     private void addArgs() {
+        if(getConfig().getPaddingMode() == null)
+            getConfig().setPaddingMode(PaddingMode.VALID);
         addIArgument(
                 // TODO: support bias terms
 //                ArrayUtil.fromBoolean(getConfig().isBiasUsed()),
@@ -206,7 +207,6 @@ public class Conv3D extends DynamicCustomOp {
                 getConfig().getDD(),
                 getConfig().getDH(),
                 getConfig().getDW(),
-
                 getConfig().getPaddingMode().index,
                 getConfig().isNCDHW() ? 0 : 1
         );
@@ -362,8 +362,8 @@ public class Conv3D extends DynamicCustomOp {
 
     @Override
     public void initFromTensorFlow(NodeDef nodeDef, SameDiff initWith, Map<String, AttrValue> attributesForNode, GraphDef graph) {
-        TFGraphMapper.initFunctionFromProperties(nodeDef.getOp(), this, attributesForNode, nodeDef, graph);
-        addArgs();
+        throw new UnsupportedOperationException("Use the new Tensorflow Importer instead. This method is now removed.");
+
     }
 
     @Override

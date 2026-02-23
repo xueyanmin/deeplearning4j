@@ -20,7 +20,7 @@
 // @author raver119@gmail.com
 //
 
-#ifdef HAVE_ONEDNN
+#if defined(HAVE_ONEDNN) || defined(HAVE_VEONEDNN)
 #include <array/NDArrayFactory.h>
 #include <ops/declarable/CustomOperations.h>
 #include <ops/declarable/PlatformHelper.h>
@@ -32,7 +32,7 @@
 
 using namespace sd;
 
-class MklDnnTests : public testing::Test {
+class MklDnnTests : public NDArrayTests {
  public:
 };
 

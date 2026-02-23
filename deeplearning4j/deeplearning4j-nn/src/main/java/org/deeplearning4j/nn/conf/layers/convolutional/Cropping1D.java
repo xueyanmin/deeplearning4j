@@ -20,7 +20,15 @@
 
 package org.deeplearning4j.nn.conf.layers.convolutional;
 
-import lombok.*;
+import lombok.AccessLevel;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.NonNull;
+import lombok.Setter;
+import lombok.val;
+
 import org.deeplearning4j.nn.conf.InputPreProcessor;
 import org.deeplearning4j.nn.conf.NeuralNetConfiguration;
 import org.deeplearning4j.nn.conf.inputs.InputType;
@@ -150,7 +158,7 @@ public class Cropping1D extends NoParamLayer {
          * @param cropBottom Amount of cropping to apply to the bottom of the input activations
          */
         public Builder(int cropTop, int cropBottom) {
-            this.setCropping(new int[]{cropTop, cropBottom});
+            this.setCropping(cropTop, cropBottom);
         }
 
         public Cropping1D build() {

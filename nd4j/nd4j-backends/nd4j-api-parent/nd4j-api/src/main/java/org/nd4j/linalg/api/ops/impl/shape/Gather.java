@@ -25,22 +25,24 @@ import onnx.Onnx;
 import org.nd4j.autodiff.samediff.SDVariable;
 import org.nd4j.autodiff.samediff.SameDiff;
 import org.nd4j.imports.descriptors.properties.PropertyMapping;
-import org.nd4j.imports.graphmapper.tf.TFGraphMapper;
 import org.nd4j.linalg.api.buffer.DataType;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.api.ops.DynamicCustomOp;
+import org.nd4j.linalg.factory.Nd4j;
 import org.tensorflow.framework.AttrValue;
 import org.tensorflow.framework.GraphDef;
 import org.tensorflow.framework.NodeDef;
 
 import java.util.*;
 
+import static org.nd4j.linalg.api.buffer.DataType.INT32;
+
 /**
  * Gather op
  */
 public class Gather extends DynamicCustomOp {
 
-    protected int[] indices;
+    protected int[] indices = null;
     protected int jaxis = 0;
 
     public Gather() {
@@ -55,7 +57,7 @@ public class Gather extends DynamicCustomOp {
     }
 
     public Gather(SameDiff sameDiff, SDVariable input, int[] indices, int axis, boolean inPlace) {
-        super(null, sameDiff, new SDVariable[] {input}, inPlace);
+        super(null, sameDiff, new SDVariable[] {input, sameDiff.constant(Nd4j.createFromArray(indices))}, inPlace);
 
         addIArgument(axis);
         addIArgument(indices);
@@ -97,7 +99,7 @@ public class Gather extends DynamicCustomOp {
 
     @Override
     public void initFromTensorFlow(NodeDef nodeDef, SameDiff initWith, Map<String, AttrValue> attributesForNode, GraphDef graph) {
-        TFGraphMapper.initFunctionFromProperties(nodeDef.getOp(), this, attributesForNode, nodeDef, graph);
+        throw new UnsupportedOperationException("Use the new Tensorflow Importer instead. This method is now removed.");
     }
 
     @Override
@@ -160,43 +162,44 @@ public class Gather extends DynamicCustomOp {
     public List<SDVariable> doDiff(List<SDVariable> i_v) {
         //2 args: input and indices. Plus integer dimension arg
         //Gather backprop is just scatter add
-
+        //credit for fixes to @paratsu
         SDVariable indicesGrad = sameDiff.zerosLike(arg(1));
-        SDVariable inputGrad = sameDiff.zerosLike(arg(0));
+        var gradAtOut = i_v.get(0);
+        try (var ignore = sameDiff.withNameScope(gradAtOut.name())) {
+            //Gather backprop is just scatter add
+            SDVariable inputArray = arg(0);
+            SDVariable indices = args().length > 1 ? arg(1) : sameDiff.constant(Nd4j.createFromArray(this.indices));
+            SDVariable inputGrad = sameDiff.zerosLike(inputArray);
+            SDVariable inputArrayRank = inputArray.rank();
+            SDVariable gatherAxis = (jaxis < 0 ? inputArrayRank.minus(1) : sameDiff.constant(jaxis)).reshape(1);
+            SDVariable gradAtOutAdditionalDimensions = sameDiff.range(inputArrayRank, gradAtOut.rank(), sameDiff.constant(1), INT32);
 
-        SDVariable[] inputs = args();
-        SDVariable axis;
-        SDVariable rank = inputs[0].rank();
-        if(inputs.length == 2){
-            axis = sameDiff.constant(jaxis);
-            if(jaxis < 0)
-                axis = axis.add(rank);
-        } else {
-            axis = inputs[2];
+            //Use scatter add plus permute
+            SDVariable inputArrayDimensions = sameDiff.range(null, sameDiff.constant(0), inputArrayRank, sameDiff.constant(1), INT32);
+            SDVariable inputArrayDimensionsRectified =
+                    sameDiff.math().listDiff(inputArrayDimensions, gatherAxis)[0];
+
+            // Indices
+            SDVariable inputPermuteDims = sameDiff.concat(0, gatherAxis, inputArrayDimensionsRectified);
+            SDVariable outGradPermuteDims =
+                    sameDiff.concat(0, inputPermuteDims, gradAtOutAdditionalDimensions);
+            SDVariable inputInvertDims = sameDiff.invertPermutation(inputPermuteDims);
+
+            //Permute gradients so original axis is at position 0... then scatter add, and reverse
+            SDVariable permutedOutGrad = gradAtOut.permute(outGradPermuteDims);
+            SDVariable inputGradPermuted =inputGrad.permute(inputPermuteDims);
+            SDVariable inputGradPermutedScatterSum = sameDiff.scatterAdd(inputGradPermuted, indices, permutedOutGrad);
+
+            //Now, invert the permutation so axis is back where it was
+            SDVariable finalInputGrad = inputGradPermutedScatterSum.permute(inputInvertDims);
+            return Arrays.asList(finalInputGrad,indicesGrad);
         }
 
-        //Use scatter add plus permute
-        SDVariable dimsExAxis = sameDiff.range(null, sameDiff.constant(0), rank, sameDiff.constant(1), DataType.INT);
-        SDVariable axisRank1 = axis.reshape(1);
-        dimsExAxis = sameDiff.math().listDiff(dimsExAxis, axisRank1)[0];  //Don't need indices
-        SDVariable permuteDims = sameDiff.concat(0, axisRank1, dimsExAxis);
-        SDVariable invertDims = sameDiff.invertPermutation(permuteDims);
 
-
-        //Permute gradients so original axis is at position 0... then scatter add, and reverse
-        SDVariable gradAtOut = i_v.get(0);
-        SDVariable permuteGrad = gradAtOut.permute(permuteDims);
-        SDVariable inputGradPermute = inputGrad.permute(permuteDims);
-        inputGrad = sameDiff.scatterAdd(inputGradPermute, arg(1), permuteGrad);
-
-        //Now, invert the permutation so axis is back where it was
-        inputGrad = inputGrad.permute(invertDims);
-
-        return Arrays.asList(inputGrad, indicesGrad);
     }
 
     @Override
-    public List<DataType> calculateOutputDataTypes(List<DataType> dataTypes){
+    public List<DataType> calculateOutputDataTypes(List<DataType> dataTypes) {
         //Output type is same as (first) input type
         return Collections.singletonList(dataTypes.get(0));
     }

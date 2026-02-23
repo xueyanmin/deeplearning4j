@@ -24,9 +24,10 @@
 #include <ops/declarable/CustomOperations.h>
 #include <ops/declarable/helpers/axis.h>
 
+#if NOT_EXCLUDED(OP_reduce_dot_bp)
+
 namespace sd {
 namespace ops {
-#if NOT_EXCLUDED(OP_reduce_dot_bp)
 
 ////////////////////////////////////////////////////////////////////////////////
 CUSTOM_OP_IMPL(reduce_dot_bp, -1, 2, false, 0, 0) {
@@ -45,8 +46,13 @@ CUSTOM_OP_IMPL(reduce_dot_bp, -1, 2, false, 0, 0) {
                ShapeUtils::shapeAsString(x).c_str(), ShapeUtils::shapeAsString(y).c_str());
 
   if (gradO->lengthOf() == 1) {  // scalar of reduced to scalar with keep dimensions
-    gradX->assign((*y) * (*gradO));
-    gradY->assign((*x) * (*gradO));
+    auto* assign1 = (*y) * (*gradO);
+    gradX->assign(assign1);
+    delete assign1;
+    
+    auto* assign2 = (*x) * (*gradO);
+    gradY->assign(assign2);
+    delete assign2;
   } else {
     bool keepDims = false;
     auto dimensions = *block.getIArguments();
@@ -62,7 +68,7 @@ CUSTOM_OP_IMPL(reduce_dot_bp, -1, 2, false, 0, 0) {
       keepDims = (bool)T_ARG(0);
 
     REQUIRE_TRUE(
-        dimensions.size() <= x->rankOf(), 0,
+        dimensions.size() <= static_cast<size_t>(x->rankOf()), 0,
         "REDUCE_DOT_BP OP: the number of dimensions to reduce along must be <= input array rank, but got %i instead",
         dimensions.size());
 
@@ -74,16 +80,33 @@ CUSTOM_OP_IMPL(reduce_dot_bp, -1, 2, false, 0, 0) {
 
     if (!keepDims) {
       auto gradOShapeKeepDims =
-          ShapeUtils::evalReduceShapeInfo(gradO->ordering(), dimensions, *x, true, false, block.getWorkspace());
-      auto r = gradO->reshape(gradO->ordering(),
-                              ShapeUtils::pullShapeFromShapeInfo(
-                                  gradOShapeKeepDims));  // for example could be something like [a,b] -> [1,a,1,b]
+          ShapeUtils::evalReduceShapeInfo(gradO->ordering(), &dimensions, *x, true, false, block.getWorkspace());
+      std::vector<sd::LongType> shape =  ShapeUtils::pullShapeFromShapeInfo(
+          gradOShapeKeepDims);
+      auto* r = gradO->reshape(gradO->ordering(), shape);  // for example could be something like [a,b] -> [1,a,1,b]
 
-      gradX->assign((*y) * r);
-      gradY->assign((*x) * r);
+      // First case - for gradX
+      auto* gradXTemp1 = (*y) * (*r);
+      gradX->assign(gradXTemp1);
+      delete gradXTemp1;
+
+      // First case - for gradY
+      auto* gradYTemp1 = (*x) * (*r);
+      gradY->assign(gradYTemp1);
+      delete gradYTemp1;
+      
+      delete r;
+
     } else {
-      gradX->assign((*y) * (*gradO));
-      gradY->assign((*x) * (*gradO));
+      // Second case - for gradX
+      auto* gradXTemp2 = (*y) * (*gradO);
+      gradX->assign(gradXTemp2);
+      delete gradXTemp2;
+
+      // Second case - for gradY
+      auto* gradYTemp2 = (*x) * (*gradO);
+      gradY->assign(gradYTemp2);
+      delete gradYTemp2;
     }
   }
   return sd::Status::OK;
@@ -91,7 +114,6 @@ CUSTOM_OP_IMPL(reduce_dot_bp, -1, 2, false, 0, 0) {
 
 DECLARE_SHAPE_FN(reduce_dot_bp) {
   if (shape::length(inputShape->at(2)) > 1) {
-    bool keepDims = false;
     auto dimensions = *block.getIArguments();
 
     if (block.width() > 3) {
@@ -99,13 +121,9 @@ DECLARE_SHAPE_FN(reduce_dot_bp) {
       helpers::adjustAxis(INPUT_VARIABLE(0)->rankOf(), axesVector, dimensions);
     }
 
-    if (block.getBArguments()->size())
-      keepDims = B_ARG(0);
-    else if (block.getTArguments()->size())
-      keepDims = (bool)T_ARG(0);
 
     REQUIRE_TRUE(
-        dimensions.size() <= inputShape->at(0)[0], 0,
+        dimensions.size() <= static_cast<size_t>(inputShape->at(0)[0]), 0,
         "REDUCE_DOT_BP OP: the number of dimensions to reduce along must be <= input array rank, but got %i instead",
         dimensions.size());
 
@@ -116,18 +134,14 @@ DECLARE_SHAPE_FN(reduce_dot_bp) {
           inputShape->at(0)[0], inputShape->at(0)[0], item);
   }
 
-  sd::LongType *outShapeInfo1, *outShapeInfo2;
-  COPY_SHAPE(inputShape->at(0), outShapeInfo1);
-  COPY_SHAPE(inputShape->at(1), outShapeInfo2);
-
-  return SHAPELIST(CONSTANT(outShapeInfo1), CONSTANT(outShapeInfo2));
+  return SHAPELIST(CONSTANT(inputShape->at(0)), CONSTANT(inputShape->at(1)));
 }
 
 DECLARE_TYPES(reduce_dot_bp) {
   getOpDescriptor()->setAllowedInputTypes(sd::DataType::ANY)->setAllowedOutputTypes({ALL_FLOATS});
 }
 
-#endif
-
 }  // namespace ops
 }  // namespace sd
+
+#endif

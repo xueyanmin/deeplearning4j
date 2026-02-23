@@ -40,17 +40,20 @@ namespace ops {
  *
  * @tparam T
  */
-CONFIGURABLE_OP_IMPL(scatter_update, 2, 1, true, 0, -1) {
+CONFIGURABLE_OP_IMPL(scatter_update, -2, 1, true, 0, -2) {
+  //NOTE: DO NOT USE. USE scatter_upd instead.
   auto operand = INPUT_VARIABLE(0);
   auto updates = INPUT_VARIABLE(1);
+  if(updates->isEmpty())
+    return Status::OK;
 
   helpers::scatterUpdate(block.launchContext(), *operand, *updates, block.getIArguments());
 
-  return sd::Status::OK;
+  return Status::OK;
 }
 DECLARE_SYN(scatterupdate, scatter_update);
 
-DECLARE_TYPES(scatter_update) { getOpDescriptor()->setAllowedInputTypes(sd::DataType::ANY)->setSameMode(true); }
+DECLARE_TYPES(scatter_update) { getOpDescriptor()->setAllowedInputTypes(ANY)->setSameMode(true); }
 }  // namespace ops
 }  // namespace sd
 

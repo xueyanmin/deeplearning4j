@@ -37,17 +37,21 @@ CONFIGURABLE_OP_IMPL(prelu, 2, 1, true, 0, 0) {
   auto alpha = INPUT_VARIABLE(1);
   auto output = OUTPUT_VARIABLE(0);
 
-  std::vector<int> sharedAxes = *block.getIArguments();
+  std::vector<LongType> sharedAxes = *block.getIArguments();
 
   const int inputRank = input->rankOf();
   const int numSharedAxes = sharedAxes.size();  // can be zero as well
-  const sd::LongType inputLen = input->lengthOf();
-  const sd::LongType alphaLen = alpha->lengthOf();
-  const std::vector<sd::LongType> inputShape = input->getShapeAsVector();
-  const std::vector<sd::LongType> alphaShape = alpha->getShapeAsVector();
+  const LongType inputLen = input->lengthOf();
+  const LongType alphaLen = alpha->lengthOf();
+  auto* inputShapeVec = input->getShapeAsVector();
+  auto* alphaShapeVec = alpha->getShapeAsVector();
+  const std::vector<LongType> inputShape = *inputShapeVec;
+  const std::vector<LongType> alphaShape = *alphaShapeVec;
+  delete inputShapeVec;
+  delete alphaShapeVec;
 
   //***** input validation *****//
-  std::vector<sd::LongType> expectedAlphaShape(&inputShape[1], &inputShape[inputRank]);
+  std::vector<LongType> expectedAlphaShape(&inputShape[1], &inputShape[inputRank]);
 
   REQUIRE_TRUE(inputRank > 1, 0,
                "PRELU OP: wrong rank of input array, expected rank should be > 1, but got %i instead !", inputRank);
@@ -61,23 +65,19 @@ CONFIGURABLE_OP_IMPL(prelu, 2, 1, true, 0, 0) {
     expectedAlphaShape[sharedAxes[i] - 1] = 1;
   }
 
-  sd::LongType product = 1;
-  for (const auto& item : expectedAlphaShape) product *= item;
 
-  REQUIRE_TRUE(product == alphaLen, 0, "PRELU OP: wrong shape of alpha array, expected is %s, but got %s instead !",
-               ShapeUtils::shapeAsString(expectedAlphaShape).c_str(), ShapeUtils::shapeAsString(alphaShape).c_str());
-  // ***** end of validation ***** //
+  NDArray *alpha2 =  alphaShape != expectedAlphaShape ? alpha->reshape(alpha->ordering(), expectedAlphaShape) : alpha;
+  helpers::prelu(block.launchContext(), input,
+                 alpha2,
+                 output);
 
-  helpers::prelu(block.launchContext(), *input,
-                 alphaShape != expectedAlphaShape ? alpha->reshape(alpha->ordering(), expectedAlphaShape) : *alpha,
-                 *output);
-
-  return sd::Status::OK;
+  if(alpha2 != alpha) delete alpha2;
+  return Status::OK;
 }
 
 DECLARE_TYPES(prelu) {
   getOpDescriptor()
-      ->setAllowedInputTypes(0, DataType::ANY)
+      ->setAllowedInputTypes(0, ANY)
       ->setAllowedInputTypes(1, {ALL_FLOATS})
       ->setAllowedOutputTypes(0, {ALL_FLOATS});
 }
@@ -91,14 +91,18 @@ CONFIGURABLE_OP_IMPL(prelu_bp, 3, 2, true, 0, 0) {
   auto dLdI = OUTPUT_VARIABLE(0);
   auto dLdA = OUTPUT_VARIABLE(1);
 
-  std::vector<int> sharedAxes = *block.getIArguments();
+  std::vector<LongType> sharedAxes = *block.getIArguments();
 
   const int inputRank = input->rankOf();
   const int numSharedAxes = sharedAxes.size();  // can be zero as well
-  const sd::LongType inputLen = input->lengthOf();
-  const sd::LongType alphaLen = alpha->lengthOf();
-  const std::vector<sd::LongType> inputShape = input->getShapeAsVector();
-  const std::vector<sd::LongType> alphaShape = alpha->getShapeAsVector();
+  const LongType inputLen = input->lengthOf();
+  const LongType alphaLen = alpha->lengthOf();
+  auto* inputShapeVec = input->getShapeAsVector();
+  auto* alphaShapeVec = alpha->getShapeAsVector();
+  const std::vector<LongType> inputShape = *inputShapeVec;
+  const std::vector<LongType> alphaShape = *alphaShapeVec;
+  delete inputShapeVec;
+  delete alphaShapeVec;
 
   //***** input validation *****//
 
@@ -110,7 +114,7 @@ CONFIGURABLE_OP_IMPL(prelu_bp, 3, 2, true, 0, 0) {
                "%lld and %lld correspondingly!",
                input->lengthOf(), alpha->lengthOf());
 
-  std::vector<sd::LongType> expectedAlphaShape(&inputShape[1], &inputShape[inputRank]);
+  std::vector<LongType> expectedAlphaShape(&inputShape[1], &inputShape[inputRank]);
 
   REQUIRE_TRUE(inputRank > 1, 0,
                "PRELU_BP OP: wrong rank of input array, expected rank should be > 1, but got %i instead !", inputRank);
@@ -124,35 +128,41 @@ CONFIGURABLE_OP_IMPL(prelu_bp, 3, 2, true, 0, 0) {
     expectedAlphaShape[sharedAxes[i] - 1] = 1;
   }
 
-  sd::LongType product = 1;
+  LongType product = 1;
   for (const auto& item : expectedAlphaShape) product *= item;
 
   REQUIRE_TRUE(product == alphaLen, 0, "PRELU_BP OP: wrong shape of alpha array, expected is %s, but got %s instead !",
                ShapeUtils::shapeAsString(expectedAlphaShape).c_str(), ShapeUtils::shapeAsString(alphaShape).c_str());
   // ***** end of validation ***** //
 
+  NDArray* alphaReshaped = nullptr;
+  NDArray* dLdAReshaped = nullptr;
+  
   if (alphaShape != expectedAlphaShape) {
-    alpha = new NDArray(alpha->reshape(alpha->ordering(), expectedAlphaShape));
-    dLdA = new NDArray(dLdA->reshape(dLdA->ordering(), expectedAlphaShape));
+    alphaReshaped = alpha->reshape(alpha->ordering(), expectedAlphaShape);
+    dLdAReshaped = dLdA->reshape(dLdA->ordering(), expectedAlphaShape);
   }
 
-  helpers::preluBP(block.launchContext(), *input, *alpha, *dLdO, *dLdI, *dLdA);
+  helpers::preluBP(block.launchContext(), input, 
+                   alphaReshaped != nullptr ? alphaReshaped : alpha, 
+                   dLdO, dLdI, 
+                   dLdAReshaped != nullptr ? dLdAReshaped : dLdA);
 
-  if (alphaShape != expectedAlphaShape) {
-    delete alpha;
-    delete dLdA;
+  if (alphaReshaped != nullptr) {
+    delete alphaReshaped;
+    delete dLdAReshaped;
   }
 
-  return sd::Status::OK;
+  return Status::OK;
 }
 
 DECLARE_TYPES(prelu_bp) {
   getOpDescriptor()
-      ->setAllowedInputTypes(0, DataType::ANY)
-      ->setAllowedInputTypes(1, {DataType::FLOAT32, DataType ::DOUBLE, DataType::HALF})
-      ->setAllowedInputTypes(2, {DataType::FLOAT32, DataType ::DOUBLE, DataType::HALF})
-      ->setAllowedOutputTypes(0, {DataType::FLOAT32, DataType ::DOUBLE, DataType::HALF})
-      ->setAllowedOutputTypes(1, {DataType::FLOAT32, DataType ::DOUBLE, DataType::HALF});
+      ->setAllowedInputTypes(0, ANY)
+      ->setAllowedInputTypes(1, {FLOAT32, DOUBLE, HALF})
+      ->setAllowedInputTypes(2, {FLOAT32, DOUBLE, HALF})
+      ->setAllowedOutputTypes(0, {FLOAT32, DOUBLE, HALF})
+      ->setAllowedOutputTypes(1, {FLOAT32, DOUBLE, HALF});
 }
 
 }  // namespace ops

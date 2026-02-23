@@ -57,7 +57,7 @@ public class LossL2 implements ILossFunction {
      * @param weights Weights array (row vector). May be null.
      */
     public LossL2(@JsonProperty("weights") INDArray weights) {
-        if (weights != null && !weights.isRowVector()) {
+        if (weights != null && !weights.isRowVectorOrScalar()) {
             throw new IllegalArgumentException("Weights array must be a row vector");
         }
         this.weights = weights;
@@ -109,7 +109,7 @@ public class LossL2 implements ILossFunction {
 
     @Override
     public INDArray computeGradient(INDArray labels, INDArray preOutput, IActivation activationFn, INDArray mask) {
-        if(!labels.equalShapes(preOutput)){
+        if(!labels.equalShapes(preOutput)) {
             Preconditions.throwEx("Labels and preOutput must have equal shapes: got shapes %s vs %s", labels.shape(), preOutput.shape());
         }
         labels = labels.castTo(preOutput.dataType());   //No-op if already correct dtype

@@ -27,125 +27,305 @@
 #include <array/NDArrayFactory.h>
 #include <helpers/BlasHelper.h>
 #include <helpers/ShapeUtils.h>
+#include <ops/declarable/headers/shape.h>
+#include <ops/declarable/helpers/batched_gemm.h>
+
+#include <algorithm>
+#include <iterator>
+#include <numeric>
+#include <vector>
+
+#include "ops/declarable/headers/blas.h"
 
 namespace sd {
 
 //////////////////////////////////////////////////////////////////////////
-sd::NDArray* sd::MmulHelper::tensorDot(const sd::NDArray* A, const sd::NDArray* B,
-                                       const std::initializer_list<int>& axesA,
-                                       const std::initializer_list<int>& axesB) {
-  std::vector<int> aA(axesA);
-  std::vector<int> aB(axesB);
+NDArray* MmulHelper::tensorDot(NDArray* A, NDArray* B,
+                               const std::initializer_list<LongType>& axesA,
+                               const std::initializer_list<LongType>& axesB) {
+  std::vector<LongType> aA(axesA);
+  std::vector<LongType> aB(axesB);
   return tensorDot(A, B, aA, aB);
 }
 
 //////////////////////////////////////////////////////////////////////////
-sd::NDArray* sd::MmulHelper::tensorDot(const sd::NDArray* a, const sd::NDArray* b, const std::vector<int>& axes_0,
-                                       const std::vector<int>& axes_1) {
-  std::vector<int> permutAt, permutBt;
-  std::vector<sd::LongType> shapeAt, shapeBt;
+NDArray* MmulHelper::tensorDot(NDArray* A, NDArray* B, const std::vector<LongType>& axesA,
+                               const std::vector<LongType>& axesB) {
+  std::vector<LongType> permutAt, permutBt;
+  std::vector<LongType> shapeAt, shapeBt;
 
-  auto outShape = ShapeUtils::evalShapeForTensorDot(a, b, axes_0, axes_1, permutAt, permutBt, shapeAt, shapeBt);
+  auto outShape = ShapeUtils::evalShapeForTensorDot(A, B, axesA, axesB, permutAt, permutBt, shapeAt, shapeBt);
 
   // check whether permutation is necessary
-  const NDArray* aP = permutAt.empty() ? a : new NDArray(a->permute(permutAt));
-  const NDArray* bP = permutBt.empty() ? b : new NDArray(b->permute(permutBt));
+  NDArray* aP = permutAt.empty() ? A : A->permute(permutAt, false, false);
+  NDArray* bP = permutBt.empty() ? B : B->permute(permutBt, false, false);
 
   // check whether reshape is necessary
-  const NDArray* aPR = aP->isSameShape(shapeAt) ? aP : new NDArray(aP->reshape(aP->ordering(), shapeAt));
-  const NDArray* bPR = bP->isSameShape(shapeAt) ? bP : new NDArray(bP->reshape(bP->ordering(), shapeBt));
+  NDArray* aPR = aP->isSameShape(shapeAt) ? aP : aP->reshape(aP->ordering(), shapeAt);
+  NDArray* bPR = bP->isSameShape(shapeAt) ? bP : bP->reshape(bP->ordering(), shapeBt);
 
   NDArray* c = mmul(aPR, bPR, nullptr, 1.0, 0.0);
 
   c->reshapei(outShape);
 
-  if (aP != aPR) delete aPR;
-  if (bP != bPR) delete bPR;
-  if (a != aP) delete aP;
-  if (b != bP) delete bP;
+  // Delete reshaped arrays first
+  if(aPR != A && aPR != aP) {
+    delete aPR;
+  }
+  if(bPR != B && bPR != bP) {
+    delete bPR;
+  }
+
+  // Then delete permuted arrays
+  if(aP != A) {
+    delete aP;
+  }
+  if(bP != B) {
+    delete bP;
+  }
 
   return c;
 }
 
+
+void MmulHelper::computeNewShapesAndAxes(
+    NDArray& as_, const std::vector<LongType>& axes_a,
+    NDArray& bs, const std::vector<LongType>& axes_b,
+    std::vector<LongType>& newshape_a, std::vector<LongType>& newaxes_a,
+    std::vector<LongType>& newshape_b, std::vector<LongType>& newaxes_b
+) {
+
+
+  std::vector<LongType> *as_shape = as_.getShapeAsVector();
+  std::vector<LongType> *bs_shape = bs.getShapeAsVector();
+
+  std::vector<LongType> notin_a;
+  for(size_t k = 0; k < as_shape->size(); ++k) {
+    if(std::find(axes_a.begin(), axes_a.end(), k) == axes_a.end())
+      notin_a.push_back(k);
+  }
+
+
+
+  newaxes_a.clear();
+  std::copy(notin_a.begin(), notin_a.end(), std::back_inserter(newaxes_a));
+  std::copy(axes_a.begin(), axes_a.end(), std::back_inserter(newaxes_a));
+
+  LongType N2_a = std::accumulate(axes_a.begin(), axes_a.end(), 1L, [&](LongType product, LongType i){
+    return product * (*as_shape)[i];
+  });
+
+  newshape_a.clear();
+  newshape_a.push_back(std::accumulate(notin_a.begin(), notin_a.end(), 1L, [&](LongType product, LongType i){
+    return product * (*as_shape)[i];
+  }));
+  newshape_a.push_back(N2_a);
+
+
+
+  std::vector<LongType> notin_b;
+  for(size_t k = 0; k < bs_shape->size(); ++k) {
+    if(std::find(axes_b.begin(), axes_b.end(), k) == axes_b.end())
+      notin_b.push_back(k);
+  }
+
+
+  newaxes_b.clear();
+  std::copy(axes_b.begin(), axes_b.end(), std::back_inserter(newaxes_b));
+  std::copy(notin_b.begin(), notin_b.end(), std::back_inserter(newaxes_b));
+
+
+
+  LongType N2_b = std::accumulate(axes_b.begin(), axes_b.end(), 1L, [&](LongType product, LongType i){
+    return product * (*bs_shape)[i];
+  });
+
+
+
+  newshape_b.clear();
+  newshape_b.push_back(N2_b);
+  newshape_b.push_back(std::accumulate(notin_b.begin(), notin_b.end(), 1L, [&](LongType product, LongType i){
+    return product * (*bs_shape)[i];
+  }));
+
+
+}
+
 //////////////////////////////////////////////////////////////////////////
-void sd::MmulHelper::tensorDot(const sd::NDArray* a, const sd::NDArray* b, sd::NDArray* c,
-                               const std::vector<int>& axes_a, const std::vector<int>& axes_b,
-                               const std::vector<int>& permutForC) {
-  std::vector<int> permutAt, permutBt;
-  std::vector<sd::LongType> shapeAt, shapeBt;
-  ShapeUtils::evalShapeForTensorDot(a, b, axes_a, axes_b, permutAt, permutBt, shapeAt, shapeBt);
+void MmulHelper::tensorDot2(NDArray* a, NDArray* b, NDArray* c, const std::vector<LongType>& axes_a,
+                            const std::vector<LongType>& axes_b, std::vector<LongType>& permutAt,
+                            std::vector<LongType>& permuteBt, std::vector<LongType>& permuteCt,
+                            NDArray* realFinalResult) {
 
   // check whether permutation is required
-  NDArray* cP = permutForC.empty() ? c : new NDArray(c->permute(permutForC));
+  NDArray* cP  =permuteCt.empty() ? c : c->permute(permuteCt, false, false);
 
-  // check whether permutation is necessary
-  const NDArray* aP = permutAt.empty() ? a : new NDArray(a->permute(permutAt));
-  const NDArray* bP = permutBt.empty() ? b : new NDArray(b->permute(permutBt));
+  std::vector<LongType> shapeAt, shapeBt;
+  std::vector<LongType> permutAtDummy, permuteBtDummy;
 
-  // check whether reshape is necessary
-  const NDArray* aPR = aP->isSameShape(shapeAt) ? aP : new NDArray(aP->reshape(aP->ordering(), shapeAt));
-  const NDArray* bPR = bP->isSameShape(shapeAt) ? bP : new NDArray(bP->reshape(bP->ordering(), shapeBt));
+  std::vector<LongType> newshape_a, newaxes_a, newshape_b, newaxes_b;
+  computeNewShapesAndAxes(*a, axes_a, *b, axes_b, newshape_a, newaxes_a, newshape_b, newaxes_b);
 
-  std::vector<sd::LongType> requiredCshape = {aPR->sizeAt(0), bPR->sizeAt(1)};
+  NDArray* aP = permutAt.empty() ? a : a->permute(permutAt, false, false);
+  NDArray* bP = permuteBt.empty() ? b :b->permute(permuteBt, false, false);
 
-  NDArray* cPR = cP->isSameShape(requiredCshape) ? cP : new NDArray(cP->reshape(cP->ordering(), requiredCshape, false));
+  NDArray* aPermuted = aP->permute(newaxes_a, false, false);
+  NDArray* aPR = aPermuted->reshape('c', newshape_a, true);
 
-  mmul(aPR, bPR, cPR, 1.0, 0.0);
+  NDArray* bPermuted = bP->permute(newaxes_b, false, false);
+  NDArray* bPR = bPermuted->reshape('c', newshape_b, true);
+
+  std::vector<LongType> requiredCshape  = {aPR->sizeAt(0), bPR->sizeAt(1)};
+  NDArray *cP2 = cP->reshape('f', requiredCshape, false);
+  NDArray* cPR = cP2;
+
+  NDArray * ret = mmul(aPR, bPR, cPR, 1.0, 0.0);
 
   if (cPR->buffer() != cP->buffer() ||
-      cPR->specialBuffer() != cP->specialBuffer())  // this means both permute and reshape have been performed on c, cP
-                                                    // always points on c->buffer()
-    cP->assign(cPR);
+      cPR->specialBuffer() != cP->specialBuffer()) {  // this means both permute and reshape have been performed on c, cP
+    if(c->buffer() == cP->buffer()) {
+      auto copyFromBuff = cP->dataBuffer();
+      cP->dataBuffer()->copyBufferFrom(*copyFromBuff);
+    } else {
+      auto copyFromBuff = cP->dataBuffer();
+      c->dataBuffer()->copyBufferFrom(*copyFromBuff);
+    }
+  }
 
-  if (aP != aPR) delete aPR;
-  if (bP != bPR) delete bPR;
-  if (a != aP) delete aP;
-  if (b != bP) delete bP;
+  if(realFinalResult != c) {
+    realFinalResult->dataBuffer()->copyBufferFrom(*c->dataBuffer());
+  }
 
-  if (cP != cPR) delete cPR;
-  if (c != cP) delete cP;
+  if(cP != c) {
+    delete cP;
+  }
+  if(cPR != c) {
+    delete cPR;
+  }
+
+  if(aP != a && !aP->isView()) {
+    delete aP;
+  }
+  if(bP != b && !bP->isView()) {
+    delete bP;
+  }
+
+  // Delete in reverse order of creation to avoid use-after-free
+  if(bPR != b && bPR != bP && bPR != bPermuted && !bPR->isView()) {
+    delete bPR;
+  }
+  if(bPermuted != b && bPermuted != bP && !bPermuted->isView()) {
+    delete bPermuted;
+  }
+
+  if(aPR != a && aPR != aP && aPR != aPermuted && !aPR->isView()) {
+    delete aPR;
+  }
+  if(aPermuted != a && aPermuted != aP && !aPermuted->isView()) {
+    delete aPermuted;
+  }
+
+}
+
+
+void MmulHelper::tensorDot(NDArray* a, NDArray* b, NDArray* c,
+                           std::vector<LongType>& axes_a, std::vector<LongType>& axes_b,
+                           std::vector<LongType>& permutForC) {
+
+  std::vector<LongType> permutAt, permutBt;
+  std::vector<LongType> shapeAt, shapeBt;
+  ShapeUtils::evalShapeForTensorDot(a, b, axes_a, axes_b, permutAt, permutBt, shapeAt, shapeBt);
+
+
+  // check whether permutation is required
+  NDArray* cP = permutForC.empty() ? c :c->permute(permutForC, false, false);
+  // check whether permutation is necessary
+  NDArray* aP = permutAt.empty() ? a :a->permute(permutAt, false, false);
+  NDArray* bP = permutBt.empty() ? b : b->permute(permutBt, false, false);
+
+  // check whether reshape is necessary
+  NDArray* aPR = aP->isSameShape(shapeAt) ? aP : aP->reshape(aP->ordering(), shapeAt);
+  NDArray* bPR = bP->isSameShape(shapeAt) ? bP : bP->reshape(bP->ordering(), shapeBt);
+
+  std::vector<LongType> requiredCshape = {aPR->sizeAt(0), bPR->sizeAt(1)};
+
+
+  NDArray* cPR = cP->isSameShape(requiredCshape) ? cP : cP->reshape(cP->ordering(), requiredCshape, false);
+  NDArray *ret = mmul(aPR, bPR, cPR, 1.0, 0.0);
+
+  if (c != ret) {  // this means both permute and reshape have been performed on c, cP
+    // always points on c->buffer()
+    NDArray *assign2 = ret->reshape(c->ordering(),requiredCshape);
+    c->assign(assign2);
+    delete assign2;
+  }
+
+
+  if(c != cP && !cP->isView()) {
+    delete cP;
+  }
+
+  if(aP != a && !aP->isView()) {
+    delete aP;
+  }
+
+  if(bP != b && !bP->isView()) {
+    delete bP;
+  }
+
+  if(aPR != a && aPR != aP && !aPR->isView()) {
+    delete aPR;
+  }
+  if(bPR != b && bPR != bP && !bPR->isView()) {
+    delete bPR;
+  }
+
+  if(cPR != c && cPR != cP && !cPR->isView()) {
+    delete cPR;
+  }
 }
 
 #ifndef __JAVACPP_HACK__
 //////////////////////////////////////////////////////////////////////////
-void sd::MmulHelper::tensorDot(const NDArray* a, const NDArray* b, NDArray* c,
-                               const std::vector<std::vector<sd::LongType>>& modifA,
-                               const std::vector<std::vector<sd::LongType>>& modifB,
-                               const std::vector<std::vector<sd::LongType>>& modifC) {
+void MmulHelper::tensorDot(NDArray* a, NDArray* b, NDArray* c,
+                           std::vector<std::vector<LongType>>& modifA,
+                           std::vector<std::vector<LongType>>& modifB,
+                           std::vector<std::vector<LongType>>& modifC) {
   NDArray *aPR(const_cast<NDArray*>(a)), *bPR(const_cast<NDArray*>(b));
   std::string whatToDoWithA, whatToDoWithB,
       whatToDoWithC;  // "" - nothing; "p" - permutation; "r" - reshaping; "pr" - permutation+reshaping; "rp" -
-                      // reshaping/permutation, and so on; if another string is produced - throw exception
+  // reshaping/permutation, and so on; if another string is produced - throw exception
 
   for (const auto& arr : modifA)
     whatToDoWithA =
         (std::find(arr.begin(), arr.end(), 0) != arr.end())
-            ? whatToDoWithA + "p"
-            : whatToDoWithA +
-                  "r";  // when 0 is present in arr then it is permutation array, otherwise - it is reshaping array
+        ? whatToDoWithA + "p"
+        : whatToDoWithA +
+          "r";  // when 0 is present in arr then it is permutation array, otherwise - it is reshaping array
   for (const auto& arr : modifB)
     whatToDoWithB = (std::find(arr.begin(), arr.end(), 0) != arr.end()) ? whatToDoWithB + "p" : whatToDoWithB + "r";
   for (const auto& arr : modifC)
     whatToDoWithC = (std::find(arr.begin(), arr.end(), 0) != arr.end()) ? whatToDoWithC + "p" : whatToDoWithC + "r";
 
   // first step for a array
+
   if (!whatToDoWithA.empty())
-    aPR = (whatToDoWithA[0] == 'p') ? new NDArray(a->permute(modifA[0]))
-                                    : new NDArray(a->reshape(a->ordering(), modifA[0]));
+    aPR = (whatToDoWithA[0] == 'p') ? a->permute(modifA[0], false, false)
+                                    :a->reshape(a->ordering(), modifA[0]);
   // first step for b array
   if (!whatToDoWithB.empty())
-    bPR = (whatToDoWithB[0] == 'p') ? new NDArray(b->permute(modifB[0]))
-                                    : new NDArray(b->reshape(b->ordering(), modifB[0]));
+    bPR = (whatToDoWithB[0] == 'p') ? b->permute(modifB[0], false, false)
+                                    : b->reshape(b->ordering(), modifB[0]);
   // rest steps for a array
-  for (int i = 1; i < whatToDoWithA.size(); ++i)
+  for (size_t i = 1; i < whatToDoWithA.size(); ++i)
     if (whatToDoWithA[i] == 'p')
-      aPR->permutei(modifA[i]);
+      aPR->permutei(modifA[i], false, false);
     else
       aPR->reshapei(modifA[i]);
   // rest steps for b array
-  for (int i = 1; i < whatToDoWithB.size(); ++i)
+  for (size_t i = 1; i < whatToDoWithB.size(); ++i)
     if (whatToDoWithB[i] == 'p')
-      bPR->permutei(modifB[i]);
+      bPR->permutei(modifB[i], false, false);
     else
       bPR->reshapei(modifB[i]);
 
@@ -153,13 +333,13 @@ void sd::MmulHelper::tensorDot(const NDArray* a, const NDArray* b, NDArray* c,
   std::vector<NDArray*> cArrs = {c};
   if (!whatToDoWithC.empty()) {
     cArrs = std::vector<NDArray*>(whatToDoWithC.size() + 1, c);
-    for (int i = 0; i < cArrs.size() - 1; ++i)
+    for (size_t i = 0; i < cArrs.size() - 1; ++i)
       cArrs[i + 1] =
           (whatToDoWithC[i] == 'p')
-              ? new NDArray(cArrs[i]->permute(modifC[i]))
-              : new NDArray(cArrs[i]->reshape(
-                    c->ordering(), modifC[i],
-                    false));  // since we ignore first element in cArrs (that is cArrs[0]) then it is always equal to c
+          ? cArrs[i]->permute(modifC[i], false, false)
+          : cArrs[i]->reshape(
+              c->ordering(), modifC[i],
+              false);  // since we ignore first element in cArrs (that is cArrs[0]) then it is always equal to c
   }
 
   mmul(aPR, bPR, cArrs[cArrs.size() - 1], 1.0, 0.0);
@@ -178,82 +358,91 @@ void sd::MmulHelper::tensorDot(const NDArray* a, const NDArray* b, NDArray* c,
 }
 
 //////////////////////////////////////////////////////////////////////////
-NDArray* sd::MmulHelper::tensorDot(const sd::NDArray* a, const sd::NDArray* b,
-                                   const std::vector<std::vector<sd::LongType>>& modifA,
-                                   const std::vector<std::vector<sd::LongType>>& modifB) {
+NDArray* MmulHelper::tensorDot(NDArray* a, NDArray* b,
+                               std::vector<std::vector<LongType>>& modifA,
+                               std::vector<std::vector<LongType>>& modifB) {
   NDArray *aPR(const_cast<NDArray*>(a)), *bPR(const_cast<NDArray*>(b));
   std::string whatToDoWithA,
       whatToDoWithB;  // "" - nothing; "p" - permutation only; "r" - reshaping only; "pr" - permutation+reshaping; "rp"
-                      // - reshaping/permutation; another string - throw exception
+  // - reshaping/permutation; another string - throw exception
 
   for (const auto& arr : modifA)
     whatToDoWithA =
         (std::find(arr.begin(), arr.end(), 0) != arr.end())
-            ? whatToDoWithA + "p"
-            : whatToDoWithA +
-                  "r";  // when 0 is present in arr then it is permutation array, otherwise - it is reshaping array
+        ? whatToDoWithA + "p"
+        : whatToDoWithA +
+          "r";  // when 0 is present in arr then it is permutation array, otherwise - it is reshaping array
   for (const auto& arr : modifB)
     whatToDoWithB = (std::find(arr.begin(), arr.end(), 0) != arr.end()) ? whatToDoWithB + "p" : whatToDoWithB + "r";
 
   // first step for a array
   if (!whatToDoWithA.empty())
-    aPR = (whatToDoWithA[0] == 'p') ? new NDArray(a->permute(modifA[0]))
-                                    : new NDArray(a->reshape(a->ordering(), modifA[0]));
+    aPR = (whatToDoWithA[0] == 'p') ?a->permute(modifA[0], false, false)
+                                    : a->reshape(a->ordering(), modifA[0]);
   // first step for b array
   if (!whatToDoWithB.empty())
-    bPR = (whatToDoWithB[0] == 'p') ? new NDArray(b->permute(modifB[0]))
-                                    : new NDArray(b->reshape(b->ordering(), modifB[0]));
+    bPR = (whatToDoWithB[0] == 'p') ? b->permute(modifB[0], false, false)
+                                    : b->reshape(b->ordering(), modifB[0]);
   // rest steps for a array
-  for (int i = 1; i < whatToDoWithA.size(); ++i)
+  for (size_t i = 1; i < whatToDoWithA.size(); ++i)
     if (whatToDoWithA[i] == 'p')
-      aPR->permutei(modifA[i]);
+      aPR->permutei(modifA[i], false, false);
     else
       aPR->reshapei(modifA[i]);
   // rest steps for b array
-  for (int i = 1; i < whatToDoWithB.size(); ++i)
+  for (size_t i = 1; i < whatToDoWithB.size(); ++i)
     if (whatToDoWithB[i] == 'p')
-      bPR->permutei(modifB[i]);
+      bPR->permutei(modifB[i], false, false);
     else
       bPR->reshapei(modifB[i]);
 
   NDArray* result = mmul(aPR, bPR, nullptr, 1.0, 0.0);
 
-  if (aPR != a) delete aPR;
-  if (bPR != b) delete bPR;
   return result;
 }
 #endif
 
 //////////////////////////////////////////////////////////////////////////
-sd::NDArray* MmulHelper::mmul(const sd::NDArray* A, const sd::NDArray* B, sd::NDArray* C, const double alpha,
-                              const double beta, const char outOrder) {
-  int lenDim;
-  const int aRank = A->rankOf();
-  const int bRank = B->rankOf();
+NDArray* MmulHelper::mmul(NDArray* A, NDArray* B, NDArray* C, const double alpha,
+                          const double beta, const char outOrder) {
+  LongType lenDim;
+  const LongType aRank = A->rankOf();
+  const LongType bRank = B->rankOf();
   const bool isAVector = shape::isCommonVector(A->shapeInfo(), lenDim);
   const bool isBVector = shape::isCommonVector(B->shapeInfo(), lenDim);
-
   // dot product of 2 vectors
   if (A->lengthOf() == B->lengthOf() && isAVector && isBVector &&
       (aRank != 2 ||
-       aRank == 2 && (A->isSameShape(B) ||
-                      bRank == 1 && A->sizeAt(1) == 1)))  // (1x1x1 * 1x1) or (1x4 * 1*4) or (4x1 * 4x1) or (4x1 * 4)
-    return dot(A, B, C, alpha, beta);
+       (aRank == 2 && (A->isSameShape(B) ||
+                      (bRank == 1 && A->sizeAt(1) == 1))))) {  // (1x1x1 * 1x1) or (1x4 * 1*4) or (4x1 * 4x1) or (4x1 * 4)
 
+
+    return dot(A, B, C, alpha, beta);
+  }
   // matrix x matrix
-  if (aRank == 2 && bRank == 2) return mmulMxM(A, B, C, alpha, beta, outOrder);
+  if (aRank == 2 && bRank == 2) {
+    return mmulMxM(A, B, C, alpha, beta, outOrder);
+  }
 
   // matrix x vector
-  if (aRank == 2 && isBVector) return mmulMxV(A, B, C, alpha, beta, outOrder);
+  if (aRank == 2 && isBVector) {
+    return mmulMxV(A, B, C, alpha, beta, outOrder);
+  }
 
   // vector x matrix, A{M} x B{M,N} = C{N} -> reduce to matrix x matrix A2{1,M} x B{M,N} = C2{1,N}, since there is no
   // corresponding blas operation sgevm
   if (isAVector && bRank == 2) {
-    NDArray* A2 = new NDArray(A->reshape(A->ordering(), {1, A->lengthOf()}));                       // A{M} -> A2{1,M}
-    NDArray* C2 = C ? new NDArray(C->reshape(C->ordering(), {1, C->lengthOf()}, false)) : nullptr;  // C{N} -> C2{1,N}
+    std::vector<sd::LongType> aShape = {1, A->lengthOf()};
+    std::vector<sd::LongType> cShape = {1, C->lengthOf()};
+
+
+    NDArray* A2 = A->reshape(A->ordering(), aShape);                       // A{M} -> A2{1,M}
+    NDArray* C2 = C ? C->reshape(C->ordering(), cShape, false) : nullptr;  // C{N} -> C2{1,N}
     auto result = mmulMxM(A2, B, C2, alpha, beta, outOrder);                                        // result{1,N}
-    delete A2;
-    delete C2;
+
+    // Cleanup reshaped arrays
+    if (A2 != A) delete A2;
+    if (C2 != nullptr && C2 != C) delete C2;
 
     if (!C) {
       result->reshapei({result->lengthOf()});  // result{1,N} -> result{N}
@@ -266,78 +455,162 @@ sd::NDArray* MmulHelper::mmul(const sd::NDArray* A, const sd::NDArray* B, sd::ND
   return mmulNxN(A, B, C, alpha, beta, outOrder);
 }
 
+bool MmulHelper::resolveTranspose(sd::NDArray& a, sd::NDArray& b, bool& transA, bool& transB) {
+  int rowsA = a.sizeAt(-2);
+  int colsA = a.sizeAt(-1);
+  int rowsB = b.sizeAt(-2);
+  int colsB = b.sizeAt(-1);
+
+  transA = false;
+  transB = false;
+
+
+  if (colsA == rowsB) {
+    // No transpose needed
+    return true;
+  } else if (rowsA == rowsB) {
+    // Transpose A
+    transA = true;
+    return true;
+  } else if (colsA == colsB) {
+    // Transpose B
+    transB = true;
+    return true;
+  } else {
+    // Dimensions do not match for matrix multiply
+    return false;
+  }
+}
+
 //////////////////////////////////////////////////////////////////////////
-void MmulHelper::matmul(const sd::NDArray* x, const sd::NDArray* y, sd::NDArray* z, const bool transX,
-                        const bool transY, double alpha, double beta) {
+void MmulHelper::matmul(NDArray* x, NDArray* y, NDArray* z, const bool transX, const bool transY, double alpha,
+                        double beta, NDArray* realFinalResult) {
   int xRank = x->rankOf();
   int yRank = y->rankOf();
 
   auto outShape = ShapeUtils::evalShapeForMatmul(x->shapeInfo(), y->shapeInfo(), transX, transY);
   if (!z->isSameShape(outShape)) {
-    sd_printf(
-        "NDArrayFactory::matmul static method: input shape of output array is wrong, actual is %s and expected is %s ! "
-        "\n",
-        ShapeUtils::shapeAsString(z).c_str(), ShapeUtils::shapeAsString(outShape).c_str());
-    throw std::invalid_argument("");
+    std::string errorMessage;
+    errorMessage = "NDArrayFactory::matmul static method: input shape of output array is wrong, actual is";
+    errorMessage += ShapeUtils::shapeAsString(z).c_str();
+    errorMessage += " and expected is ";
+    errorMessage += ShapeUtils::shapeAsString(outShape).c_str();
+    errorMessage += " ! \n";
+    THROW_EXCEPTION(errorMessage.c_str());
   }
 
   if (z->isEmpty()) return;
 
-  NDArray *xT(const_cast<NDArray*>(x)), *yT(const_cast<NDArray*>(y)), *zT(z);
+  NDArray *xT = const_cast<NDArray *>(x);
+  NDArray *yT = const_cast<NDArray *>(y);
+  NDArray *zT = z;
 
+  // Handle transpose via permute + dup for contiguous data
+  // permute creates a view with swapped strides, dup() makes a contiguous copy
   if ((transX && xRank > 1) || (transY && yRank > 1)) {
     const int rank = xRank >= yRank ? xRank : yRank;
-    std::vector<int> permut(rank);
+    std::vector<LongType> permut(rank);
     for (int i = 0; i < rank - 2; ++i) permut[i] = i;
     permut[rank - 2] = rank - 1;
     permut[rank - 1] = rank - 2;
 
-    if (transX) xT = new NDArray(x->permute(permut));
-
-    if (transY) yT = new NDArray(y->permute(permut));
+    if (transX) {
+      NDArray *permutedView = x->permute(permut, false, false);  // Create view (non-contiguous)
+      xT = permutedView->dup();  // Make contiguous copy with proper data layout
+      delete permutedView;
+    }
+    if (transY) {
+      NDArray *permutedView = y->permute(permut, false, false);  // Create view (non-contiguous)
+      yT = permutedView->dup();  // Make contiguous copy with proper data layout
+      delete permutedView;
+    }
   }
 
-  if (xRank <= 2 &&
-      yRank <= 2) {  // dot (1Dx1D), vector-matrix (1Dx2D), matrix-vector (2Dx1D), matrix-matrix (2Dx2D) product cases
+  if (xRank <= 2 && yRank <= 2) {
+    // dot (1Dx1D), vector-matrix (1Dx2D), matrix-vector (2Dx1D), matrix-matrix (2Dx2D) product cases
+    NDArray* xReshaped = nullptr;
+    NDArray* zReshaped = nullptr;
+    
+    if (xRank == 1 && yRank == 2) {
+      // reduce vector-matrix to matrix-matrix case
+      std::vector<sd::LongType> xShape = {1, xT->lengthOf()};
+      std::vector<sd::LongType> zShape = {1, z->lengthOf()};
 
-    if (xRank == 1 && yRank == 2) {  // reduce vector-matrix to matrix-matrix case
-      xT = new NDArray(x->reshape(x->ordering(),
-                                  {1, x->lengthOf()}));  // please note x is not transposed in this case (since xRank=1)
-      zT = new NDArray(z->reshape(z->ordering(), {1, z->lengthOf()}));
+      // Remember if we need to delete the permuted versions
+      NDArray* xPermuted = (xT != x) ? xT : nullptr;
+      NDArray* zPermuted = (zT != z) ? zT : nullptr;
+
+      xReshaped = xT->reshape(xT->ordering(), xShape, false);
+      xT = xReshaped;
+      zReshaped = z->reshape(z->ordering(), zShape, false);
+      zT = zReshaped;
+
+      // Clean up permuted versions if they exist
+      if(xPermuted != nullptr && !xPermuted->isView()) {
+        delete xPermuted;
+      }
+      if(zPermuted != nullptr && !zPermuted->isView()) {
+        delete zPermuted;
+      }
     }
 
     mmul(xT, yT, zT, alpha, beta);
-  } else {  // rest cases -  batched mmul
 
-    const int batchRank = xRank - 2;
-    std::vector<int> dimsToExclude(batchRank);
-    for (int i = 0; i < batchRank; ++i) dimsToExclude[i] = i;
+    // Copy back result and clean up reshaped output
+    if(zT != z) {
+      z->dataBuffer()->copyBufferFrom(*zT->dataBuffer(), zT->lengthOf() * zT->sizeOfT());
+      delete zT;
+      zT = z;  // Reset to original to prevent double-free at end of function
+    }
 
-    const sd::LongType numOfSubArrs = ShapeUtils::getNumOfSubArrs(xT->shapeInfo(), dimsToExclude);
+    // Clean up reshaped input
+    if(xReshaped != nullptr && xReshaped != x) {
+      delete xReshaped;
+      xT = x;  // Reset to original to prevent double-free at end of function
+    }
 
-    // PRAGMA_OMP_PARALLEL_FOR
-    for (sd::LongType i = 0; i < numOfSubArrs; ++i) {
-      auto xSubArr = (*xT)(i, dimsToExclude);
-      auto ySubArr = (*yT)(i, dimsToExclude);
-      auto zSubArr = (*zT)(i, dimsToExclude);
-      mmul(&xSubArr, &ySubArr, &zSubArr, alpha, beta);
+  } else {
+    // Batched matmul: loop over batch dimensions and call 2D gemm for each slice
+    // This is more reliable than mmulNxN which has bugs in batch index calculation
+
+    // For 3D arrays [batch, M, K] x [batch, K, N] = [batch, M, N]
+    // We iterate over batch dimension and call 2D mmul for each slice
+    const int xRankT = xT->rankOf();
+    const int yRankT = yT->rankOf();
+    const int zRankT = zT->rankOf();
+
+    if (xRankT == 3 && yRankT == 3 && zRankT == 3) {
+      // Simple case: all 3D with matching batch dimension
+      const LongType batchSize = xT->sizeAt(0);
+      const LongType M = xT->sizeAt(1);
+      const LongType K = xT->sizeAt(2);
+      const LongType N = yT->sizeAt(2);
+
+      for (LongType b = 0; b < batchSize; ++b) {
+        // Get 2D slices for this batch using subarray
+        auto xSlice = (*xT)(b, {0});  // [M, K]
+        auto ySlice = (*yT)(b, {0});  // [K, N]
+        auto zSlice = (*zT)(b, {0});  // [M, N]
+
+        // Call 2D matmul - no transpose flags since we already handled them via permute+dup
+        mmul(xSlice, ySlice, zSlice, alpha, beta);
+      }
+    } else {
+      // Fall back to mmulNxN for other cases (4D+, mixed ranks, etc.)
+      mmulNxN(xT, yT, zT, alpha, beta, z->ordering());
     }
   }
 
-  if (xT != x) delete xT;
-  if (yT != y) delete yT;
-  if (zT != z) delete zT;
+  // Clean up permuted arrays (works for both cases)
+  if (xT != x && xT != nullptr) delete xT;
+  if (yT != y && yT != nullptr) delete yT;
+
+  if(realFinalResult != nullptr && realFinalResult != z) {
+    realFinalResult->dataBuffer()->copyBufferFrom(*z->dataBuffer());
+  }
+
+
 }
-
-// BUILD_TRIPLE_TEMPLATE(template void usualGemm, (const char cOrder, const bool transA, const bool transB, const int M,
-// const int N, const int K, const double alpha, const void* A, const int lda, const void* B, const int ldb, const double
-// beta, void* C, const int ldc), SD_COMMON_TYPES, SD_FLOAT_TYPES, SD_FLOAT_TYPES); BUILD_TRIPLE_TEMPLATE(template void
-// usualGemv, (const char aOrder, const int M, const int N, const double alpha, const void* A, const int lda, const void*
-// B, const int incx, const double beta, void* C, const int incy), SD_COMMON_TYPES, SD_FLOAT_TYPES, SD_FLOAT_TYPES);
-// BUILD_TRIPLE_TEMPLATE(template void usualDot,  (const sd::LongType length, const double alpha, const void* vX, const
-// sd::LongType incx, const void* vY, const sd::LongType incy, const double beta, void* vZ), SD_COMMON_TYPES,
-// SD_FLOAT_TYPES, SD_FLOAT_TYPES);
-
 }  // namespace sd
 
 #endif

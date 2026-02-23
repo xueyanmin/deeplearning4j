@@ -20,7 +20,12 @@
 
 package org.deeplearning4j.nn.conf.constraint;
 
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
+
 import org.apache.commons.lang3.ArrayUtils;
 import org.deeplearning4j.nn.api.Layer;
 import org.deeplearning4j.nn.api.ParamInitializer;
@@ -41,13 +46,13 @@ public abstract class BaseConstraint implements LayerConstraint {
     @Getter
     protected Set<String> params = new HashSet<>();
     protected double epsilon = 1e-6;
-    protected int[] dimensions;
+    protected long[] dimensions;
 
     protected BaseConstraint(){
         //No arg for json ser/de
     }
 
-    protected BaseConstraint(Set<String> paramNames, int... dimensions){
+    protected BaseConstraint(Set<String> paramNames, long... dimensions){
         this(paramNames, DEFAULT_EPSILON, dimensions);
     }
 
@@ -73,11 +78,14 @@ public abstract class BaseConstraint implements LayerConstraint {
 
     public abstract BaseConstraint clone();
 
-    public static int[] getBroadcastDims(int[] reduceDimensions, int rank){
-        int[] out = new int[rank-reduceDimensions.length];
+    public static long[] getBroadcastDims(long[] reduceDimensions, int rank) {
+        long[] out = new long[rank - reduceDimensions.length];
+        if(rank < 1 || reduceDimensions.length < 1 || out.length < 1) {
+            return new long[]{0};
+        }
         int outPos = 0;
-        for( int i=0; i<rank; i++ ){
-            if(!ArrayUtils.contains(reduceDimensions, i)){
+        for( int i = 0; i < rank; i++) {
+            if(!ArrayUtils.contains(reduceDimensions, i)) {
                 out[outPos++] = i;
             }
         }

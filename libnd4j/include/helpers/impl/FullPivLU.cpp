@@ -24,6 +24,7 @@
 
 #include <numeric>
 
+#if NOT_EXCLUDED(OP_triangular_solve)
 namespace sd {
 namespace ops {
 namespace helpers {
@@ -31,37 +32,39 @@ namespace helpers {
 //////////////////////////////////////////////////////////////////////////
 // A{M,K} * x{K,N} = b{M,N}
 template <typename T>
-void FullPivLU<T>::solve(const NDArray& A, const NDArray& b, NDArray& x) {
-  if (A.rankOf() != 2) throw std::runtime_error("FullPivLU::solve: input matrix A must be 2D !");
+void FullPivLU<T>::solve(NDArray &A, NDArray &b, NDArray& x) {
+  if (A.rankOf() != 2) THROW_EXCEPTION("FullPivLU::solve: input matrix A must be 2D !");
 
   if (A.sizeAt(0) != b.sizeAt(0))
-    throw std::runtime_error("FullPivLU::solve: A and b must have the same number of rows !");
+    THROW_EXCEPTION("FullPivLU::solve: A and b must have the same number of rows !");
 
   if (A.sizeAt(1) != x.sizeAt(0))
-    throw std::runtime_error("FullPivLU::solve: number of A columns must be equal to number of x rows !");
+    THROW_EXCEPTION("FullPivLU::solve: number of A columns must be equal to number of x rows !");
 
-  NDArray LU = A.dup();
-
-  const int rows = LU.sizeAt(0);
-  const int cols = LU.sizeAt(1);
+  NDArray *LU = A.dup(A.ordering());
+  NDArray luRef = *LU;
+  const int rows = LU->sizeAt(0);
+  const int cols = LU->sizeAt(1);
   const int diagLen = math::sd_min<int>(rows, cols);
 
   std::vector<int> rowsInds(rows), colsInds(cols);
 
-  int numOfTranspos = 0;
   int nonZeroPivots1 = diagLen;
 
   T maxPivot = T(0);
 
   for (int k = 0; k < diagLen; ++k) {
-    NDArray bottomRightCorner = LU({k, rows, k, cols}, true);
-    const int indPivot =
-        static_cast<int>(bottomRightCorner.indexReduceNumber(indexreduce::IndexAbsoluteMax).t<sd::LongType>(0));
+    NDArray *bottomRightCornerPtr = luRef({k, rows, k, cols}, true);
+    NDArray bottomRightCorner = *bottomRightCornerPtr;
+    delete bottomRightCornerPtr;
+    
+    NDArray *indexNum = bottomRightCorner.indexReduceNumber(indexreduce::IndexAbsoluteMax);
+    const int indPivot = static_cast<int>(indexNum->t<LongType>(0));
 
     int colPivot = indPivot % (cols - k);
     int rowPivot = indPivot / (cols - k);
 
-    T currentMax = math::sd_abs<T>(bottomRightCorner.t<T>(rowPivot, colPivot));
+    T currentMax = math::sd_abs<T,T>(bottomRightCorner.t<T>(rowPivot, colPivot));
 
     // take into account that this was calculated in corner, not in whole LU
     rowPivot += k;
@@ -72,6 +75,7 @@ void FullPivLU<T>::solve(const NDArray& A, const NDArray& b, NDArray& x) {
 
       for (int i = k; i < diagLen; ++i) rowsInds[i] = colsInds[i] = i;
 
+      delete indexNum;
       break;
     }
 
@@ -81,35 +85,53 @@ void FullPivLU<T>::solve(const NDArray& A, const NDArray& b, NDArray& x) {
     colsInds[k] = colPivot;
 
     if (k != rowPivot) {
-      NDArray row1 = LU({k, k + 1, 0, 0}, true);
-      NDArray row2 = LU({rowPivot, rowPivot + 1, 0, 0}, true);
-      row1.swapUnsafe(row2);
-      ++numOfTranspos;
+      NDArray *row1Ptr = luRef({k, k + 1, 0, 0}, true);
+      NDArray *row2Ptr = luRef({rowPivot, rowPivot + 1, 0, 0}, true);
+      row1Ptr->swapUnsafe(*row2Ptr);
+      delete row1Ptr;
+      delete row2Ptr;
     }
     if (k != colPivot) {
-      NDArray col1 = LU({0, 0, k, k + 1}, true);
-      NDArray col2 = LU({0, 0, colPivot, colPivot + 1}, true);
-      col1.swapUnsafe(col2);
-      ++numOfTranspos;
+      NDArray *col1Ptr = luRef({0, 0, k, k + 1}, true);
+      NDArray *col2Ptr = luRef({0, 0, colPivot, colPivot + 1}, true);
+      col1Ptr->swapUnsafe(*col2Ptr);
+      delete col1Ptr;
+      delete col2Ptr;
     }
 
-    if (k < rows - 1) LU({k + 1, rows, k, k + 1}, true) /= LU.t<T>(k, k);
+    if (k < rows - 1) {
+      NDArray *divViewPtr = luRef({k + 1, rows, k, k + 1}, true);
+      *divViewPtr /= luRef.t<T>(k, k);
+      delete divViewPtr;
+    }
 
-    if (k < diagLen - 1)
-      LU({k + 1, rows, k + 1, cols}, true) -=
-          mmul(LU({k + 1, rows, k, k + 1}, true), LU({k, k + 1, k + 1, cols}, true));
+    if (k < diagLen - 1) {
+      NDArray *leftPtr = luRef({k + 1, rows, k, k + 1}, true);
+      NDArray *rightPtr = luRef({k, k + 1, k + 1, cols}, true);
+      NDArray *targetPtr = luRef({k + 1, rows, k + 1, cols}, true);
+      NDArray left = *leftPtr;
+      NDArray right = *rightPtr;
+      NDArray *mulResult = mmul(left, right);
+      *targetPtr -= *mulResult;
+      delete mulResult;
+      delete leftPtr;
+      delete rightPtr;
+      delete targetPtr;
+    }
+
+    delete indexNum;
   }
-
   //***************************************************//
 
   const T threshold = maxPivot * DataTypeUtils::eps<T>() * (T)diagLen;
 
   int nonZeroPivots2 = 0;
   for (int i = 0; i < nonZeroPivots1; ++i)
-    nonZeroPivots2 += static_cast<int>(math::sd_abs<T>(LU.t<T>(i, i)) > threshold);
+    nonZeroPivots2 += static_cast<int>(math::sd_abs<T,T>(luRef.t<T>(i, i)) > threshold);
 
   if (nonZeroPivots2 == 0) {
     x.nullify();
+    delete LU;
     return;
   }
 
@@ -132,29 +154,73 @@ void FullPivLU<T>::solve(const NDArray& A, const NDArray& b, NDArray& x) {
 
   //***************************************************//
 
-  NDArray c = b.ulike();
+  NDArray *bUlike = b.ulike();
+  NDArray c = *bUlike;
 
-  for (int i = 0; i < rows; ++i) c({i, i + 1, 0, 0}, true).assign(b({rowsPermut2[i], rowsPermut2[i] + 1, 0, 0}, true));
-
-  NDArray cTopRows1 = c({0, diagLen, 0, 0}, true);
+  for (int i = 0; i < rows; ++i) {
+    NDArray *cAssignPtr = b({rowsPermut2[i], rowsPermut2[i] + 1, 0, 0}, true);
+    NDArray cAssign = *cAssignPtr;
+    delete cAssignPtr;
+    
+    NDArray *cTargetPtr = c({i, i + 1, 0, 0}, true);
+    cTargetPtr->assign(&cAssign);
+    delete cTargetPtr;
+  }
+  
+  NDArray *cTopRows1Ptr = c({0, diagLen, 0, 0}, true);
+  NDArray cTopRows1 = *cTopRows1Ptr;
+  delete cTopRows1Ptr;
+  
+  NDArray *luDiagPtr = luRef({0, diagLen, 0, diagLen}, true);
   // TriangularSolver<T>::solve(LU({0,diagLen, 0,diagLen}, true), cTopRows1, true, true, cTopRows1);
-  ops::helpers::triangularSolve2D<T>(nullptr, LU({0, diagLen, 0, diagLen}, true), cTopRows1, true, true, cTopRows1);
+  helpers::triangularSolve2D<T>(nullptr, *luDiagPtr, cTopRows1, true, true, cTopRows1);
+  delete luDiagPtr;
 
-  if (rows > cols) c({cols, -1, 0, 0}, true) -= mmul(LU({cols, -1, 0, 0}, true), c({0, cols, 0, 0}, true));
+  if (rows > cols) {
+    NDArray *leftPtr = luRef({cols, -1, 0, 0}, true);
+    NDArray *rightPtr = c({0, cols, 0, 0}, true);
+    NDArray *targetPtr = c({cols, -1, 0, 0}, true);
+    NDArray left = *leftPtr;
+    NDArray right = *rightPtr;
+    NDArray *mulResult = mmul(left, right);
+    *targetPtr -= *mulResult;
+    delete mulResult;
+    delete leftPtr;
+    delete rightPtr;
+    delete targetPtr;
+  }
+  
+  NDArray *cTopRows2Ptr = c({0, nonZeroPivots2, 0, 0}, true);
+  NDArray cTopRows2 = *cTopRows2Ptr;
+  delete cTopRows2Ptr;
+  
+  NDArray *luNonZeroPtr = luRef({0, nonZeroPivots2, 0, nonZeroPivots2}, true);
+  helpers::triangularSolve2D<T>(nullptr, *luNonZeroPtr, cTopRows2, false, false, cTopRows2);
+  delete luNonZeroPtr;
 
-  NDArray cTopRows2 = c({0, nonZeroPivots2, 0, 0}, true);
-  // TriangularSolver<T>::solve(LU({0,nonZeroPivots2, 0,nonZeroPivots2}, true), cTopRows2, false, false, cTopRows2);
-  ops::helpers::triangularSolve2D<T>(nullptr, LU({0, nonZeroPivots2, 0, nonZeroPivots2}, true), cTopRows2, false, false,
-                                     cTopRows2);
+  for (int i = 0; i < nonZeroPivots2; ++i) {
+    NDArray *cAssignPtr = c({i, i + 1, 0, 0}, true);
+    NDArray cAssign = *cAssignPtr;
+    delete cAssignPtr;
+    
+    NDArray *xTargetPtr = x({colsPermut[i], colsPermut[i] + 1, 0, 0}, true);
+    xTargetPtr->assign(&cAssign);
+    delete xTargetPtr;
+  }
+  
+  for (int i = nonZeroPivots2; i < cols; ++i) {
+    NDArray *xNullifyPtr = x({colsPermut[i], colsPermut[i] + 1, 0, 0}, true);
+    xNullifyPtr->nullify();
+    delete xNullifyPtr;
+  }
 
-  for (int i = 0; i < nonZeroPivots2; ++i)
-    x({colsPermut[i], colsPermut[i] + 1, 0, 0}, true).assign(c({i, i + 1, 0, 0}, true));
-
-  for (int i = nonZeroPivots2; i < cols; ++i) x({colsPermut[i], colsPermut[i] + 1, 0, 0}, true).nullify();
+  delete LU;
+  delete bUlike;
 }
 
-BUILD_SINGLE_TEMPLATE(template class FullPivLU, , SD_FLOAT_TYPES);
+BUILD_SINGLE_TEMPLATE( class FullPivLU, , SD_FLOAT_TYPES);
 
 }  // namespace helpers
 }  // namespace ops
 }  // namespace sd
+#endif

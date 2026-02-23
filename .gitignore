@@ -16,6 +16,7 @@ release.properties
 *.prefs
 *.settings/*
 *.log
+libnd4j/preprocessed
 .project
 .classpath
 metastore_db
@@ -38,6 +39,11 @@ release.properties
 *dependency-reduced-pom.xml
 Test Results*.xml
 Test Results*.html
+libnd4j/tests_*
+platform-tests/*.proto
+platform-tests/*.txt
+platform-tests/*.pbtxt
+
 # Specific for Nd4j
 *.md5
 *.pom
@@ -63,6 +69,7 @@ nd4j/samediff-import/samediff-import-onnx/*.pbtxt
 nd4j/samediff-import/samediff-import-tensorflow/*.txt
 nd4j/samediff-import/samediff-import-tensorflow/*.pbtxt
 *.pom.xml.tmp
+libnd4j/tests_cpu/surefire-reports
 
 doc_sources/
 doc_sources_*

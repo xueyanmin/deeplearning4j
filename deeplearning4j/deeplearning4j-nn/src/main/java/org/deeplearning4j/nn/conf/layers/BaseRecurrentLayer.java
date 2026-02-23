@@ -20,7 +20,13 @@
 
 package org.deeplearning4j.nn.conf.layers;
 
-import lombok.*;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
+
 import org.deeplearning4j.nn.api.layers.LayerConstraint;
 import org.deeplearning4j.nn.conf.InputPreProcessor;
 import org.deeplearning4j.nn.conf.RNNFormat;
@@ -41,11 +47,13 @@ public abstract class BaseRecurrentLayer extends FeedForwardLayer {
 
     protected IWeightInit weightInitFnRecurrent;
     protected RNNFormat rnnDataFormat;
+    protected boolean useBias = true;
 
     protected BaseRecurrentLayer(Builder builder) {
         super(builder);
         this.weightInitFnRecurrent = builder.weightInitFnRecurrent;
         this.rnnDataFormat = builder.rnnDataFormat;
+        this.useBias = builder.useBias;
     }
 
     @Override
@@ -86,6 +94,12 @@ public abstract class BaseRecurrentLayer extends FeedForwardLayer {
     @Getter
     @Setter
     public static abstract class Builder<T extends Builder<T>> extends FeedForwardLayer.Builder<T> {
+
+
+        /**
+         * If true (default = true): include bias parameters in the model.
+         */
+        protected boolean useBias = true;
 
         /**
          * Set the format of data expected by the RNN. NCW = [miniBatchSize, size, timeSeriesLength],

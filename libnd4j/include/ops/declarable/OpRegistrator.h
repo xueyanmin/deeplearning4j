@@ -26,6 +26,7 @@
 #include <execution/Engine.h>
 #include <ops/declarable/DeclarableOp.h>
 #include <ops/declarable/PlatformHelper.h>
+#include <ops/declarable/PlatformHelperLegacy.h>
 
 #include <mutex>
 #include <unordered_map>
@@ -68,44 +69,37 @@ class SD_LIB_EXPORT OpRegistrator {
   static OpRegistrator* _INSTANCE;
   OpRegistrator() {
     sd_debug("OpRegistrator started\n", "");
-
-#ifndef _RELEASE
-    std::signal(SIGSEGV, &OpRegistrator::sigSegVHandler);
-    std::signal(SIGINT, &OpRegistrator::sigIntHandler);
-    std::signal(SIGABRT, &OpRegistrator::sigIntHandler);
-    std::signal(SIGFPE, &OpRegistrator::sigIntHandler);
-    std::signal(SIGILL, &OpRegistrator::sigIntHandler);
-    std::signal(SIGTERM, &OpRegistrator::sigIntHandler);
-    atexit(&OpRegistrator::exitHandler);
-#endif
   };
 
-  SD_MAP_IMPL<sd::LongType, std::string> _msvc;
+  SD_MAP_IMPL<LongType, std::string> _msvc;
 
   // pointers to our operations
-  SD_MAP_IMPL<sd::LongType, sd::ops::DeclarableOp*> _declarablesLD;
-  SD_MAP_IMPL<std::string, sd::ops::DeclarableOp*> _declarablesD;
-  std::vector<sd::ops::DeclarableOp*> _uniqueD;
+  SD_MAP_IMPL<LongType, DeclarableOp*> _declarablesLD;
+  SD_MAP_IMPL<std::string, DeclarableOp*> _declarablesD;
+  std::vector<DeclarableOp*> _uniqueD;
 
   // pointers to platform-specific helpers
-  SD_MAP_IMPL<std::pair<sd::LongType, samediff::Engine>, sd::ops::platforms::PlatformHelper*> _helpersLH;
-  SD_MAP_IMPL<std::pair<std::string, samediff::Engine>, sd::ops::platforms::PlatformHelper*> _helpersH;
-  std::vector<sd::ops::platforms::PlatformHelper*> _uniqueH;
+  SD_MAP_IMPL<std::pair<LongType, samediff::Engine>, platforms::PlatformHelper*> _helpersLH;
+  SD_MAP_IMPL<std::pair<std::string, samediff::Engine>, platforms::PlatformHelper*> _helpersH;
+  std::vector<platforms::PlatformHelper*> _uniqueH;
+
 
   std::mutex _locker;
   std::string _opsList;
-  bool isInit = false;
+  std::vector<OpExecTrace *> opexecTrace;
 
+  bool isInit = false;
+  bool isTrace = false;
  public:
   ~OpRegistrator();
 
+  void purgeOpExecs();
+  void registerOpExec(OpExecTrace *opExecTrace);
+  std::vector<OpExecTrace *> * execTrace();
+
   static OpRegistrator& getInstance();
 
-  static void exitHandler();
-  static void sigIntHandler(int sig);
-  static void sigSegVHandler(int sig);
-
-  void updateMSVC(sd::LongType newHash, std::string& oldName);
+  void updateMSVC(LongType newHash, std::string& oldName);
 
   template <typename T>
   std::string local_to_string(T value);
@@ -116,20 +110,22 @@ class SD_LIB_EXPORT OpRegistrator {
    *
    * @param op
    */
-  bool registerOperation(const char* name, sd::ops::DeclarableOp* op);
-  bool registerOperation(sd::ops::DeclarableOp* op);
+  bool registerOperation(const char* name, DeclarableOp* op);
+  bool registerOperation(DeclarableOp* op);
+  bool traceOps();
+  void toggleTraceOps(bool traceOps);
+  void registerHelper(platforms::PlatformHelper* op);
 
-  void registerHelper(sd::ops::platforms::PlatformHelper* op);
 
-  bool hasHelper(sd::LongType hash, samediff::Engine engine);
+  bool hasHelper(LongType hash, samediff::Engine engine);
 
-  sd::ops::DeclarableOp* getOperation(const char* name);
-  sd::ops::DeclarableOp* getOperation(sd::LongType hash);
-  sd::ops::DeclarableOp* getOperation(std::string& name);
+  DeclarableOp* getOperation(const char* name);
+  DeclarableOp* getOperation(LongType hash);
+  DeclarableOp* getOperation(std::string& name);
 
-  sd::ops::platforms::PlatformHelper* getPlatformHelper(sd::LongType hash, samediff::Engine engine);
+  platforms::PlatformHelper* getPlatformHelper(LongType hash, samediff::Engine engine);
 
-  std::vector<sd::LongType> getAllHashes();
+  std::vector<LongType> getAllHashes();
 
   int numberOfOperations();
 };

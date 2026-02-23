@@ -21,16 +21,15 @@
 package org.deeplearning4j.nn.modelimport.keras.layers.pooling;
 
 import lombok.extern.slf4j.Slf4j;
-import org.deeplearning4j.nn.conf.CNN2DFormat;
-import org.deeplearning4j.nn.conf.inputs.InputType;
-import org.deeplearning4j.nn.conf.layers.Subsampling1DLayer;
 import org.deeplearning4j.nn.modelimport.keras.KerasLayer;
 import org.deeplearning4j.nn.modelimport.keras.exceptions.InvalidKerasConfigurationException;
 import org.deeplearning4j.nn.modelimport.keras.exceptions.UnsupportedKerasConfigurationException;
+import org.deeplearning4j.nn.modelimport.keras.layers.convolutional.KerasConvolutionUtils;
+import org.deeplearning4j.nn.conf.CNN2DFormat;
+import org.deeplearning4j.nn.conf.inputs.InputType;
+import org.deeplearning4j.nn.conf.layers.Subsampling1DLayer;
 
 import java.util.Map;
-
-import static org.deeplearning4j.nn.modelimport.keras.layers.convolutional.KerasConvolutionUtils.*;
 
 /**
  * Imports a Keras 1D Pooling layer as a DL4J Subsampling layer.
@@ -67,10 +66,10 @@ public class KerasPooling1D extends KerasLayer {
                 KerasPoolingUtils.mapPoolingType(this.className, conf)).name(this.layerName)
                 .dropOut(this.dropout)
                 .dataFormat(dimOrder == DimOrder.TENSORFLOW ? CNN2DFormat.NHWC : CNN2DFormat.NCHW)
-                .convolutionMode(getConvolutionModeFromConfig(layerConfig, conf))
-                .kernelSize(getKernelSizeFromConfig(layerConfig, 1, conf, kerasMajorVersion)[0])
-                .stride(getStrideFromConfig(layerConfig, 1, conf)[0]);
-        int[] padding = getPaddingFromBorderModeConfig(layerConfig, 1, conf, kerasMajorVersion);
+                .convolutionMode(KerasConvolutionUtils.getConvolutionModeFromConfig(layerConfig, conf))
+                .kernelSize(KerasConvolutionUtils.getKernelSizeFromConfig(layerConfig, 1, conf, kerasMajorVersion)[0])
+                .stride(KerasConvolutionUtils.getStrideFromConfig(layerConfig, 1, conf)[0]);
+        int[] padding = KerasConvolutionUtils.getPaddingFromBorderModeConfig(layerConfig, 1, conf, kerasMajorVersion);
         if (padding != null)
             builder.padding(padding[0]);
         this.layer = builder.build();

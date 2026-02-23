@@ -22,11 +22,11 @@
 // @author raver119@gmail.com
 //
 #include <loops/cpu/reduce/reduce_float.hpp>
-#cmakedefine SD_FLOAT_TYPES_GEN
-#if defined(SD_FLOAT_TYPES_GEN) && defined(SD_FLOAT_TYPES_@FL_TYPE_INDEX@)
+#cmakedefine SD_COMMON_TYPES_GEN
+#if  defined(SD_COMMON_TYPES_GEN) && defined(SD_COMMON_TYPES_@FL_TYPE_INDEX@) && COUNT_NARG(SD_FLOAT_TYPES) > 0
 namespace functions {
     namespace reduce {
-        BUILD_DOUBLE_TEMPLATE(template class SD_LIB_HIDDEN ReduceFloatFunction, , SD_COMMON_TYPES, SD_FLOAT_TYPES_@FL_TYPE_INDEX@);
+        BUILD_DOUBLE_TEMPLATE(template class SD_LIB_HIDDEN ReduceFloatFunction, , SD_COMMON_TYPES_@FL_TYPE_INDEX@ , SD_FLOAT_TYPES);
     }
 }
 #endif

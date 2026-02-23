@@ -34,7 +34,6 @@ import org.nd4j.samediff.frameworkimport.tensorflow.NodeDef
 import org.nd4j.samediff.frameworkimport.tensorflow.context.TensorflowMappingContext
 import org.nd4j.samediff.frameworkimport.tensorflow.convertNDArrayToTensorflowTensor
 import org.nd4j.samediff.frameworkimport.tensorflow.nodeByName
-import org.nd4j.tensorflow.conversion.TensorflowConversion
 import org.tensorflow.framework.*
 
 class TensorflowIRGraph(graphDef: GraphDef, opDef: OpList
@@ -96,6 +95,27 @@ class TensorflowIRGraph(graphDef: GraphDef, opDef: OpList
     }
 
 
+    override fun graphStructure(): String {
+        val builder = StringBuilder()
+        builder.append("TensorFlow Graph Structure:\n")
+        builder.append("=========================\n")
+        builder.append("Inputs: ${inputs.joinToString(", ")}\n")
+        builder.append("Outputs: ${outputs.joinToString(", ")}\n")
+        builder.append("Total Nodes: ${nodeNames.size}\n\n")
+
+        builder.append("Nodes:\n")
+        cachedNodeList.forEach { node ->
+            builder.append("  ${node.nodeName()} (${node.opName()})\n")
+            if (node.inputs().isNotEmpty()) {
+                builder.append("    Inputs: ${node.inputs().joinToString(", ")}\n")
+            }
+            if (node.outputs().isNotEmpty()) {
+                builder.append("    Outputs: ${node.outputs().joinToString(", ")}\n")
+            }
+        }
+
+        return builder.toString()
+    }
 
     override fun createMappingContext(
         opDef: OpDef,
@@ -123,6 +143,10 @@ class TensorflowIRGraph(graphDef: GraphDef, opDef: OpList
 
     override fun isPlaceHolder(opName: String): Boolean {
         return opName == "Placeholder" || opName == "PlaceholderWithDefault"
+    }
+
+    override fun variableNames(): List<String> {
+        return nodeNames.toList()
     }
 
     override fun shapeOfInput(varName: String): LongArray? {
@@ -234,6 +258,9 @@ class TensorflowIRGraph(graphDef: GraphDef, opDef: OpList
     }
 
     override fun hasConstantInitializer(name: String): Boolean {
+        if(!cachedNodeList.map { input -> input.nodeName() }.contains(name)) {
+            return false
+        }
         val node = nodeByName(name)
         return node != null && node.op == "Const"
     }
@@ -269,6 +296,10 @@ class TensorflowIRGraph(graphDef: GraphDef, opDef: OpList
 
     override fun updateNodeCacheWith(nodeList: List<IRNode<NodeDef, TensorProto, OpDef.AttrDef, AttrValue, DataType>>) {
         this.cachedNodeList = nodeList
+    }
+
+    override fun convertToTensor(ndarrayInput: INDArray, tensorName: String): TensorProto {
+        return convertNDArrayToTensorflowTensor(ndarrayInput)
     }
 
 

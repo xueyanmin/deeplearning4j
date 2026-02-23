@@ -56,7 +56,26 @@ public class Flatten extends DynamicCustomOp {
     public Flatten(SameDiff sameDiff, char order, SDVariable... inputs) {
         super(sameDiff, inputs);
         this.order = order;
-        addIArgument(order);
+        addIArgument(Long.valueOf((int) this.order));
+    }
+
+    public Flatten(SameDiff sd, SDVariable input, String order) {
+        this(sd,order.charAt(0),input);
+    }
+
+    public Flatten(INDArray input, String order) {
+        super(new INDArray[]{input},null);
+        addIArgument(order.charAt(0));
+    }
+
+    public Flatten(SameDiff sd, SDVariable[] inputs, String order) {
+        super(sd,inputs);
+        addIArgument(order.charAt(0));
+    }
+
+    public Flatten(INDArray[] inputs, String order) {
+        super(inputs,null);
+        addIArgument(order.charAt(0));
     }
 
     @Override

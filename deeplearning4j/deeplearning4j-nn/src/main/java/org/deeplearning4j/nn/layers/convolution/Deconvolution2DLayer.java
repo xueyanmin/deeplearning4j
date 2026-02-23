@@ -20,6 +20,7 @@
 
 package org.deeplearning4j.nn.layers.convolution;
 
+import lombok.SneakyThrows;
 import lombok.val;
 import org.deeplearning4j.exception.DL4JInvalidInputException;
 import org.deeplearning4j.nn.conf.CNN2DFormat;
@@ -35,7 +36,6 @@ import org.nd4j.linalg.api.buffer.DataType;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.api.ops.CustomOp;
 import org.nd4j.linalg.api.ops.DynamicCustomOp;
-import org.nd4j.linalg.api.shape.Shape;
 import org.nd4j.linalg.factory.Nd4j;
 import org.nd4j.common.primitives.Pair;
 import org.deeplearning4j.nn.workspace.LayerWorkspaceMgr;
@@ -51,11 +51,7 @@ public class Deconvolution2DLayer extends ConvolutionLayer {
 
 
     @Override
-    void initializeHelper() {
-        // no op
-    }
-
-    @Override
+    @SneakyThrows
     public Pair<Gradient, INDArray> backpropGradient(INDArray epsilon, LayerWorkspaceMgr workspaceMgr) {
         assertInputSet(true);
         if (input.rank() != 4) {
@@ -81,13 +77,13 @@ public class Deconvolution2DLayer extends ConvolutionLayer {
         long kH = weights.size(2);
         long kW = weights.size(3);
 
-        int[] dilation = layerConf().getDilation();
-        int[] kernel = layerConf().getKernelSize();
-        int[] strides = layerConf().getStride();
-        int[] pad;
+        long[] dilation = layerConf().getDilation();
+        long[] kernel = layerConf().getKernelSize();
+        long[] strides = layerConf().getStride();
+        long[] pad;
         if (convolutionMode == ConvolutionMode.Same) {
-            int[] outSize = new int[]{(int)epsilon.size(hDim), (int)epsilon.size(wDim)};
-            pad = ConvolutionUtils.getSameModeTopLeftPadding(outSize, new int[] {(int)inH, (int)inW}, kernel, strides, dilation);
+            long[] outSize = {epsilon.size(hDim), epsilon.size(wDim)};
+            pad = ConvolutionUtils.getSameModeTopLeftPadding(outSize, new long[] {inH, inW}, kernel, strides, dilation);
         } else {
             pad = layerConf().getPadding();
         }
@@ -100,8 +96,8 @@ public class Deconvolution2DLayer extends ConvolutionLayer {
 
         Integer sameMode = (convolutionMode == ConvolutionMode.Same) ? 1 : 0;
 
-        int[] args = new int[] {
-                (int)kH, (int)kW, strides[0], strides[1],
+        long[] args = {
+                kH, kW, strides[0], strides[1],
                 pad[0], pad[1], dilation[0], dilation[1], sameMode,
                 nchw ? 0 : 1 //0 = NCHW; 1 = NHWC
         };
@@ -198,19 +194,19 @@ public class Deconvolution2DLayer extends ConvolutionLayer {
         int kH = (int) weights.size(2);
         int kW = (int) weights.size(3);
 
-        int[] dilation = layerConf().getDilation();
-        int[] kernel = layerConf().getKernelSize();
-        int[] strides = layerConf().getStride();
+        long[] dilation = layerConf().getDilation();
+        long[] kernel = layerConf().getKernelSize();
+        long[] strides = layerConf().getStride();
 
-        int[] pad;
-        int[] outSize;
+        long[] pad;
+        long[] outSize;
         if (convolutionMode == ConvolutionMode.Same) {
-            outSize = ConvolutionUtils.getDeconvolutionOutputSize(input, kernel, strides, null, convolutionMode, dilation, format); //Also performs validation
-            pad = ConvolutionUtils.getSameModeTopLeftPadding(outSize, new int[] {(int) input.size(hDim), (int) input.size(wDim)}, kernel,
+            outSize = ConvolutionUtils.getDeconvolutionOutputSizeLong(input, kernel, strides, null, convolutionMode, dilation, format); //Also performs validation
+            pad = ConvolutionUtils.getSameModeTopLeftPadding(outSize, new long[] { input.size(hDim),  input.size(wDim)}, kernel,
                     strides, dilation );
         } else {
             pad = layerConf().getPadding();
-            outSize = ConvolutionUtils.getDeconvolutionOutputSize(input, kernel, strides, pad, convolutionMode, dilation, format); //Also performs validation
+            outSize = ConvolutionUtils.getDeconvolutionOutputSizeLong(input, kernel, strides, pad, convolutionMode, dilation, format); //Also performs validation
         }
 
         long outH = outSize[0];
@@ -223,7 +219,7 @@ public class Deconvolution2DLayer extends ConvolutionLayer {
 
         int sameMode = (convolutionMode == ConvolutionMode.Same) ? 1 : 0;
 
-        int[] args = new int[] {
+        long[] args = {
                 kH, kW, strides[0], strides[1],
                 pad[0], pad[1], dilation[0], dilation[1], sameMode,
                 nchw ? 0 : 1 //0 = NCHW; 1 = NHWC
@@ -263,12 +259,6 @@ public class Deconvolution2DLayer extends ConvolutionLayer {
 
         IActivation afn = layerConf().getActivationFn();
 
-        if (helper != null && Shape.strideDescendingCAscendingF(z)) {
-            INDArray ret = helper.activate(z, layerConf().getActivationFn(), training);
-            if (ret != null) {
-                return ret;
-            }
-        }
 
         INDArray activation = afn.getActivation(z, training);
         return activation;

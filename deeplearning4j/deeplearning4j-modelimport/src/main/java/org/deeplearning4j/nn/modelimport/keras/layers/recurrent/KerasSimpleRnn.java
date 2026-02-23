@@ -23,6 +23,10 @@ package org.deeplearning4j.nn.modelimport.keras.layers.recurrent;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.extern.slf4j.Slf4j;
+import org.deeplearning4j.nn.modelimport.keras.KerasLayer;
+import org.deeplearning4j.nn.modelimport.keras.exceptions.InvalidKerasConfigurationException;
+import org.deeplearning4j.nn.modelimport.keras.exceptions.UnsupportedKerasConfigurationException;
+import org.deeplearning4j.nn.modelimport.keras.utils.KerasActivationUtils;
 import org.deeplearning4j.nn.api.layers.LayerConstraint;
 import org.deeplearning4j.nn.conf.InputPreProcessor;
 import org.deeplearning4j.nn.conf.RNNFormat;
@@ -34,9 +38,6 @@ import org.deeplearning4j.nn.conf.layers.recurrent.LastTimeStep;
 import org.deeplearning4j.nn.conf.layers.recurrent.SimpleRnn;
 import org.deeplearning4j.nn.conf.layers.util.MaskZeroLayer;
 import org.deeplearning4j.nn.conf.layers.wrapper.BaseWrapperLayer;
-import org.deeplearning4j.nn.modelimport.keras.KerasLayer;
-import org.deeplearning4j.nn.modelimport.keras.exceptions.InvalidKerasConfigurationException;
-import org.deeplearning4j.nn.modelimport.keras.exceptions.UnsupportedKerasConfigurationException;
 import org.deeplearning4j.nn.modelimport.keras.utils.KerasConstraintUtils;
 import org.deeplearning4j.nn.modelimport.keras.utils.KerasLayerUtils;
 import org.deeplearning4j.nn.params.SimpleRnnParamInitializer;
@@ -50,7 +51,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
-import static org.deeplearning4j.nn.modelimport.keras.utils.KerasActivationUtils.getIActivationFromConfig;
 import static org.deeplearning4j.nn.modelimport.keras.utils.KerasInitilizationUtils.getWeightInitFromConfig;
 import static org.deeplearning4j.nn.modelimport.keras.utils.KerasLayerUtils.getNOutFromConfig;
 
@@ -140,7 +140,7 @@ public class KerasSimpleRnn extends KerasLayer {
         Map<String, Object> innerConfig = KerasLayerUtils.getInnerLayerConfigFromConfig(layerConfig, conf);
         this.returnSequences = (Boolean) innerConfig.get(conf.getLAYER_FIELD_RETURN_SEQUENCES());
 
-        KerasRnnUtils.getRecurrentDropout(conf, layerConfig);
+        this.dropout = KerasRnnUtils.getRecurrentDropout(conf, layerConfig);
         this.unroll = KerasRnnUtils.getUnrollRecurrentLayer(conf, layerConfig);
 
         Pair<Boolean, Double> maskingConfig = KerasLayerUtils.getMaskingConfiguration(inboundLayerNames, previousLayers);
@@ -152,17 +152,21 @@ public class KerasSimpleRnn extends KerasLayer {
         LayerConstraint recurrentConstraint = KerasConstraintUtils.getConstraintsFromConfig(
                 layerConfig, conf.getLAYER_FIELD_RECURRENT_CONSTRAINT(), conf, kerasMajorVersion);
 
+        boolean useBias = KerasLayerUtils.getHasBiasFromConfig(layerConfig, conf);
         SimpleRnn.Builder builder = new SimpleRnn.Builder()
                 .name(this.layerName)
                 .nOut(getNOutFromConfig(layerConfig, conf))
                 .dropOut(this.dropout)
-                .activation(getIActivationFromConfig(layerConfig, conf))
+                .activation(KerasActivationUtils.getIActivationFromConfig(layerConfig, conf))
                 .weightInit(init)
                 .weightInitRecurrent(recurrentInit)
                 .biasInit(0.0)
                 .l1(this.weightL1Regularization)
                 .l2(this.weightL2Regularization).dataFormat(RNNFormat.NWC);
+        builder.setUseBias(useBias);
         Integer nIn = KerasLayerUtils.getNInFromInputDim(layerConfig, conf);
+        builder.setRnnDataFormat(RNNFormat.NWC);
+
         if(nIn != null)
             builder.setNIn(nIn);
         if (biasConstraint != null)
@@ -277,12 +281,11 @@ public class KerasSimpleRnn extends KerasLayer {
 
 
         INDArray b;
-        if (weights.containsKey(conf.getKERAS_PARAM_NAME_B()))
+        if (weights.containsKey(conf.getKERAS_PARAM_NAME_B())) {
             b = weights.get(conf.getKERAS_PARAM_NAME_B());
-        else
-            throw new InvalidKerasConfigurationException(
-                    "Keras SimpleRNN layer does not contain parameter " + conf.getKERAS_PARAM_NAME_B());
-        this.weights.put(SimpleRnnParamInitializer.BIAS_KEY, b);
+
+            this.weights.put(SimpleRnnParamInitializer.BIAS_KEY, b);
+        }
 
 
         if (weights.size() > NUM_TRAINABLE_PARAMS) {
@@ -296,13 +299,13 @@ public class KerasSimpleRnn extends KerasLayer {
         }
 
         FeedForwardLayer ffl;
-        if(this.layer instanceof BaseWrapperLayer){
+        if(this.layer instanceof BaseWrapperLayer) {
             BaseWrapperLayer bwl = (BaseWrapperLayer)this.layer;
             ffl = (FeedForwardLayer)bwl.getUnderlying();
         } else {
             ffl = (FeedForwardLayer) this.layer;
         }
-        if(ffl.getNIn() != W.rows()){
+        if(ffl.getNIn() != W.rows()) {
             //Workaround/hack for ambiguous input shapes (nIn inference) for some RNN models (using NCW format but not recorded in config)
             //We can reliably infer nIn from the shape of the weights array however
             ffl.setNIn(W.rows());

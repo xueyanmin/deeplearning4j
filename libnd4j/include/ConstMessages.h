@@ -35,6 +35,9 @@ namespace sd {
 #define ORDERING_MSG_INPUT_ "the Ordering of the Input NDArray"
 #define ORDERING_MSG_OUTPUT_ "the Ordering of the Output NDArray"
 
+extern const char *UNIQUE_TRANSFORM_STRICT_PREFIX;
+extern const char *UNIQUE_SCALAROP_PREFIX;
+
 extern const char *OP_VALIDATION_FAIL_MSG;
 extern const char *HAVE_SEQLENARR;
 extern const char *HAVE_PEEPHOLE;
@@ -98,26 +101,32 @@ extern const char *ORDERING_MSG_INPUT3;
 extern const char *RANK_MSG_OUTPUT;
 extern const char *RANK_MSG_OUTPUT0;
 extern const char *RANK_MSG_OUTPUT1;
+extern const char *RANK_MSG_OUTPUT2;
 
-extern const char *IS_EMPTY_OUTPUT;
-extern const char *IS_EMPTY_OUTPUT0;
-extern const char *IS_EMPTY_OUTPUT1;
+extern const char *IS_EMPTY_MSG_OUTPUT;
+extern const char *IS_EMPTY_MSG_OUTPUT0;
+extern const char *IS_EMPTY_MSG_OUTPUT1;
+extern const char *IS_EMPTY_MSG_OUTPUT2;
 
 extern const char *TYPE_MSG_OUTPUT;
 extern const char *TYPE_MSG_OUTPUT0;
 extern const char *TYPE_MSG_OUTPUT1;
+extern const char *TYPE_MSG_OUTPUT2;
 
 extern const char *EWS_MSG_OUTPUT;
 extern const char *EWS_MSG_OUTPUT0;
 extern const char *EWS_MSG_OUTPUT1;
+extern const char *EWS_MSG_OUTPUT2;
 
 extern const char *ORDERING_MSG_OUTPUT;
 extern const char *ORDERING_MSG_OUTPUT0;
 extern const char *ORDERING_MSG_OUTPUT1;
+extern const char *ORDERING_MSG_OUTPUT2;
 
 extern const char *SHAPE_MSG_OUTPUT;
 extern const char *SHAPE_MSG_OUTPUT0;
 extern const char *SHAPE_MSG_OUTPUT1;
+extern const char *SHAPE_MSG_OUTPUT2;
 
 extern const char *IS_USE_ONEDNN_MSG;
 extern const char *ONEDNN_STREAM_NOT_SUPPORTED;

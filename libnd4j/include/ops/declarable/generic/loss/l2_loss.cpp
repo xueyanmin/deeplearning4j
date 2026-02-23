@@ -34,17 +34,20 @@ CUSTOM_OP_IMPL(l2_loss, 1, 1, false, 0, 0) {
   REQUIRE_TRUE(output->isScalar(), 0, "Rank output should be scalar");
 
   // FIXME: output should be used directly here, to avoid sum
-  input->reduceNumber(reduce::SquaredNorm, *output);
-  (*output) /= 2.;
+  auto* result = input->reduceNumber(reduce::SquaredNorm);
+  NDArray* divided = (*result) / 2.;
+  output->assign(divided);
+  delete divided;
+  delete result;
 
-  return sd::Status::OK;
+  return Status::OK;
 }
 DECLARE_SHAPE_FN(l2_loss) {
   return SHAPELIST(ConstantShapeHelper::getInstance().scalarShapeInfo(ArrayOptions::dataType(inputShape->at(0))));
 }
 
 DECLARE_TYPES(l2_loss) {
-  getOpDescriptor()->setAllowedInputTypes(sd::DataType::ANY)->setAllowedOutputTypes({ALL_FLOATS});
+  getOpDescriptor()->setAllowedInputTypes(ANY)->setAllowedOutputTypes({ALL_FLOATS});
 }
 }  // namespace ops
 }  // namespace sd

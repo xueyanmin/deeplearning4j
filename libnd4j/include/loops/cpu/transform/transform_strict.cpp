@@ -32,8 +32,8 @@ namespace transform {
 
 template <typename X>
 void TransformStrict<X>::exec(int opNum, const void *x, const sd::LongType *xShapeInfo, void *z,
-                              const sd::LongType *zShapeInfo, void *extraParams, uint64_t threadId,
-                              uint64_t numThreads) {
+                              const sd::LongType *zShapeInfo, void *extraParams, sd::LongType threadId,
+                              sd::LongType numThreads) {
   DISPATCH_BY_OPNUM_T(exec, PARAMS(x, xShapeInfo, z, zShapeInfo, extraParams, threadId, numThreads),
                       TRANSFORM_STRICT_OPS);
 }
@@ -41,16 +41,15 @@ void TransformStrict<X>::exec(int opNum, const void *x, const sd::LongType *xSha
 template <typename X>
 template <typename OpType>
 void SD_HOST TransformStrict<X>::exec(const void *vx, const sd::LongType *xShapeInfo, void *vz,
-                                      const sd::LongType *zShapeInfo, void *vextraParams, uint64_t threadId,
-                                      uint64_t numThreads) {
+                                      const sd::LongType *zShapeInfo, void *vextraParams, sd::LongType threadId,
+                                      sd::LongType numThreads) {
   auto x = reinterpret_cast<const X *>(vx);
   auto z = reinterpret_cast<X *>(vz);
   auto extraParams = reinterpret_cast<X *>(vextraParams);
-
   sd::TransformLoops<X, X, X>::template loopTransform<OpType>(x, xShapeInfo, z, zShapeInfo, extraParams, threadId,
                                                               numThreads);
 }
 
-BUILD_SINGLE_TEMPLATE(template class TransformStrict, , SD_FLOAT_TYPES);
+BUILD_SINGLE_TEMPLATE( class TransformStrict, , SD_FLOAT_TYPES);
 }  // namespace transform
 }  // namespace functions

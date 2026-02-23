@@ -27,6 +27,7 @@ import org.nd4j.samediff.frameworkimport.ir.IRTensor
 import org.nd4j.samediff.frameworkimport.ndarrayFromNameSpaceTensor
 import org.tensorflow.framework.DataType
 import org.tensorflow.framework.TensorProto
+import java.lang.IllegalArgumentException
 
 class TensorflowIRTensor(input: TensorProto): IRTensor<TensorProto, DataType> {
 
@@ -54,6 +55,10 @@ class TensorflowIRTensor(input: TensorProto): IRTensor<TensorProto, DataType> {
             builder.addDims(tensor.tensorShape.getDim(i).size)
         }
 
+
+        var hasNormalData = false
+
+
         when(tensor.dtype) {
             DataType.DT_UINT8 -> builder.dataType = TensorNamespace.DataType.UINT8.ordinal
             DataType.DT_UINT16 -> builder.dataType = TensorNamespace.DataType.UINT16.ordinal
@@ -73,43 +78,66 @@ class TensorflowIRTensor(input: TensorProto): IRTensor<TensorProto, DataType> {
             DataType.DT_COMPLEX64 -> builder.dataType = TensorNamespace.DataType.COMPLEX64.ordinal
             DataType.DT_COMPLEX128 -> builder.dataType = TensorNamespace.DataType.COMPLEX128.ordinal
             DataType.UNRECOGNIZED -> builder.dataType = TensorNamespace.DataType.UNRECOGNIZED.ordinal
-
+            DataType.DT_INVALID -> builder.dataType = TensorNamespace.DataType.UNRECOGNIZED.ordinal
+            DataType.DT_FLOAT_REF -> builder.dataType = TensorNamespace.DataType.FLOAT.ordinal
+            DataType.DT_DOUBLE_REF -> builder.dataType = TensorNamespace.DataType.DOUBLE.ordinal
+            DataType.DT_INT32_REF -> builder.dataType = TensorNamespace.DataType.INT32.ordinal
+            DataType.DT_UINT8_REF ->builder.dataType = TensorNamespace.DataType.UINT8.ordinal
+            DataType.DT_INT16_REF -> builder.dataType = TensorNamespace.DataType.INT16.ordinal
+            DataType.DT_INT8_REF -> builder.dataType = TensorNamespace.DataType.INT8.ordinal
+            DataType.DT_STRING_REF -> builder.dataType = TensorNamespace.DataType.STRING.ordinal
+            DataType.DT_INT64_REF -> builder.dataType = TensorNamespace.DataType.INT64.ordinal
+            DataType.DT_BOOL_REF -> builder.dataType = TensorNamespace.DataType.BOOL.ordinal
+            DataType.DT_BFLOAT16_REF -> builder.dataType = TensorNamespace.DataType.BFLOAT16.ordinal
+            DataType.DT_UINT16_REF -> builder.dataType = TensorNamespace.DataType.UINT16.ordinal
+            DataType.DT_HALF_REF -> builder.dataType = TensorNamespace.DataType.FLOAT16.ordinal
+            DataType.DT_UINT32_REF -> builder.dataType = TensorNamespace.DataType.UINT32.ordinal
+            DataType.DT_UINT64_REF -> builder.dataType = TensorNamespace.DataType.UINT64.ordinal
+            else -> throw IllegalArgumentException("Unsupported type ${tensor.dtype}")
         }
 
 
         if(tensor.doubleValList != null && tensor.doubleValCount > 0) {
+            hasNormalData = true
             builder.addAllDoubleData(tensor.doubleValList)
         }
 
         if(tensor.stringValList != null && tensor.stringValCount > 0) {
+            hasNormalData = true
             builder.addAllStringData(tensor.stringValList)
         }
 
         if(tensor.floatValList != null && tensor.floatValCount > 0) {
+            hasNormalData = true
             builder.addAllFloatData(tensor.floatValList)
         }
 
         if(tensor.intValList != null && tensor.intValCount > 0) {
+            hasNormalData = true
             builder.addAllInt32Data(tensor.intValList)
         }
 
         if(tensor.uint64ValList != null && tensor.uint64ValCount > 0) {
+            hasNormalData = true
             builder.addAllInt64Data(tensor.uint64ValList)
         }
 
         if(tensor.int64ValList != null && tensor.int64ValCount > 0) {
+            hasNormalData = true
             builder.addAllInt64Data(tensor.int64ValList)
         }
 
         if(tensor.halfValList != null && tensor.halfValCount > 0) {
+            hasNormalData = true
             builder.addAllHalfVal(tensor.halfValList)
         }
 
         if(tensor.boolValList != null && tensor.boolValCount > 0) {
+            hasNormalData = true
             builder.addAllBoolVal(tensor.boolValList)
         }
 
-        if(tensor.tensorContent != null) {
+        if(tensor.tensorContent != null && !hasNormalData) {
             builder.rawData = tensor.tensorContent
         }
 

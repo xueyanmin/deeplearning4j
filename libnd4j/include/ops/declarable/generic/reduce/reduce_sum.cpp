@@ -24,16 +24,16 @@
 #include <ops/declarable/CustomOperations.h>
 #include <ops/declarable/helpers/axis.h>
 
+#if NOT_EXCLUDED(OP_reduce_sum)
 namespace sd {
 namespace ops {
-#if NOT_EXCLUDED(OP_reduce_sum)
+
 
 //////////////////////////////////////////////////////////////////////////
 CUSTOM_OP_IMPL(reduce_sum, -1, 1, false, 0, 0) {
   auto input = INPUT_VARIABLE(0);
   auto output = OUTPUT_VARIABLE(0);
-
-  std::vector<int> dimensions;
+  std::vector<sd::LongType> dimensions;
   if (block.width() > 1) {
     auto axesVector = INPUT_VARIABLE(1);
     helpers::adjustAxis(input->rankOf(), axesVector, dimensions);
@@ -41,7 +41,7 @@ CUSTOM_OP_IMPL(reduce_sum, -1, 1, false, 0, 0) {
     dimensions = *block.getIArguments();
 
   REQUIRE_TRUE(
-      dimensions.size() <= input->rankOf(), 0,
+      dimensions.size() <= static_cast<size_t>(input->rankOf()), 0,
       "REDUCE_SUM OP: the number of dimensions to reduce along must be <= input array rank, but got %i instead",
       dimensions.size());
 
@@ -56,7 +56,7 @@ CUSTOM_OP_IMPL(reduce_sum, -1, 1, false, 0, 0) {
   else if (block.getTArguments()->size())
     keepDims = (bool)T_ARG(0);
 
-  input->reduceAlongDimension(reduce::Sum, *output, dimensions, keepDims);
+  input->reduceAlongDimension(reduce::Sum, output, &dimensions, keepDims);
 
   return sd::Status::OK;
 }
@@ -68,7 +68,7 @@ DECLARE_SHAPE_FN(reduce_sum) {
   else if (block.getTArguments()->size())
     keepDims = (bool)T_ARG(0);
 
-  std::vector<int> dimensions;
+  std::vector<sd::LongType> dimensions;
   if (block.width() > 1) {
     auto axesVector = INPUT_VARIABLE(1);
     helpers::adjustAxis(INPUT_VARIABLE(0)->rankOf(), axesVector, dimensions);
@@ -76,7 +76,7 @@ DECLARE_SHAPE_FN(reduce_sum) {
     dimensions = *block.getIArguments();
 
   REQUIRE_TRUE(
-      dimensions.size() <= inputShape->at(0)[0], 0,
+      dimensions.size() <= static_cast<size_t>(inputShape->at(0)[0]), 0,
       "REDUCE_SUM OP: the number of dimensions to reduce along must be <= input array rank, but got %i instead",
       dimensions.size());
 
@@ -85,14 +85,12 @@ DECLARE_SHAPE_FN(reduce_sum) {
                  "REDUCE_SUM OP: the input dimension to reduce along must be in range [-%i, %i), but got %i instead !",
                  inputShape->at(0)[0], inputShape->at(0)[0], item);
 
-  return SHAPELIST(ShapeUtils::evalReduceShapeInfo(shape::order(inputShape->at(0)), dimensions, inputShape->at(0),
+  return SHAPELIST(ShapeUtils::evalReduceShapeInfo(shape::order(inputShape->at(0)), &dimensions, inputShape->at(0),
                                                    keepDims, false, block.getWorkspace()));
 }
 
 DECLARE_TYPES(reduce_sum) { getOpDescriptor()->setAllowedInputTypes(sd::DataType::ANY)->setSameMode(true); }
-#endif
 
-#if NOT_EXCLUDED(OP_reduce_sum_bp)
 //////////////////////////////////////////////////////////////////////////
 CUSTOM_OP_IMPL(reduce_sum_bp, -1, 1, false, 0, 0) {
   auto input = INPUT_VARIABLE(0);
@@ -113,7 +111,7 @@ CUSTOM_OP_IMPL(reduce_sum_bp, -1, 1, false, 0, 0) {
     keepDims = (bool)T_ARG(0);
 
   REQUIRE_TRUE(
-      dimensions.size() <= input->rankOf(), 0,
+      dimensions.size() <= static_cast<size_t>(input->rankOf()), 0,
       "REDUCE_SUM_BP OP: the number of dimensions to reduce along must be <= input array rank, but got %i instead",
       dimensions.size());
 
@@ -127,13 +125,15 @@ CUSTOM_OP_IMPL(reduce_sum_bp, -1, 1, false, 0, 0) {
 
   if (!keepDims) {
     auto gradOShapeKeepDims =
-        ShapeUtils::evalReduceShapeInfo(gradO->ordering(), dimensions, *input, true, false, block.getWorkspace());
+        ShapeUtils::evalReduceShapeInfo(gradO->ordering(), &dimensions, *input, true, false, block.getWorkspace());
+    std::vector<sd::LongType> shape =  ShapeUtils::pullShapeFromShapeInfo(
+        gradOShapeKeepDims);
     auto r = gradO->reshape(gradO->ordering(),
-                            ShapeUtils::pullShapeFromShapeInfo(
-                                gradOShapeKeepDims));  // for example could be something like [a,b] -> [1,a,1,b]
-    gradI->applyTrueBroadcast(sd::BroadcastOpsTuple::Assign(), r, *gradI);
+                            shape);  // for example could be something like [a,b] -> [1,a,1,b]
+    gradI->applyTrueBroadcast(sd::BroadcastOpsTuple::Assign(), r, gradI);
+    delete r;
   } else
-    gradI->applyTrueBroadcast(sd::BroadcastOpsTuple::Assign(), *gradO, *gradI);
+    gradI->applyTrueBroadcast(sd::BroadcastOpsTuple::Assign(), gradO, gradI);
 
   return sd::Status::OK;
 }
@@ -146,7 +146,7 @@ DECLARE_SHAPE_FN(reduce_sum_bp) {
   }
 
   REQUIRE_TRUE(
-      dimensions.size() <= inputShape->at(0)[0], 0,
+      dimensions.size() <= static_cast<size_t>(inputShape->at(0)[0]), 0,
       "REDUCE_SUM_BP OP: the number of dimensions to reduce along must be <= input array rank, but got %i instead",
       dimensions.size());
 
@@ -156,17 +156,15 @@ DECLARE_SHAPE_FN(reduce_sum_bp) {
         "REDUCE_SUM_BP OP: the input dimension to reduce along must be in range [-%i, %i), but got %i instead !",
         inputShape->at(0)[0], inputShape->at(0)[0], item);
 
-  sd::LongType* outShapeInfo;
-  COPY_SHAPE(inputShape->at(0), outShapeInfo);
 
-  return SHAPELIST(CONSTANT(outShapeInfo));
+  return SHAPELIST(CONSTANT(inputShape->at(0)));
 }
 
 DECLARE_TYPES(reduce_sum_bp) {
   getOpDescriptor()->setAllowedInputTypes(sd::DataType::ANY)->setAllowedOutputTypes({ALL_FLOATS});
 }
 
-#endif
 
 }  // namespace ops
 }  // namespace sd
+#endif

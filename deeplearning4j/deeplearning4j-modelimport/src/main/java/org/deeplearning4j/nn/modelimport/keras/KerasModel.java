@@ -22,35 +22,33 @@ package org.deeplearning4j.nn.modelimport.keras;
 
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.collections4.set.ListOrderedSet;
+import org.deeplearning4j.nn.modelimport.keras.exceptions.InvalidKerasConfigurationException;
+import org.deeplearning4j.nn.modelimport.keras.exceptions.UnsupportedKerasConfigurationException;
+import org.deeplearning4j.nn.modelimport.keras.utils.KerasModelUtils;
+import org.deeplearning4j.nn.modelimport.keras.utils.KerasOptimizerUtils;
 import org.deeplearning4j.nn.conf.*;
 import org.deeplearning4j.nn.conf.graph.PreprocessorVertex;
 import org.deeplearning4j.nn.conf.inputs.InputType;
+import org.deeplearning4j.nn.conf.layers.Convolution3D;
 import org.deeplearning4j.nn.conf.layers.Layer;
 import org.deeplearning4j.nn.conf.layers.samediff.SameDiffLambdaLayer;
 import org.deeplearning4j.nn.graph.ComputationGraph;
-import org.deeplearning4j.nn.modelimport.keras.config.KerasLayerConfiguration;
-import org.deeplearning4j.nn.modelimport.keras.config.KerasModelConfiguration;
-import org.deeplearning4j.nn.modelimport.keras.exceptions.InvalidKerasConfigurationException;
-import org.deeplearning4j.nn.modelimport.keras.exceptions.UnsupportedKerasConfigurationException;
-import org.deeplearning4j.nn.modelimport.keras.layers.KerasInput;
-import org.deeplearning4j.nn.modelimport.keras.layers.KerasLoss;
-import org.deeplearning4j.nn.modelimport.keras.layers.core.KerasLambda;
 import org.deeplearning4j.nn.modelimport.keras.layers.recurrent.KerasLSTM;
 import org.deeplearning4j.nn.modelimport.keras.layers.recurrent.KerasRnnUtils;
 import org.deeplearning4j.nn.modelimport.keras.layers.recurrent.KerasSimpleRnn;
+import org.deeplearning4j.nn.modelimport.keras.config.KerasLayerConfiguration;
+import org.deeplearning4j.nn.modelimport.keras.config.KerasModelConfiguration;
+import org.deeplearning4j.nn.modelimport.keras.layers.KerasInput;
+import org.deeplearning4j.nn.modelimport.keras.layers.KerasLoss;
+import org.deeplearning4j.nn.modelimport.keras.layers.core.KerasLambda;
 import org.deeplearning4j.nn.modelimport.keras.utils.KerasLayerUtils;
 import org.deeplearning4j.nn.modelimport.keras.utils.KerasModelBuilder;
-import org.deeplearning4j.nn.modelimport.keras.utils.KerasModelUtils;
-import org.deeplearning4j.nn.modelimport.keras.utils.KerasOptimizerUtils;
+import org.deeplearning4j.util.Convolution3DUtils;
 import org.deeplearning4j.util.ConvolutionUtils;
-import org.nd4j.autodiff.samediff.internal.DependencyList;
-import org.nd4j.autodiff.samediff.internal.DependencyTracker;
 import org.nd4j.common.primitives.Counter;
 import org.nd4j.common.primitives.Pair;
 import org.nd4j.linalg.learning.config.IUpdater;
 import org.nd4j.shade.guava.collect.Lists;
-import org.tensorflow.framework.NodeDef;
 
 import java.io.IOException;
 import java.util.*;
@@ -409,13 +407,22 @@ public class KerasModel {
                 lossLayers.add(new KerasLoss(outputLayerName + "_loss", outputLayerName, kerasLoss));
         } else if (kerasLossObj instanceof Map) {
             Map<String, Object> kerasLossMap = (Map<String, Object>) kerasLossObj;
-            for (String outputLayerName : kerasLossMap.keySet()) {
-                Object kerasLoss = kerasLossMap.get(outputLayerName);
-                if (kerasLoss instanceof String)
-                    lossLayers.add(new KerasLoss(outputLayerName + "_loss", outputLayerName, (String) kerasLoss));
-                else
-                    throw new InvalidKerasConfigurationException("Unknown Keras loss " + kerasLoss.toString());
+            //tf.keras double nesting
+            if(kerasLossMap.containsKey("config")) {
+                kerasLossMap = (Map<String, Object>) kerasLossMap.get("config");
+                lossLayers.add(new KerasLoss(layersOrdered.get(layers.size() - 1).getLayerName() + "_loss",layersOrdered.get(layers.size() - 1).getLayerName(),kerasLossMap.get("name").toString()));
+
+
+            } else {
+                for (String outputLayerName : kerasLossMap.keySet()) {
+                    Object kerasLoss = kerasLossMap.get(outputLayerName);
+                    if (kerasLoss instanceof String)
+                        lossLayers.add(new KerasLoss(outputLayerName + "_loss", outputLayerName, (String) kerasLoss));
+                    else
+                        throw new InvalidKerasConfigurationException("Unknown Keras loss " + kerasLoss.toString());
+                }
             }
+
         }
         this.outputLayerNames.clear();
 
@@ -445,7 +452,7 @@ public class KerasModel {
                 KerasInput kerasInput = (KerasInput) layer;
                 Layer layer1 = layersOrdered.get(kerasLayerIdx + 1).layer;
                 //no dim order, try to pull it from the next layer if there is one
-                if(ConvolutionUtils.layerHasConvolutionLayout(layer1)) {
+                if(layer1 != null && ConvolutionUtils.layerHasConvolutionLayout(layer1)) {
                     CNN2DFormat formatForLayer = ConvolutionUtils.getFormatForLayer(layer1);
                     if(formatForLayer == CNN2DFormat.NCHW) {
                         dimOrder = KerasLayer.DimOrder.THEANO;
@@ -454,7 +461,17 @@ public class KerasModel {
                     } else {
                         dimOrder = KerasLayer.DimOrder.NONE;
                     }
-                } else if(KerasRnnUtils.isRnnLayer(layersOrdered.get(kerasLayerIdx + 1))) {
+                } else if(layer1 != null && Convolution3DUtils.layerHasConvolution3DLayout(layer1)) {
+                    Convolution3D.DataFormat dataFormat = Convolution3DUtils.getFormatForLayer(layer1);
+                    if(dataFormat == Convolution3D.DataFormat.NCDHW) {
+                        dimOrder = KerasLayer.DimOrder.THEANO;
+                    } else if(dataFormat == Convolution3D.DataFormat.NDHWC) {
+                        dimOrder = KerasLayer.DimOrder.TENSORFLOW;
+                    } else {
+                        dimOrder = KerasLayer.DimOrder.NONE;
+
+                    }
+                }  else if(KerasRnnUtils.isRnnLayer(layersOrdered.get(kerasLayerIdx + 1))) {
                     if(kerasInput.inputShape == null)
                         kerasInput.inputShape =  layersOrdered.get(kerasLayerIdx + 1).inputShape;
                 }

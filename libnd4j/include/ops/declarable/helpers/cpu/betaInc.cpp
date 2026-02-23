@@ -25,7 +25,7 @@
 #include <ops/declarable/helpers/betaInc.h>
 
 #include <cmath>
-
+#if NOT_EXCLUDED(OP_betainc)
 namespace sd {
 namespace ops {
 namespace helpers {
@@ -36,42 +36,42 @@ namespace helpers {
 
 template <typename T>
 static T continuedFraction(const T a, const T b, const T x) {
-  const T min = DataTypeUtils::min_positive<T>() / DataTypeUtils::eps<T>();
+  const T min = DataTypeUtils::min_positive<T>() / static_cast<T>(DataTypeUtils::eps<T>());
   const T aPlusb = a + b;
   T val, aPlus2i;
 
-  T t2 = 1;
+  T t2 = static_cast<T>(1);
   T t1 = static_cast<T>(1) - aPlusb * x / (a + static_cast<T>(1));
-  if (math::sd_abs<T>(t1) < min) t1 = min;
+  if (math::sd_abs<T,T>(t1) < min) t1 = min;
   t1 = static_cast<T>(1) / t1;
   T result = t1;
 
-  for (sd::Unsigned i = 1; i <= maxIter; ++i) {
+  for (sd::LongType i = 1; i <= maxIter; ++i) {
     aPlus2i = a + static_cast<T>(2 * i);
     val = i * (b - i) * x / ((aPlus2i - static_cast<T>(1)) * aPlus2i);
     // t1
     t1 = static_cast<T>(1) + val * t1;
-    if (math::sd_abs<T>(t1) < min) t1 = min;
+    if (math::sd_abs<T,T>(t1) < min) t1 = min;
     t1 = static_cast<T>(1) / t1;
     // t2
     t2 = static_cast<T>(1) + val / t2;
-    if (math::sd_abs<T>(t2) < min) t2 = min;
+    if (math::sd_abs<T,T>(t2) < min) t2 = min;
     // result
     result *= t2 * t1;
     val = -(a + i) * (aPlusb + i) * x / ((aPlus2i + static_cast<T>(1)) * aPlus2i);
     // t1
     t1 = static_cast<T>(1) + val * t1;
-    if (math::sd_abs<T>(t1) < min) t1 = min;
+    if (math::sd_abs<T,T>(t1) < min) t1 = min;
     t1 = static_cast<T>(1) / t1;
     // t2
     t2 = static_cast<T>(1) + val / t2;
-    if (math::sd_abs<T>(t2) < min) t2 = min;
+    if (math::sd_abs<T,T>(t2) < min) t2 = min;
     // result
     val = t2 * t1;
     result *= val;
 
     // condition to stop loop
-    if (math::sd_abs<T>(val - static_cast<T>(1)) <= DataTypeUtils::eps<T>()) return result;
+    if (math::sd_abs<T,T>(val - static_cast<T>(1)) <= DataTypeUtils::eps<T>()) return result;
   }
 
   return DataTypeUtils::infOrMax<T>();  // no convergence, more iterations is required, return infinity
@@ -81,18 +81,12 @@ static T continuedFraction(const T a, const T b, const T x) {
 // evaluates incomplete beta function for positive a and b, and x between 0 and 1.
 template <typename T>
 static T betaIncCore(T a, T b, T x) {
-  // if (a <= (T)0. || b <= (T)0.)
-  //     throw("betaInc function: a and b must be > 0 !");
-
-  // if (x < (T)0. || x > (T)1.)
-  //     throw("betaInc function: x must be within (0, 1) interval !");
-
   // t^{n-1} * (1 - t)^{n-1} is symmetric function with respect to x = 0.5
   if (a == b && x == static_cast<T>(0.5)) return static_cast<T>(0.5);
 
   if (x == static_cast<T>(0) || x == static_cast<T>(1)) return x;
 
-  const T gammaPart = lgamma(a) + lgamma(b) - lgamma(a + b);
+  const T gammaPart = static_cast<T>(lgamma(a) + lgamma(b) - lgamma(a + b));
   const T front = math::sd_exp<T, T>(math::sd_log<T, T>(x) * a + math::sd_log<T, T>(1.f - x) * b - gammaPart);
 
   if (x <= (a + static_cast<T>(1)) / (a + b + static_cast<T>(2)))
@@ -103,7 +97,7 @@ static T betaIncCore(T a, T b, T x) {
 
 ///////////////////////////////////////////////////////////////////
 template <typename T>
-static void betaIncForArray(sd::LaunchContext* context, const NDArray& a, const NDArray& b, const NDArray& x,
+static void betaIncForArray(sd::LaunchContext* context, NDArray& a, NDArray& b, NDArray& x,
                             NDArray& output) {
   int xLen = x.lengthOf();
 
@@ -116,16 +110,17 @@ static void betaIncForArray(sd::LaunchContext* context, const NDArray& a, const 
 
 ///////////////////////////////////////////////////////////////////
 // overload betaInc for arrays, shapes of a, b and x must be the same !!!
-void betaInc(sd::LaunchContext* context, const NDArray& a, const NDArray& b, const NDArray& x, NDArray& output) {
+void betaInc(sd::LaunchContext* context, NDArray& a, NDArray& b, NDArray& x, NDArray& output) {
   auto xType = a.dataType();
   BUILD_SINGLE_SELECTOR(xType, betaIncForArray, (context, a, b, x, output), SD_FLOAT_TYPES);
 }
 
-BUILD_SINGLE_TEMPLATE(template void betaIncForArray,
-                      (sd::LaunchContext * context, const NDArray& a, const NDArray& b, const NDArray& x,
+BUILD_SINGLE_TEMPLATE( void betaIncForArray,
+                      (sd::LaunchContext * context, NDArray& a, NDArray& b, NDArray& x,
                        NDArray& output),
                       SD_FLOAT_TYPES);
 
 }  // namespace helpers
 }  // namespace ops
 }  // namespace sd
+#endif

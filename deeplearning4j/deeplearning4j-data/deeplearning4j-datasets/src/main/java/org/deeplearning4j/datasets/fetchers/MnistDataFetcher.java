@@ -27,6 +27,8 @@ import org.deeplearning4j.datasets.base.MnistFetcher;
 import org.deeplearning4j.common.resources.DL4JResources;
 import org.deeplearning4j.common.resources.ResourceType;
 import org.deeplearning4j.datasets.mnist.MnistManager;
+import org.eclipse.deeplearning4j.resources.DataSetResource;
+import org.eclipse.deeplearning4j.resources.ResourceDataSets;
 import org.nd4j.linalg.api.buffer.DataType;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.dataset.DataSet;
@@ -64,11 +66,11 @@ public class MnistDataFetcher extends BaseDataFetcher {
     protected boolean fOrder = false; //MNIST is C order, EMNIST is F order
 
     protected boolean firstShuffle = true;
-    protected final int numExamples;
+    protected  int numExamples = 0;
     protected String images,labels;
     //note: we default to zero here on purpose, otherwise when first initializes an error is thrown.
     private long lastCursor = 0;
-
+    protected MnistManager manager;
 
     /**
      * Constructor telling whether to binarize the dataset or not
@@ -79,47 +81,56 @@ public class MnistDataFetcher extends BaseDataFetcher {
         this(binarize, true, true, System.currentTimeMillis(), NUM_EXAMPLES);
     }
 
-    public MnistDataFetcher(boolean binarize, boolean train, boolean shuffle, long rngSeed, int numExamples) throws IOException {
-        if (!mnistExists()) {
-            new MnistFetcher().downloadAndUntar();
-        }
 
-        String MNIST_ROOT = DL4JResources.getDirectory(ResourceType.DATASET, "MNIST").getAbsolutePath();
+
+    public MnistDataFetcher(boolean binarize, boolean train, boolean shuffle, long rngSeed, int numExamples,File topLevelDir) throws IOException {
+        if(this instanceof EmnistDataFetcher)
+            return;
+
+
+        this.topLevelDir = topLevelDir;
         long[] checksums;
+        DataSetResource imageResource = null;
+        DataSetResource labelResource = null;
         if (train) {
-            images = FilenameUtils.concat(MNIST_ROOT, MnistFetcher.TRAINING_FILES_FILENAME_UNZIPPED);
-            labels = FilenameUtils.concat(MNIST_ROOT, MnistFetcher.TRAINING_FILE_LABELS_FILENAME_UNZIPPED);
+            imageResource = topLevelDir() != null ?  ResourceDataSets.mnistTrain(topLevelDir()) :  ResourceDataSets.mnistTrain();
+            if(!imageResource.existsLocally())
+                imageResource.download(true,3,200000,20000);
+
+            labelResource = topLevelDir() != null ? ResourceDataSets.mnistTrainLabels(topLevelDir()) : ResourceDataSets.mnistTrainLabels();
+            if(!labelResource.existsLocally())
+                labelResource.download(true,3,200000,20000);
+
             totalExamples = NUM_EXAMPLES;
             checksums = CHECKSUMS_TRAIN;
         } else {
-            images = FilenameUtils.concat(MNIST_ROOT, MnistFetcher.TEST_FILES_FILENAME_UNZIPPED);
-            labels = FilenameUtils.concat(MNIST_ROOT, MnistFetcher.TEST_FILE_LABELS_FILENAME_UNZIPPED);
+            imageResource = topLevelDir() != null ?  ResourceDataSets.mnistTest(topLevelDir()) :  ResourceDataSets.mnistTest();
+            if(!imageResource.existsLocally())
+                imageResource.download(true,3,200000,20000);
+
+            labelResource = topLevelDir() != null ? ResourceDataSets.mnistTestLabels(topLevelDir()) : ResourceDataSets.mnistTestLabels();
+            if(!labelResource.existsLocally())
+                labelResource.download(true,3,200000,20000);
+
             totalExamples = NUM_EXAMPLES_TEST;
             checksums = CHECKSUMS_TEST;
         }
-        String[] files = new String[]{images, labels};
+
+        images = imageResource.localPath().getAbsolutePath();
+        labels = labelResource.localPath().getAbsolutePath();
+
 
         try {
-            MnistManager man = new MnistManager(images, labels, train);
-            validateFiles(files, checksums);
-            man.close();
+            manager = new MnistManager(images, labels, train);
         } catch (Exception e) {
-            try {
-                FileUtils.deleteDirectory(new File(MNIST_ROOT));
-            } catch (Exception e2){ }
-            new MnistFetcher().downloadAndUntar();
-            MnistManager man = new MnistManager(images, labels, train);
-            lastCursor = man.getCurrent();
-            validateFiles(files, checksums);
-            man.close();
+            throw new RuntimeException(e);
         }
 
-        MnistManager man = new MnistManager(images, labels, train);
 
         numOutcomes = 10;
         this.binarize = binarize;
         cursor = 0;
-        inputColumns = man.getImages().getEntryLength();
+        inputColumns = manager.getImages().getEntryLength();
         this.train = train;
         this.shuffle = shuffle;
 
@@ -133,26 +144,13 @@ public class MnistDataFetcher extends BaseDataFetcher {
         rng = new Random(rngSeed);
         this.numExamples = numExamples;
         reset(); //Shuffle order
-        man.close();
     }
 
-    private boolean mnistExists() {
-        String MNIST_ROOT = DL4JResources.getDirectory(ResourceType.DATASET, "MNIST").getAbsolutePath();
-        //Check 4 files:
-        File f = new File(MNIST_ROOT, MnistFetcher.TRAINING_FILES_FILENAME_UNZIPPED);
-        if (!f.exists())
-            return false;
-        f = new File(MNIST_ROOT, MnistFetcher.TRAINING_FILE_LABELS_FILENAME_UNZIPPED);
-        if (!f.exists())
-            return false;
-        f = new File(MNIST_ROOT, MnistFetcher.TEST_FILES_FILENAME_UNZIPPED);
-        if (!f.exists())
-            return false;
-        f = new File(MNIST_ROOT, MnistFetcher.TEST_FILE_LABELS_FILENAME_UNZIPPED);
-        if (!f.exists())
-            return false;
-        return true;
+    public MnistDataFetcher(boolean binarize, boolean train, boolean shuffle, long rngSeed, int numExamples) throws IOException {
+        this(binarize,train,shuffle,rngSeed,numExamples,null);
     }
+
+
 
     private void validateFiles(String[] files, long[] checksums) {
         //Validate files:
@@ -184,8 +182,7 @@ public class MnistDataFetcher extends BaseDataFetcher {
             throw new IllegalStateException("Unable to get more; there are no more images");
         }
 
-        MnistManager man = new MnistManager(images, labels, totalExamples);
-        man.setCurrent((int) lastCursor);
+        manager.setCurrent((int) lastCursor);
         INDArray labels = Nd4j.zeros(DataType.FLOAT, numExamples, numOutcomes);
 
         if(featureData == null || featureData.length < numExamples){
@@ -198,9 +195,9 @@ public class MnistDataFetcher extends BaseDataFetcher {
             if (!hasMore())
                 break;
 
-            man.setCurrent(cursor);
+            manager.setCurrent(cursor);
             lastCursor = cursor;
-            byte[] img = man.readImageUnsafe(order[cursor]);
+            byte[] img = manager.readImageUnsafe(order[cursor]);
 
             if (fOrder) {
                 //EMNIST requires F order to C order
@@ -213,7 +210,7 @@ public class MnistDataFetcher extends BaseDataFetcher {
                 img = working;
             }
 
-            int label = man.readLabel(order[cursor]);
+            int label = manager.readLabel(order[cursor]);
             if (oneIndexed) {
                 //For some inexplicable reason, Emnist LETTERS set is indexed 1 to 26 (i.e., 1 to nClasses), while everything else
                 // is indexed (0 to nClasses-1) :/
@@ -248,7 +245,6 @@ public class MnistDataFetcher extends BaseDataFetcher {
         }
 
         curr = new DataSet(features, labels);
-        man.close();
     }
 
     @Override

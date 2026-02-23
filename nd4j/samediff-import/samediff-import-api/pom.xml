@@ -27,7 +27,7 @@
   <artifactId>samediff-import-api</artifactId>
 
   <parent>
-    <groupId>org.nd4j</groupId>
+    <groupId>org.eclipse.deeplearning4j</groupId>
     <artifactId>samediff-import</artifactId>
     <version>1.0.0-SNAPSHOT</version>
   </parent>
@@ -36,18 +36,27 @@
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <commonsio.version>2.5</commonsio.version>
-    <commons.lang.version>3.6</commons.lang.version>
+    <commonsio.version>2.7</commonsio.version>
+    <commons.lang.version>3.7</commons.lang.version>
     <commons.dbutils.version>1.7</commons.dbutils.version>
-    <lombok.version>1.18.8</lombok.version>
-    <logback.version>1.1.7</logback.version>
+    <lombok.version>1.18.42</lombok.version>
+    <logback.version>1.2.3</logback.version>
     <protobuf.version>3.8.0</protobuf.version>
     <classgraph.version>4.8.90</classgraph.version>
     <commons-collections4.version>4.1</commons-collections4.version>
+    <module.name>samediff.modelimport.api</module.name>
   </properties>
+
+
+
 
   <build>
     <plugins>
+      <plugin>
+        <groupId>org.moditect</groupId>
+        <artifactId>moditect-maven-plugin</artifactId>
+      </plugin>
+
       <plugin>
         <groupId>org.jetbrains.kotlin</groupId>
         <artifactId>kotlin-maven-plugin</artifactId>
@@ -60,6 +69,12 @@
   </build>
 
   <dependencies>
+    <dependency>
+      <groupId>io.github.microutils</groupId>
+      <artifactId>kotlin-logging-jvm</artifactId>
+      <version>${kotlin-logging.version}</version>
+    </dependency>
+
     <dependency>
       <groupId>io.github.classgraph</groupId>
       <artifactId>classgraph</artifactId>
@@ -81,12 +96,11 @@
       <artifactId>slf4j-api</artifactId>
       <version>1.7.28</version>
     </dependency>
-
+    <!-- Redirect jackson to slf4j.  -->
     <dependency>
-      <groupId>ch.qos.logback</groupId>
-      <artifactId>logback-classic</artifactId>
-      <version>${logback.version}</version>
-      <scope>test</scope>
+      <groupId>org.slf4j</groupId>
+      <artifactId>log4j-over-slf4j</artifactId>
+      <version>1.7.28</version>
     </dependency>
 
     <dependency>
@@ -106,7 +120,7 @@
     <dependency>
       <groupId>com.squareup</groupId>
       <artifactId>javapoet</artifactId>
-      <version>1.11.1</version>
+      <version>${javapoet.version}</version>
     </dependency>
 
 
@@ -115,40 +129,28 @@
     <dependency>
       <groupId>com.fasterxml.jackson.module</groupId>
       <artifactId>jackson-module-kotlin</artifactId>
-      <version>2.9.9</version>
-    </dependency>
-
-
-
-    <dependency>
-      <groupId>org.nd4j</groupId>
-      <artifactId>nd4j-tensorflow</artifactId>
-      <version>${project.version}</version>
+      <version>${jackson.version}</version>
     </dependency>
 
     <dependency>
-      <groupId>org.nd4j</groupId>
+      <groupId>org.eclipse.deeplearning4j</groupId>
       <artifactId>nd4j-api</artifactId>
     </dependency>
 
     <dependency>
-      <groupId>org.nd4j</groupId>
+      <groupId>org.eclipse.deeplearning4j</groupId>
       <artifactId>nd4j-common</artifactId>
       <version>${project.version}</version>
     </dependency>
 
-    <dependency>
-      <groupId>org.nd4j</groupId>
-      <artifactId>nd4j-onnxruntime</artifactId>
-      <version>${project.version}</version>
-    </dependency>
 
+    <dependency>
+      <groupId>org.jetbrains.kotlin</groupId>
+      <artifactId>kotlin-reflect</artifactId>
+      <version>${kotlin.version}</version>
+    </dependency>
 
   </dependencies>
 
-  <profiles>
-    <profile>
-      <id>testresources</id>
-    </profile>
-  </profiles>
+
 </project>

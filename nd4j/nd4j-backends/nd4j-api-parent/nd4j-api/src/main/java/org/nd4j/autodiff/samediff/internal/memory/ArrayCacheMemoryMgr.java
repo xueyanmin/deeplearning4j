@@ -20,94 +20,232 @@
 
 package org.nd4j.autodiff.samediff.internal.memory;
 
-import lombok.*;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.atomic.AtomicLong;
+
 import org.bytedeco.javacpp.Pointer;
 import org.nd4j.common.base.Preconditions;
+import org.nd4j.common.config.ND4JSystemProperties;
+import org.nd4j.common.primitives.AtomicDouble;
+import org.nd4j.linalg.api.buffer.DataBuffer;
 import org.nd4j.linalg.api.buffer.DataType;
+import org.nd4j.linalg.api.ndarray.BaseNDArray;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.api.shape.LongShapeDescriptor;
-import org.nd4j.linalg.api.shape.options.ArrayOptionsHelper;
+import org.nd4j.linalg.api.shape.Shape;
 import org.nd4j.linalg.factory.Nd4j;
-import org.nd4j.common.util.ArrayUtil;
+import org.nd4j.shade.guava.collect.HashBasedTable;
+import org.nd4j.shade.guava.collect.Table;
+import org.nd4j.shade.guava.primitives.Longs;
 
-import java.util.*;
+import lombok.Getter;
+import lombok.NonNull;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 
 @Getter
+@Setter
+@Slf4j
 public class ArrayCacheMemoryMgr extends AbstractMemoryMgr {
 
-    private final double maxMemFrac;
-    private final long smallArrayThreshold;
-    private final double largerArrayMaxMultiple;
+    private static ThreadLocal<Map<INDArray,INDArray>> released = new ThreadLocal<>();
 
-    private final long maxCacheBytes;
-    private final long totalMemBytes;
+    public final static double DEFAULT_MAX_MEM_FRACTION = 0.25;
+    public final static long DEFAULT_SMALL_ARRAY_THRESHOLD = 1024;
+    public final static double DEFAULT_LARGE_ARRAY_MAX_MULTIPLE = 2.0;
+    private static AtomicDouble largerArrayMaxMultiple;
 
-    private long currentCacheSize = 0;
-    private Map<DataType, ArrayStore> arrayStores = new HashMap<>();
+    private static AtomicLong maxCacheBytes;
+    private static AtomicLong totalMemBytes;
+    @Getter
+    @Setter
+    private static  AtomicDouble maxMemFrac;
+    private static AtomicLong currentCacheSize =  new AtomicLong(0);
 
-    private LinkedHashSet<Long> lruCache = new LinkedHashSet<>();
-    private Map<Long,INDArray> lruCacheValues = new HashMap<>();
+    private static ThreadLocal<Set<Long>> lruCache = new ThreadLocal<>();
+    private static ThreadLocal<Map<Long, INDArray>> lruCacheValues = new ThreadLocal<>();
 
-    /**
-     * Create an ArrayCacheMemoryMgr with default settings as per {@link ArrayCacheMemoryMgr}
-     */
-    public ArrayCacheMemoryMgr() {
-        this(0.25, 1024, 2.0);
+    private static ThreadLocal<Table<DataType, String, List<INDArray>>> arrays = new ThreadLocal<>();
+
+    private static boolean enableCache = Boolean
+            .parseBoolean(System.getProperty(ND4JSystemProperties.SAMEDIFF_MEMORY_CACHE_ENABLE, "false"));
+
+    static {
+        setCacheDefaults();
+        released.set(new IdentityHashMap<>());
+        arrays.set(HashBasedTable.create());
+        lruCacheValues.set(new ConcurrentHashMap<>());
+        lruCache.set(new ConcurrentSkipListSet<>());
+
     }
 
-    /**
-     * @param maxMemFrac             Maximum memory fraciton to use as cache
-     * @param smallArrayThreshold    Below this size (elements), don't apply the "largerArrayMaxMultiple" rule
-     * @param largerArrayMaxMultiple Maximum multiple of the requested size to return from the cache. If an array of size
-     *                               1024 is requested, and largerArrayMaxMultiple is 2.0, then we'll return from the cache
-     *                               the array with the smallest data buffer up to 2.0*1024 elements; otherwise we'll return
-     *                               a new array
-     */
-    public ArrayCacheMemoryMgr(double maxMemFrac, long smallArrayThreshold, double largerArrayMaxMultiple) {
-        Preconditions.checkArgument(maxMemFrac > 0 && maxMemFrac < 1, "Maximum memory fraction for cache must be between 0.0 and 1.0, got %s", maxMemFrac);
-        Preconditions.checkArgument(smallArrayThreshold >= 0, "Small array threshold must be >= 0, got %s", smallArrayThreshold);
-        Preconditions.checkArgument(largerArrayMaxMultiple >= 1.0, "Larger array max multiple must be >= 1.0, got %s", largerArrayMaxMultiple);
-        this.maxMemFrac = maxMemFrac;
-        this.smallArrayThreshold = smallArrayThreshold;
-        this.largerArrayMaxMultiple = largerArrayMaxMultiple;
 
-        if(isCpu()){
-            totalMemBytes = Pointer.maxBytes();
+    private static Set<Long> getLruCacheForThread() {
+        if(lruCache.get() != null)
+            return lruCache.get();
+        else {
+            lruCache.set(new ConcurrentSkipListSet<>());
+            return lruCache.get();
+        }
+    }
+
+    private static Table<DataType, String, List<INDArray>> getArraysForThread() {
+        if(arrays.get() != null)
+            return arrays.get();
+        else {
+            arrays.set(HashBasedTable.create());
+            return arrays.get();
+        }
+    }
+    private static Map<Long, INDArray> getLruCachedValuesForThread() {
+        if(lruCacheValues.get() != null)
+            return lruCacheValues.get();
+        else {
+            lruCacheValues.set(new ConcurrentHashMap<>());
+            return lruCacheValues.get();
+        }
+    }
+
+    public static void setCacheDefaults() {
+        maxMemFrac = new AtomicDouble(Double.parseDouble(System.getProperty(ND4JSystemProperties.CACHE_MEM_FRACTION,String.valueOf(DEFAULT_MAX_MEM_FRACTION))));
+        smallArrayThreshold = new AtomicLong(Long.parseLong(System.getProperty(ND4JSystemProperties.SMALL_ARRAY_THRESHOLD,String.valueOf(DEFAULT_SMALL_ARRAY_THRESHOLD))));
+        largerArrayMaxMultiple = new AtomicDouble(Double.parseDouble(System.getProperty(ND4JSystemProperties.LARGE_ARRAY_MAX_MULTIPLE,String.valueOf(DEFAULT_LARGE_ARRAY_MAX_MULTIPLE))));
+
+        if (isCpu()) {
+            totalMemBytes = new AtomicLong(Pointer.maxBytes());
         } else {
             Properties p = Nd4j.getExecutioner().getEnvironmentInformation();
             List devList = (List) p.get("cuda.devicesInformation");
             Map m = (Map) devList.get(0);
-            totalMemBytes = (Long)m.get("cuda.totalMemory");
+            totalMemBytes = new AtomicLong((Long) m.get("cuda.totalMemory"));
         }
-        maxCacheBytes = (long)(maxMemFrac * totalMemBytes);
+
+        long cacheValue = Math.round(maxMemFrac.get() * totalMemBytes.get());
+        maxCacheBytes = new AtomicLong(cacheValue);
     }
 
-    private boolean isCpu() {
+    @Getter
+    @Setter
+    private static AtomicLong smallArrayThreshold;
+
+    public static Set<Long> getLruCache() {
+        return getLruCacheForThread();
+    }
+
+    public static Map<Long, INDArray> getLruCacheValues() {
+        return getLruCachedValuesForThread();
+    }
+
+    public static AtomicDouble getMaxMemFrac() {
+        return maxMemFrac;
+    }
+
+    public static void setMaxMemFrac(AtomicDouble maxMemFrac) {
+        ArrayCacheMemoryMgr.maxMemFrac = maxMemFrac;
+    }
+
+    public static void setMaxMemFrac(double maxMemFrac) {
+        ArrayCacheMemoryMgr.maxMemFrac.set(maxMemFrac);
+    }
+
+    public static AtomicDouble getLargerArrayMaxMultiple() {
+        return largerArrayMaxMultiple;
+    }
+
+    public static void setLargerArrayMaxMultiple(AtomicDouble largerArrayMaxMultiple) {
+        ArrayCacheMemoryMgr.largerArrayMaxMultiple = largerArrayMaxMultiple;
+    }
+    public static void setLargerArrayMaxMultiple(double largerArrayMaxMultiple) {
+        ArrayCacheMemoryMgr.largerArrayMaxMultiple.set(largerArrayMaxMultiple);
+    }
+    public static AtomicLong getMaxCacheBytes() {
+        return maxCacheBytes;
+    }
+
+    public static void setMaxCacheBytes(AtomicLong maxCacheBytes) {
+        ArrayCacheMemoryMgr.maxCacheBytes = maxCacheBytes;
+    }
+
+    public static AtomicLong getCurrentCacheSize() {
+        return currentCacheSize;
+    }
+
+    public static void setCurrentCacheSize(AtomicLong currentCacheSize) {
+        ArrayCacheMemoryMgr.currentCacheSize = currentCacheSize;
+    }
+
+
+
+    /**
+     * Create an ArrayCacheMemoryMgr with default settings as per
+     * {@link ArrayCacheMemoryMgr}
+     */
+    public ArrayCacheMemoryMgr() {
+
+    }
+
+
+
+    private static boolean isCpu() {
         String backend = Nd4j.getExecutioner().getEnvironmentInformation().getProperty("backend");
         return !"CUDA".equalsIgnoreCase(backend);
     }
 
-    @Override
-    public INDArray allocate(boolean detached, DataType dataType, long... shape) {
-        if (arrayStores.containsKey(dataType)) {
-            INDArray arr = arrayStores.get(dataType).get(shape);
-            if (arr != null) {
-                //Decrement cache size
-                currentCacheSize -= dataType.width() * arr.data().length();
 
-                return arr; //Allocated from cache
+
+    @Override
+    public synchronized INDArray allocate(boolean detached, DataType dataType, long... shape) {
+        String arrayShapeString = Arrays.toString(shape);
+        Table<DataType, String, List<INDArray>> arraysForThread = getArraysForThread();
+        Set<Long> lruCacheForThread = getLruCacheForThread();
+        Map<Long, INDArray> lruCacheValues = getLruCacheValues();
+        if (arraysForThread.contains(dataType, arrayShapeString) && enableCache) {
+            INDArray arr = null;
+            boolean arrFound = false;
+            while(!arrFound) {
+                arr = !arraysForThread.get(dataType, arrayShapeString).isEmpty()
+                        ? arraysForThread.get(dataType, arrayShapeString).remove(0)
+                        : null;
+                if(arr != null && (!arr.closeable() || arr.wasClosed() || arr.isView())) {
+                    log.trace("Found array closeable, not returning from cache. Only closeable arrays are returnable from the cache.");
+                    if(arr.isView())
+                        arr.setCloseable(false);
+                    log.trace("Found view array with id " + arr.getId() + " in cache. Avoiding return. Allocating new array.");
+
+                    continue;
+                } else if(!arraysForThread.contains(dataType, arrayShapeString) || getArraysForThread().get(dataType,arrayShapeString).isEmpty()) {
+                    break;
+                }
+
+                if (arr != null) {
+                    // Decrement cache size
+                    currentCacheSize.set(currentCacheSize.get() - dataType.width() * arr.data().length());
+                    lruCacheForThread.remove(arr.getId());
+                    lruCacheValues.remove(arr.getId());
+                    // We need to assign new Id. this way we will break any possible relationship it
+                    // had in Tracker.
+                    // the old cache was recreating New Array using buffer and thus gaining new
+                    // reference . Note that it had IdentityHash with references being keys
+                    ((BaseNDArray) arr).assignNewId();
+                    return arr; // Allocated from cache
+                }
             }
+
         }
 
-        //Allocation failed, allocate new array
-        return Nd4j.createUninitializedDetached(dataType, shape);
+        // Allocation failed, allocate new array
+        //switch to using current workspace rather than detached
+        INDArray ret = detached ? Nd4j.createUninitializedDetached(dataType,shape) : Nd4j.create(dataType, shape);
+        return ret;
     }
 
     @Override
     public INDArray allocate(boolean detached, LongShapeDescriptor descriptor) {
-        if(descriptor.isEmpty()) {
-            INDArray ret =  Nd4j.create(descriptor);
-            if(detached) {
+        if (descriptor.isEmpty()) {
+            INDArray ret = Nd4j.create(descriptor);
+            if (detached) {
                 ret = ret.detach();
             }
 
@@ -116,205 +254,239 @@ public class ArrayCacheMemoryMgr extends AbstractMemoryMgr {
 
         DataType dataType = descriptor.dataType();
         long[] shape = descriptor.getShape();
-        if (arrayStores.containsKey(dataType)) {
-            INDArray arr = arrayStores.get(dataType).get(shape);
-            if(arr != null && arr.ordering() != descriptor.getOrder()) {
+        String arrayShape = Arrays.toString(shape);
+        Table<DataType, String, List<INDArray>> arraysForThread = getArraysForThread();
+        if (arraysForThread.contains(dataType, arrayShape) && enableCache && shape.length > 0 && !Longs.contains(shape, 0)) {
+            INDArray arr = null;
+            List<INDArray> arrays2 = arraysForThread.get(dataType, arrayShape);
+
+            while (arrays2.size() > 0) {
+                arr = arrays2.remove(0);
+                if(arr.isView()) {
+                    //set closeable to prevent reuse elsewhere
+                    arr.setCloseable(false);
+                    log.trace("Found view array with id " + arr.getId() + " in cache. Avoiding allocation.");
+                } else {
+                    break;
+                }
+            }
+
+            if (arr != null && arr.ordering() != descriptor.getOrder()) {
                 arr.setOrder(descriptor.getOrder());
             }
 
-
-            if (arr != null) {
-                //Decrement cache size
-                currentCacheSize -= dataType.width() * arr.data().length();
-
-                return arr; //Allocated from cache
+            if (arr != null && !arr.wasClosed()) {
+                // Decrement cache size
+                currentCacheSize.set(currentCacheSize.get() - dataType.width() * arr.data().length());
+                // We need to assign new Id. this way we will break any possible relationship it
+                // had in Tracker.
+                // the old cache was recreating New Array using buffer and thus gaining new
+                // reference . Note that it had IdentityHash with references being keys
+                getLruCache().remove(arr.getId());
+                getLruCacheValues().remove(arr.getId());
+                ((BaseNDArray) arr).assignNewId();
+                return arr; // Allocated from cache
             }
         }
 
-        //Allocation failed, allocate new array
-        return Nd4j.createUninitializedDetached(dataType, shape);
+        // Allocation failed, allocate new array
+        // CRITICAL FIX: Use initialized arrays instead of uninitialized to prevent NaN/garbage values.
+        // Uninitialized arrays can contain NaN if native operations don't write to all elements.
+        // Respect the detached parameter: create initialized array, then detach if needed.
+        return detached ? Nd4j.create(dataType, shape).detach() : Nd4j.create(dataType, shape);
     }
 
     @Override
-    public void release(@NonNull INDArray array) {
-        //Check for multiple releases of the array
-        long id = array.getId();
-        Preconditions.checkState(!lruCache.contains(id), "Array was released multiple times: id=%s, shape=%ndShape", id, array);
+    public  void release(@NonNull INDArray array) {
+        Set<Long> lruCacheForThread = getLruCacheForThread();
+        Table<DataType, String, List<INDArray>> arraysForThread = getArraysForThread();
+        Map<Long, INDArray> lruCacheValues = getLruCacheValues();
 
+        // Check for multiple releases of the array (only for closeable arrays that might be cached)
+        long id = array.getId();
+        if (array.closeable()) {
+            Preconditions.checkState(!lruCacheForThread.contains(id), "Array was released multiple times: id=%s, shape=%ndShape", id,
+                    array);
+        }
+
+        // Handle non-closeable arrays (views, etc.)
+        if (!array.closeable()) {
+            // Non-closeable arrays can't be cached, but we should still cleanup if possible
+            if (array.data() != null && Nd4j.getExecutioner().useCount(array.data()) == 1) {
+                // This is the only reference to the DataBuffer, so we can safely close it
+                // This prevents memory leaks for view arrays that are marked non-closeable
+                try {
+                    array.close();
+                } catch (Exception e) {
+                    log.warn("Failed to close non-closeable array with exclusive data buffer: " + e.getMessage());
+                }
+            }
+            // If useCount > 1, the buffer is shared, so we can't close it
+            return;
+        }
+
+        if (!enableCache) {
+            if (array.closeable()) {
+                array.close();
+            }
+            return;
+        }
 
         DataType dt = array.dataType();
-        if(array.data() == null && array.closeable()) {
+        if (array.data() == null && array.closeable()) {
             array.close();
             return;
         }
 
+        if (array != null && array.data() != null && Nd4j.getExecutioner().useCount(array.data()) > 1) {
+            // DataBuffer is used by multiple arrays (e.g., through views).
+            // CRITICAL: Do NOT close this array! Closing it would invalidate the shared
+            // DataBuffer, corrupting all other arrays that use it and causing NaN values.
+            // Instead, just return without caching or closing - let the other arrays
+            // keep the buffer alive until they're all garbage collected.
+            return;
+        }
+
         long thisBytes = array.data().length() * dt.width();
-        if(array.dataType() == DataType.UTF8) {
-            //Don't cache string arrays due to variable length buffers
-            if(array.closeable())
+        if (array.dataType() == DataType.UTF8) {
+            // Don't cache string arrays due to variable length buffers
+            if (array.closeable()) {
                 array.close();
-        } else if (currentCacheSize + thisBytes > maxCacheBytes) {
-            if(thisBytes > maxCacheBytes) {
-                //Can't store even if we clear everything - too large
-                if(array.closeable())
+            }
+            // CRITICAL FIX: Must return after closing UTF8 arrays!
+            // Previously fell through to add closed array to LRU cache, causing double-free
+            return;
+        } else if (currentCacheSize.get() + thisBytes > maxCacheBytes.get()) {
+            if (thisBytes > maxCacheBytes.get()) {
+
+                // Can't store even if we clear everything - too large
+                if (array.closeable())
                     array.close();
                 return;
             }
 
-            //Need to deallocate some arrays to stay under limit - do in "oldest first" order
-            Iterator<Long> iter = lruCache.iterator();
-            while(currentCacheSize + thisBytes > maxCacheBytes) {
+            // Need to deallocate some arrays to stay under limit - do in "oldest first"
+            // order
+            Iterator<Long> iter = lruCacheForThread.iterator();
+            while (currentCacheSize.get() + thisBytes > maxCacheBytes.get() && iter.hasNext()) {
                 long next = iter.next();
                 iter.remove();
                 INDArray nextOldest = lruCacheValues.remove(next);
                 DataType ndt = nextOldest.dataType();
                 long nextBytes = ndt.width() * nextOldest.data().length();
-                arrayStores.get(ndt).removeObject(nextOldest);
-                currentCacheSize -= nextBytes;
+                List<INDArray> listx = arraysForThread.get(ndt, Arrays.toString(nextOldest.shape()));
+                if (listx != null)
+                    listx.remove(nextOldest);
+                currentCacheSize.set(currentCacheSize.get() - nextBytes);
 
-                if(nextOldest.closeable())
+                if (nextOldest.closeable()) {
                     nextOldest.close();
+                }
             }
 
-            //After clearing space - can now cache
+            // After clearing space - can now cache
             cacheArray(array);
         } else {
-            //OK to cache
+            // OK to cache
             cacheArray(array);
         }
-
-        //Store in LRU cache for "last used" removal if we exceed cache size
-        lruCache.add(array.getId());
-        lruCacheValues.put(array.getId(), array);
+        // NOTE: Removed duplicate LRU cache additions - cacheArray() already handles this
     }
 
     private void cacheArray(INDArray array) {
         DataType dt = array.dataType();
-        if (!arrayStores.containsKey(dt))
-            arrayStores.put(dt, new ArrayStore());
-        arrayStores.get(dt).add(array);
-        currentCacheSize += array.data().length() * dt.width();
+        Table<DataType, String, List<INDArray>> arraysForThread = getArraysForThread();
+        Set<Long> lruCacheForThread = getLruCacheForThread();
+        Map<Long, INDArray> lruCacheValues = getLruCacheValues();
+        String arrayShapeString = Arrays.toString(array.shape());
+        if (!arraysForThread.contains(dt, arrayShapeString))
+            arraysForThread.put(dt, arrayShapeString, new ArrayList<>());
+        arraysForThread.get(dt, arrayShapeString).add(array);
+        currentCacheSize.set(currentCacheSize.get() + array.data().length() * dt.width());
 
-        lruCache.add(array.getId());
+        lruCacheForThread.add(array.getId());
         lruCacheValues.put(array.getId(), array);
+
     }
 
     @Override
     public void close() {
-        for (ArrayStore as : arrayStores.values()) {
-            as.close();
-        }
+        // Selectively close cached arrays that are safe to close (not shared).
+        // Arrays with useCount > 1 have shared data buffers and MUST NOT be closed
+        // as that would corrupt other arrays using the same buffer, causing NaN values.
+        // Arrays with useCount <= 1 are safe to close as no other arrays depend on them.
+        Table<DataType, String, List<INDArray>> arraysForThread = getArraysForThread();
+        Set<Long> lruCacheForThread = getLruCacheForThread();
+        Map<Long, INDArray> lruCacheValues = getLruCacheValues();
+
+        arraysForThread.values().stream().forEach(input -> input.stream().forEach(arr -> {
+            if (arr.closeable()) {
+                arr.close();
+            }
+        }));
+
+        // Clear the caches
+        arraysForThread.clear();
+        lruCacheForThread.clear();
+        lruCacheValues.clear();
+        currentCacheSize.set(0);
     }
 
-
-    @Getter
-    public class ArrayStore {
-        private INDArray[] sorted = new INDArray[1000];     //TODO resizing, don't hardcode
-        private long[] lengths = new long[1000];
-        private long lengthSum;
-        private long bytesSum;
-        private int size;
-
-        private void add(@NonNull INDArray array) {
-            //Resize arrays
-            if(size == sorted.length){
-                sorted = Arrays.copyOf(sorted, 2*sorted.length);
-                lengths = Arrays.copyOf(lengths, 2*lengths.length);
+    @Override
+    public INDArray allocateFromDescriptor(boolean detached, DataBuffer dataBuffer) {
+        long[] asJava = dataBuffer.asLong();
+        if (Shape.isEmpty(asJava)) {
+            INDArray ret = Nd4j.createFromDescriptor(dataBuffer);
+            if (detached) {
+                ret = ret.detach();
             }
 
-            long length = array.data().length();
-            int idx = Arrays.binarySearch(lengths, 0, size, length);
-            if (idx < 0) {
-                idx = -idx - 1;  //See binarySearch javadoc
-            }
-            for (int i = size - 1; i >= idx; i--) {
-                sorted[i + 1] = sorted[i];
-                lengths[i + 1] = lengths[i];
-            }
-            sorted[idx] = array;
-            lengths[idx] = length;
-            size++;
-            lengthSum += length;
-            bytesSum += length * array.dataType().width();
+            return ret;
         }
 
-        private INDArray get(long[] shape) {
-            if (size == 0)
-                return null;
+        DataType dataType = Shape.dataType(asJava);
+        long[] shape = Shape.shape(asJava);
+        String arrayShape = Arrays.toString(shape);
+        Table<DataType, String, List<INDArray>> arraysForThread = getArraysForThread();
+        if (arraysForThread.contains(dataType, arrayShape) && enableCache && shape.length > 0 && !Longs.contains(shape, 0)) {
+            INDArray arr = null;
+            List<INDArray> arrays2 = arraysForThread.get(dataType, arrayShape);
 
-            long length = shape.length == 0 ? 1 : ArrayUtil.prod(shape);
-
-            int idx = Arrays.binarySearch(lengths, 0, size, length);
-            if (idx < 0) {
-                idx = -idx - 1;
-                if (idx >= size) {
-                    //Largest array is smaller than required -> can't return from cache
-                    return null;
+            while (arrays2.size() > 0) {
+                arr = arrays2.remove(0);
+                if(arr.isView()) {
+                    //set closeable to prevent reuse elsewhere
+                    arr.setCloseable(false);
+                    log.trace("Found view array with id " + arr.getId() + " in cache. Avoiding allocation.");
+                } else {
+                    break;
                 }
-                INDArray nextSmallest = sorted[idx];
-                long nextSmallestLength = nextSmallest.data().length();
-                long nextSmallestLengthBytes = nextSmallestLength * nextSmallest.dataType().width();
-
-                boolean tooLarge = (length > (long) (nextSmallestLength * largerArrayMaxMultiple));
-
-                if (nextSmallestLengthBytes > smallArrayThreshold && tooLarge) {
-                    return null;
-                } // If less than smallArrayThreshold, ok, return as is
             }
 
-            //Remove
-            INDArray arr = removeIdx(idx);
-
-            lruCache.remove(arr.getId());
-            lruCacheValues.remove(arr.getId());
-
-            //Create a new array with the specified buffer. This is for 2 reasons:
-            //(a) the cached array and requested array sizes may differ (though this is easy to check for)
-            //(b) Some SameDiff array use tracking uses *object identity* - so we want different objects when reusing arrays
-            //    to avoid issues there
-            return Nd4j.create(arr.data(), shape);
-        }
-
-        private void removeObject(INDArray array){
-            long length = array.data().length();
-            int idx = Arrays.binarySearch(lengths, 0, size, length);
-            Preconditions.checkState(idx >= 0,
-                    "Cannot remove array from ArrayStore: no array with this length exists in the cache");
-            boolean found = false;
-            int i = 0;
-            while (!found && i < size) {
-                found = sorted[i] == array && lengths[i] == length; //Object and length equality
-                ++i;
+            if (arr != null && arr.ordering() != Shape.order(asJava)) {
+                arr.setOrder(Shape.order(asJava));
             }
-            Preconditions.checkState(found, "Cannot remove array: not found in ArrayCache");
-            removeIdx(i - 1);
-        }
 
-        private INDArray removeIdx(int idx){
-            INDArray arr = sorted[idx];
-            for (int i = idx; i < size; i++) {
-                sorted[i] = sorted[i + 1];
-                lengths[i] = lengths[i + 1];
+            if (arr != null && !arr.wasClosed()) {
+                // Decrement cache size
+                currentCacheSize.set(currentCacheSize.get() - dataType.width() * arr.data().length());
+                // We need to assign new Id. this way we will break any possible relationship it
+                // had in Tracker.
+                // the old cache was recreating New Array using buffer and thus gaining new
+                // reference . Note that it had IdentityHash with references being keys
+                getLruCache().remove(arr.getId());
+                getLruCacheValues().remove(arr.getId());
+                ((BaseNDArray) arr).assignNewId();
+                return arr; // Allocated from cache
             }
-            sorted[size] = null;
-            lengths[size] = 0;
-            size--;
-
-            bytesSum -= (arr.data().length() * arr.dataType().width());
-            lengthSum -= arr.data().length();
-
-            return arr;
         }
 
-        private void close() {
-            for (int i = 0; i < size; i++) {
-                if (sorted[i].closeable())
-                    sorted[i].close();
-                lengths[i] = 0;
-            }
-            lengthSum = 0;
-            bytesSum = 0;
-            size = 0;
-        }
+        // Allocation failed, allocate new array
+        // CRITICAL FIX: Use initialized arrays instead of uninitialized to prevent NaN/garbage values.
+        // Uninitialized arrays can contain NaN if native operations don't write to all elements.
+        // Respect the detached parameter: create initialized array, then detach if needed.
+        return detached ? Nd4j.create(dataType, shape).detach() : Nd4j.create(dataType, shape);
     }
+
+
 }

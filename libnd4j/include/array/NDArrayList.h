@@ -56,7 +56,7 @@ class SD_LIB_EXPORT NDArrayList {
   std::vector<sd::LongType> _shape;
 
   // unstack axis
-  int _axis = 0;
+  sd::LongType _axis = 0;
 
   //
   bool _expandable = false;
@@ -70,18 +70,19 @@ class SD_LIB_EXPORT NDArrayList {
 
   sd::DataType dataType();
 
+  NDArray *remove(int idx);
   NDArray *read(int idx);
   NDArray *readRaw(int idx);
   sd::Status write(int idx, NDArray *array);
 
-  NDArray *pick(std::initializer_list<int> indices);
-  NDArray *pick(std::vector<int> &indices);
+  NDArray *pick(std::initializer_list<LongType> indices);
+  NDArray *pick(std::vector<LongType> &indices);
   bool isWritten(int index);
 
   std::vector<sd::LongType> &shape();
 
   NDArray *stack();
-  void unstack(NDArray *array, int axis);
+  void unstack(NDArray *array, LongType axis);
 
   std::pair<int, int> &id();
   std::string &name();

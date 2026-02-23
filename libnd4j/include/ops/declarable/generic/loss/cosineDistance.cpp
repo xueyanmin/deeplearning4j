@@ -69,67 +69,92 @@ CUSTOM_OP_IMPL(cosine_distance_loss, 3, 1, false, 0, 2) {
                  "weights = %s and output = %s instead!",
                  ShapeUtils::shapeAsString(weights).c_str(), ShapeUtils::shapeAsString(labels).c_str());
   }
-
-  NDArray E = 1. - (*predictions * *labels).reduceAlongDimension(reduce::Sum, {dim}, true);
+  std::vector<LongType> dims;
+  dims.push_back(dim);
+  
+  NDArray* predLabels = (*predictions) * (*labels);
+  NDArray* dotProduct = predLabels->reduceAlongDimension(reduce::Sum, &dims, true);
+  delete predLabels;
+  
+  NDArray* E = 1. - (*dotProduct);
+  delete dotProduct;
 
   // perform weights broadcasting/tile to E if it is necessary
   auto weightsBroad = weights;
-  if (!weights->isScalar() && !weights->isSameShape(&E))
-    weightsBroad = new NDArray(weights->tileToShape(E.shapeInfo()));
+  if (!weights->isScalar() && !weights->isSameShape(E))
+    weightsBroad = new NDArray(weights->tileToShape(E->shapeInfo()));
 
   // multiply E on weights
-  E *= (*weightsBroad);
+  NDArray* EWeighted = (*E) * (*weightsBroad);
 
   switch (reductionMode) {
     case 0:  // 0 - "none", un-reduced weighted losses with the same shape as labels.
-      output->assign(&E);
+      output->assign(EWeighted);
       break;
 
     case 1: {  // 1 - "weighted_sum", output is scalar and equal to sum of all elements of E array
-      output->assign(E.reduceNumber(reduce::Sum));
+      auto* sumResult = EWeighted->reduceNumber(reduce::Sum);
+      output->assign(sumResult);
+      delete sumResult;
       break;
     }
     case 2: {  // 2 - "weighted_mean", output is scalar and equal to sum of all elements of E array divided by sum of
                // all elements of weightsBroad array
-      NDArray sum;
-      if (weights->isScalar())
-        sum = *weights * E.lengthOf();
-      else
+      NDArray* sum;
+      if (weights->isScalar()) {
+        sum = (*weights) * EWeighted->lengthOf();
+      } else {
         sum = weightsBroad->reduceNumber(reduce::Sum);
+      }
 
-      if (sum.e<double>(0) == 0.)
+      if (sum->e<double>(0) == 0.) {
         *output = 0.;
-      else
-        output->assign(E.reduceNumber(reduce::Sum) / sum);
+      } else {
+        auto* sumE = EWeighted->reduceNumber(reduce::Sum);
+        auto* result = (*sumE) / (*sum);
+        output->assign(result);
+        delete result;
+        delete sumE;
+      }
+      delete sum;
       break;
     }
     case 3: {  // 3 - "weighted_sum_by_nonzero_weights", output is scalar and equal to scalar sum of all elements of E
                // array divided by number of non-zero weights
-      sd::LongType numOfNonZeroWeights = 0;
+      LongType numOfNonZeroWeights = 0;
       if (weights->isScalar()) {
-        if (weights->e<double>(0) != 0.) numOfNonZeroWeights = E.lengthOf();
-      } else
-        numOfNonZeroWeights = E.reduceNumber(reduce::CountNonZero).e<sd::LongType>(0);
+        if (weights->e<double>(0) != 0.) numOfNonZeroWeights = EWeighted->lengthOf();
+      } else {
+        auto* countResult = EWeighted->reduceNumber(reduce::CountNonZero);
+        numOfNonZeroWeights = countResult->e<LongType>(0);
+        delete countResult;
+      }
 
-      if (numOfNonZeroWeights == 0)
+      if (numOfNonZeroWeights == 0) {
         *output = 0.;
-      else
-        output->assign(E.reduceNumber(reduce::Sum) / double(numOfNonZeroWeights));
-
+      } else {
+        auto* sumE = EWeighted->reduceNumber(reduce::Sum);
+        auto* result = (*sumE) / double(numOfNonZeroWeights);
+        output->assign(result);
+        delete result;
+        delete sumE;
+      }
       break;
     }
   }
 
   STORE_RESULT(*output);
 
+  delete EWeighted;
+  delete E;
   if (weightsBroad != weights) delete weightsBroad;
 
-  return sd::Status::OK;
+  return Status::OK;
 }
 
 //////////////////////////////////////////////////////////////////////////
 DECLARE_TYPES(cosine_distance_loss) {
-  getOpDescriptor()->setAllowedInputTypes(sd::DataType::ANY)->setAllowedOutputTypes({ALL_FLOATS});
+  getOpDescriptor()->setAllowedInputTypes(ANY)->setAllowedOutputTypes({ALL_FLOATS});
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -156,13 +181,13 @@ DECLARE_SHAPE_FN(cosine_distance_loss) {
   DataType outType = DataTypeUtils::pickFloatingType(ArrayOptions::dataType(predictionsShapeInfo));
 
   // evaluate output shapeInfo
-  sd::LongType const* outShapeInfo = nullptr;
+  LongType * outShapeInfo = nullptr;
   if (INT_ARG(0) != 0)  // in this case output is scalar
     outShapeInfo = ConstantShapeHelper::getInstance().scalarShapeInfo(outType);
   else {  // in this case output has the same shape as labels reduced  by dim axis
 
-    std::vector<int> dimensions = {dim};
-    outShapeInfo = ShapeUtils::evalReduceShapeInfo(shape::order(predictionsShapeInfo), dimensions, predictionsShapeInfo,
+    std::vector<LongType> dimensions = {dim};
+    outShapeInfo = ShapeUtils::evalReduceShapeInfo(shape::order(predictionsShapeInfo), &dimensions, predictionsShapeInfo,
                                                    outType, true, false, block.getWorkspace());
 
     // weights array can be single scalar or has the same rank as output, and must be broadcastable to output
@@ -199,7 +224,7 @@ CUSTOM_OP_IMPL(cosine_distance_loss_grad, 3, 3, false, 0, 2) {
   int dim = INT_ARG(1);  // axis along which sum will be made
   if (dim < 0) dim += labels->rankOf();
 
-  std::vector<int> dimensions = {dim};
+  std::vector<LongType> dimensions = {dim};
 
   // input validation
   REQUIRE_TRUE(labels->isSameShape(predictions), 0,
@@ -211,7 +236,7 @@ CUSTOM_OP_IMPL(cosine_distance_loss_grad, 3, 3, false, 0, 2) {
                "COSINE_DISTANCE_LOSS_GRAD OP: reduction mode value is not acceptable, possible values are 0, 1, 2, 3, "
                "but got %i instead!",
                reductionMode);
-  auto lossShapeInfo = ShapeUtils::evalReduceShapeInfo(predictions->ordering(), dimensions, predictions->shapeInfo(),
+  auto lossShapeInfo = ShapeUtils::evalReduceShapeInfo(predictions->ordering(), &dimensions, predictions->shapeInfo(),
                                                        true, false, block.getWorkspace());
   // weights array can be single scalar or has the same shape as loss, and must be broadcastable to loss shape
   REQUIRE_TRUE(weights->isScalar() || weights->rankOf() == shape::rank(lossShapeInfo), 0,
@@ -228,29 +253,46 @@ CUSTOM_OP_IMPL(cosine_distance_loss_grad, 3, 3, false, 0, 2) {
                "COSINE_DISTANCE_LOSS_GRAD OP: input reduction dimension (got %i) must be < labels rank %i!", dim,
                labels->rankOf());
 
-  NDArray E = 1. - (*predictions * *labels).reduceAlongDimension(reduce::Sum, {dim}, true);
+  std::vector<LongType> dims;
+  dims.push_back(dim);
+  
+  NDArray* predLabels = (*predictions) * (*labels);
+  NDArray* dotProduct = predLabels->reduceAlongDimension(reduce::Sum, &dims, true);
+  delete predLabels;
+  
+  NDArray* E = 1. - (*dotProduct);
+  delete dotProduct;
 
   // perform weights broadcasting/tile to E if it is necessary
   auto weightsBroad = weights;
-  if (!weights->isScalar() && !weights->isSameShape(&E))
-    weightsBroad = new NDArray(weights->tileToShape(E.shapeInfo()));
+  if (!weights->isScalar() && !weights->isSameShape(E))
+    weightsBroad = new NDArray(weights->tileToShape(E->shapeInfo()));
 
-  dLdp->assign(-*labels);
-  dLdl->assign(-*predictions);
+  NDArray negLabels = -(*labels);
+  NDArray negPreds = -(*predictions);
+  dLdp->assign(&negLabels);
+  dLdl->assign(&negPreds);
 
   switch (reductionMode) {
     case 1: {  // 1 - "none" and "weighted_sum", output is scalar and equal to sum of all elements of E array
 
-      *dLdp *= *weightsBroad;
-      *dLdl *= *weightsBroad;
+      NDArray* dLdpWeighted = (*dLdp) * (*weightsBroad);
+      dLdp->assign(dLdpWeighted);
+      delete dLdpWeighted;
+      
+      NDArray* dLdlWeighted = (*dLdl) * (*weightsBroad);
+      dLdl->assign(dLdlWeighted);
+      delete dLdlWeighted;
 
       if (weights->isScalar() || weights->lengthOf() == 1) {
-        dLdw->assign(E.reduceNumber(reduce::Sum));
+        auto* sumE = E->reduceNumber(reduce::Sum);
+        dLdw->assign(sumE);
+        delete sumE;
       } else {
         if (weights != weightsBroad) {
-          std::vector<int> axesToReduceAlong =
+          std::vector<LongType> axesToReduceAlong =
               ShapeUtils::evalBroadcastBackwardAxis(weights->shapeInfo(), weightsBroad->shapeInfo());
-          E.reduceAlongDimension(reduce::Sum, *dLdw, axesToReduceAlong, true);
+          E->reduceAlongDimension(reduce::Sum, dLdw, &axesToReduceAlong, true);
         } else
           dLdw->assign(E);
       }
@@ -259,76 +301,127 @@ CUSTOM_OP_IMPL(cosine_distance_loss_grad, 3, 3, false, 0, 2) {
     }
     case 2: {  // 2 - "weighted_mean", output is scalar and equal to sum of all elements of E array divided by sum of
                // all elements of weightsBroad array
-      NDArray sum;
-      if (weights->isScalar())
-        sum = (*weights) * E.lengthOf();
-      else
+      NDArray* sum;
+      if (weights->isScalar()) {
+        sum = (*weights) * E->lengthOf();
+      } else {
         sum = weightsBroad->reduceNumber(reduce::Sum);
+      }
 
-      if (sum.e<double>(0) == 0.) {
+      if (sum->e<double>(0) == 0.) {
         *dLdp = 0.;
         *dLdl = 0.;
         *dLdw = 0.;
       } else {
-        NDArray temp = *weightsBroad / sum;
-        *dLdp *= temp;
-        *dLdl *= temp;
+        NDArray* temp = (*weightsBroad) / (*sum);
+        NDArray* dLdpResult = (*dLdp) * (*temp);
+        dLdp->assign(dLdpResult);
+        delete dLdpResult;
+        
+        NDArray* dLdlResult = (*dLdl) * (*temp);
+        dLdl->assign(dLdlResult);
+        delete dLdlResult;
+        delete temp;
 
         if (weights->isScalar() || weights->lengthOf() == 1) {
           *dLdw = 0.;
         } else {
           if (weights != weightsBroad) {
-            std::vector<int> axesToReduceAlong =
+            std::vector<LongType> axesToReduceAlong =
                 ShapeUtils::evalBroadcastBackwardAxis(weights->shapeInfo(), weightsBroad->shapeInfo());
-            ((E * sum - (E * *weightsBroad).reduceNumber(reduce::Sum)) / (sum * sum))
-                .reduceAlongDimension(reduce::Sum, *dLdw, axesToReduceAlong, true);
-          } else
-            dLdw->assign((E * sum - (E * *weightsBroad).reduceNumber(reduce::Sum)) / (sum * sum));
+            NDArray* EWeighted = (*E) * (*weightsBroad);
+            NDArray* EWeightedSum = EWeighted->reduceNumber(reduce::Sum);
+            delete EWeighted;
+            NDArray* ESum = (*E) * (*sum);
+            NDArray* numerator = (*ESum) - (*EWeightedSum);
+            delete ESum;
+            delete EWeightedSum;
+            NDArray* sumSquared = (*sum) * (*sum);
+            NDArray* gradTemp = (*numerator) / (*sumSquared);
+            delete numerator;
+            delete sumSquared;
+            gradTemp->reduceAlongDimension(reduce::Sum, dLdw, &axesToReduceAlong, true);
+            delete gradTemp;
+          } else {
+            NDArray* EWeighted = (*E) * (*weightsBroad);
+            NDArray* EWeightedSum = EWeighted->reduceNumber(reduce::Sum);
+            delete EWeighted;
+            NDArray* ESum = (*E) * (*sum);
+            NDArray* numerator = (*ESum) - (*EWeightedSum);
+            delete ESum;
+            delete EWeightedSum;
+            NDArray* sumSquared = (*sum) * (*sum);
+            NDArray* gradTemp = (*numerator) / (*sumSquared);
+            delete numerator;
+            delete sumSquared;
+            dLdw->assign(gradTemp);
+            delete gradTemp;
+          }
         }
       }
+      delete sum;
       break;
     }
     case 3: {  // 3 - "weighted_sum_by_nonzero_weights", output is scalar and equal to scalar sum of all elements of E
                // array divided by number of non-zero weights
-      sd::LongType numOfNonZeroWeights = 0;
+      LongType numOfNonZeroWeights = 0;
       if (weights->isScalar()) {
-        if (weights->e<double>(0) != 0.) numOfNonZeroWeights = E.lengthOf();
-      } else
-        numOfNonZeroWeights = weightsBroad->reduceNumber(reduce::CountNonZero).e<sd::LongType>(0);
+        if (weights->e<double>(0) != 0.) numOfNonZeroWeights = E->lengthOf();
+      } else {
+        auto* countResult = weightsBroad->reduceNumber(reduce::CountNonZero);
+        numOfNonZeroWeights = countResult->e<LongType>(0);
+        delete countResult;
+      }
 
       if (numOfNonZeroWeights == 0) {
         *dLdp = 0.;
         *dLdl = 0.;
         *dLdw = 0.;
       } else {
-        NDArray temp = *weightsBroad / numOfNonZeroWeights;
-        *dLdp *= temp;
-        *dLdl *= temp;
+        NDArray* temp = (*weightsBroad) / numOfNonZeroWeights;
+        NDArray* dLdpResult = (*dLdp) * (*temp);
+        dLdp->assign(dLdpResult);
+        delete dLdpResult;
+        
+        NDArray* dLdlResult = (*dLdl) * (*temp);
+        dLdl->assign(dLdlResult);
+        delete dLdlResult;
+        delete temp;
 
         if (weights->isScalar() || weights->lengthOf() == 1) {
-          dLdw->assign(E.reduceNumber(reduce::Sum) / numOfNonZeroWeights);
+          auto* sumE = E->reduceNumber(reduce::Sum);
+          auto* result = (*sumE) / numOfNonZeroWeights;
+          dLdw->assign(result);
+          delete result;
+          delete sumE;
         } else {
           if (weights != weightsBroad) {
-            std::vector<int> axesToReduceAlong =
+            std::vector<LongType> axesToReduceAlong =
                 ShapeUtils::evalBroadcastBackwardAxis(weights->shapeInfo(), weightsBroad->shapeInfo());
-            E.reduceAlongDimension(reduce::Sum, *dLdw, axesToReduceAlong, true);
-            *dLdw /= numOfNonZeroWeights;
-          } else
-            dLdw->assign(E / numOfNonZeroWeights);
+            E->reduceAlongDimension(reduce::Sum, dLdw, &axesToReduceAlong, true);
+            NDArray* dLdwResult = (*dLdw) / numOfNonZeroWeights;
+            dLdw->assign(dLdwResult);
+            delete dLdwResult;
+          } else {
+            NDArray* result = (*E) / numOfNonZeroWeights;
+            dLdw->assign(result);
+            delete result;
+          }
         }
       }
       break;
     }
   }
 
+  delete E;
   if (weightsBroad != weights) delete weightsBroad;
 
-  return sd::Status::OK;
+  return Status::OK;
 }
 
 //////////////////////////////////////////////////////////////////////////
 DECLARE_TYPES(cosine_distance_loss_grad) {
-  getOpDescriptor()->setAllowedInputTypes(sd::DataType::ANY)->setAllowedOutputTypes({ALL_FLOATS});
+  getOpDescriptor()->setAllowedInputTypes(ANY)->setAllowedOutputTypes({ALL_FLOATS});
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -341,7 +434,7 @@ DECLARE_SHAPE_FN(cosine_distance_loss_grad) {
   int dim = INT_ARG(1);
   if (dim < 0) dim += labelsShapeInfo[0];
 
-  std::vector<int> dimensions = {dim};
+  std::vector<LongType> dimensions = {dim};
 
   // labels and predictions must have the same shapes
   REQUIRE_TRUE(shape::shapeEquals(labelsShapeInfo, predictionsShapeInfo), 0,
@@ -349,7 +442,7 @@ DECLARE_SHAPE_FN(cosine_distance_loss_grad) {
                "%s correspondingly !",
                ShapeUtils::shapeAsString(labelsShapeInfo).c_str(),
                ShapeUtils::shapeAsString(predictionsShapeInfo).c_str());
-  auto lossShapeInfo = ShapeUtils::evalReduceShapeInfo(shape::order(predictionsShapeInfo), dimensions,
+  auto lossShapeInfo = ShapeUtils::evalReduceShapeInfo(shape::order(predictionsShapeInfo), &dimensions,
                                                        predictionsShapeInfo, true, false, block.getWorkspace());
   // weights array can be single scalar or has the same rank as loss, and must be broadcastable to loss
   REQUIRE_TRUE(shape::isScalar(weightsShapeInfo) || shape::rank(weightsShapeInfo) == shape::rank(lossShapeInfo), 0,

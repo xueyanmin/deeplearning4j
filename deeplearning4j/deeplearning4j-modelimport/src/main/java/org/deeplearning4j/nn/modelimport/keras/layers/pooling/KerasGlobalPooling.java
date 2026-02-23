@@ -23,18 +23,15 @@ package org.deeplearning4j.nn.modelimport.keras.layers.pooling;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.extern.slf4j.Slf4j;
+import org.deeplearning4j.nn.modelimport.keras.KerasLayer;
+import org.deeplearning4j.nn.modelimport.keras.exceptions.InvalidKerasConfigurationException;
+import org.deeplearning4j.nn.modelimport.keras.exceptions.UnsupportedKerasConfigurationException;
 import org.deeplearning4j.nn.conf.InputPreProcessor;
 import org.deeplearning4j.nn.conf.inputs.InputType;
 import org.deeplearning4j.nn.conf.layers.GlobalPoolingLayer;
 import org.deeplearning4j.nn.conf.preprocessor.FeedForwardToRnnPreProcessor;
-import org.deeplearning4j.nn.modelimport.keras.KerasLayer;
-import org.deeplearning4j.nn.modelimport.keras.exceptions.InvalidKerasConfigurationException;
-import org.deeplearning4j.nn.modelimport.keras.exceptions.UnsupportedKerasConfigurationException;
 
 import java.util.Map;
-
-import static org.deeplearning4j.nn.modelimport.keras.layers.pooling.KerasPoolingUtils.mapGlobalPoolingDimensions;
-import static org.deeplearning4j.nn.modelimport.keras.layers.pooling.KerasPoolingUtils.mapPoolingType;
 
 /**
  * Imports a Keras Pooling layer as a DL4J Subsampling layer.
@@ -46,7 +43,7 @@ import static org.deeplearning4j.nn.modelimport.keras.layers.pooling.KerasPoolin
 @EqualsAndHashCode(callSuper = false)
 public class KerasGlobalPooling extends KerasLayer {
 
-    private final int[] dimensions;
+    private final long[] dimensions;
 
     /**
      * Constructor from parsed Keras layer configuration dictionary.
@@ -71,9 +68,9 @@ public class KerasGlobalPooling extends KerasLayer {
     public KerasGlobalPooling(Map<String, Object> layerConfig, boolean enforceTrainingConfig)
             throws InvalidKerasConfigurationException, UnsupportedKerasConfigurationException {
         super(layerConfig, enforceTrainingConfig);
-        this.dimensions = mapGlobalPoolingDimensions(this.className, conf, dimOrder);
+        this.dimensions = KerasPoolingUtils.mapGlobalPoolingDimensionsLong(this.className, conf, dimOrder);
         GlobalPoolingLayer.Builder builder =
-                new GlobalPoolingLayer.Builder(mapPoolingType(this.className, conf))
+                new GlobalPoolingLayer.Builder(KerasPoolingUtils.mapPoolingType(this.className, conf))
                         .poolingDimensions(dimensions)
                         .collapseDimensions(true) // keras 2 collapses dimensions
                         .name(this.layerName)

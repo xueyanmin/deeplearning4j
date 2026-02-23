@@ -34,7 +34,7 @@ import static org.nd4j.tvm.util.TVMUtils.*;
 
 @Slf4j
 public class TvmRunner implements Closeable  {
-    private static DLContext ctx;
+    private static DLDevice ctx;
     private  org.bytedeco.tvm.Module modFactory;
     private TVMValue values;
     private IntPointer codes;
@@ -50,25 +50,25 @@ public class TvmRunner implements Closeable  {
     @Builder
     public TvmRunner(String modelUri) {
         if (ctx == null) {
-            ctx = new DLContext().device_type(kDLCPU).device_id(0);
+            ctx = new DLDevice().device_type(kDLCPU).device_id(0);
             ctx.retainReference();
         }
 
         // create the runtime module
         try (PointerScope scope = new PointerScope()) {
-            modFactory = org.bytedeco.tvm.Module.LoadFromFile(modelUri);
+            modFactory = org.bytedeco.tvm.Module.LoadFromFile(new TVMString(modelUri));
             values = new TVMValue(2);
             codes = new IntPointer(2);
             setter = new TVMArgsSetter(values, codes);
             setter.apply(0, ctx);
             rv = new TVMRetValue();
-            modFactory.GetFunction("default").CallPacked(new TVMArgs(values, codes, 1), rv);
+            modFactory.GetFunction(new TVMString("default")).CallPacked(new TVMArgs(values, codes, 1), rv);
             gmod = rv.asModule();
-            getNumInputs = gmod.GetFunction("get_num_inputs");
-            getNumOutputs = gmod.GetFunction("get_num_outputs");
-            setInput = gmod.GetFunction("set_input");
-            getOutput = gmod.GetFunction("get_output");
-            run = gmod.GetFunction("run");
+            getNumInputs = gmod.GetFunction(new TVMString("get_num_inputs"));
+            getNumOutputs = gmod.GetFunction(new TVMString("get_num_outputs"));
+            setInput = gmod.GetFunction(new TVMString("set_input"));
+            getOutput = gmod.GetFunction(new TVMString("get_output"));
+            run = gmod.GetFunction(new TVMString("run"));
             // retain the session reference to prevent pre emptive release of the session.
             modFactory.retainReference();
             values.retainReference();

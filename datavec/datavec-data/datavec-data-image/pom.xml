@@ -20,22 +20,26 @@
   -->
 
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>org.datavec</groupId>
+        <groupId>org.eclipse.deeplearning4j</groupId>
         <artifactId>datavec-data</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>datavec-data-image</artifactId>
 
+    <properties>
+        <module.name>datavec.data.image</module.name>
+    </properties>
+
     <dependencies>
         <dependency>
-            <groupId>org.datavec</groupId>
+            <groupId>org.eclipse.deeplearning4j</groupId>
             <artifactId>datavec-api</artifactId>
         </dependency>
         <dependency>
@@ -84,37 +88,43 @@
             <groupId>org.bytedeco</groupId>
             <artifactId>javacv</artifactId>
             <version>${javacv.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>ffmpeg-platform</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.bytedeco</groupId>
+                    <artifactId>ffmpeg</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.bytedeco</groupId>
             <artifactId>opencv-platform</artifactId>
             <version>${opencv.version}-${javacpp-presets.version}</version>
         </dependency>
-        <dependency>
-            <groupId>org.bytedeco</groupId>
-            <artifactId>leptonica-platform</artifactId>
-            <version>${leptonica.version}-${javacpp-presets.version}</version>
-        </dependency>
+
         <dependency>
             <groupId>org.bytedeco</groupId>
             <artifactId>hdf5-platform</artifactId>
-            <version>${hdf5.version}-${javacpp-presets.version}</version>
+            <version>${hdf5.version}-1.5.10</version>
         </dependency>
+
         <dependency>
-            <groupId>org.bytedeco</groupId>
-            <artifactId>ffmpeg-platform</artifactId>
-            <version>${ffmpeg.version}-${javacpp.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.nd4j</groupId>
-            <artifactId>nd4j-common-tests</artifactId>
+            <groupId>org.eclipse.deeplearning4j</groupId>
+            <artifactId>resources</artifactId>
             <version>${project.version}</version>
-            <scope>test</scope>
         </dependency>
     </dependencies>
 
     <build>
         <plugins>
+            <plugin>
+                <groupId>org.moditect</groupId>
+                <artifactId>moditect-maven-plugin</artifactId>
+            </plugin>
+
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
@@ -125,20 +135,13 @@
                         <classpathDependencyExclude>com.google.android:android
                         </classpathDependencyExclude>
                     </classpathDependencyExcludes>
+                    <argLine>
+                        --add-exports java.base/java.nio=ALL-UNNAMED --add-opens java.base/java.nio=ALL-UNNAMED
+                    </argLine>
                 </configuration>
             </plugin>
         </plugins>
     </build>
 
-    <profiles>
-        <profile>
-            <id>nd4j-tests-cpu</id>
-        </profile>
-        <profile>
-            <id>nd4j-tests-cuda</id>
-        </profile>
-  <profile>
-            <id>nd4j-tests-aurora</id>
-        </profile>
-    </profiles>
+
 </project>

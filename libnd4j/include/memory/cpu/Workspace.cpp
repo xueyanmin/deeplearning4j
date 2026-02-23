@@ -115,7 +115,7 @@ sd::LongType Workspace::getCurrentSize() { return _currentSize; }
 sd::LongType Workspace::getCurrentOffset() { return _offset.load(); }
 
 void *Workspace::allocateBytes(sd::LongType numBytes) {
-  if (numBytes < 1) throw allocation_exception::build("Number of bytes for allocation should be positive", numBytes);
+  if (numBytes < 1) THROW_EXCEPTION(allocation_exception::build("Number of bytes for allocation should be positive", numBytes).what());
 
   // numBytes += 32;
   void *result = nullptr;
@@ -169,7 +169,7 @@ void Workspace::scopeOut() {
 sd::LongType Workspace::getSpilledSize() { return _spillsSize.load(); }
 
 void *Workspace::allocateBytes(sd::memory::MemoryType type, sd::LongType numBytes) {
-  if (type == DEVICE) throw std::runtime_error("CPU backend doesn't have device memory");
+  if (type == DEVICE) THROW_EXCEPTION("CPU backend doesn't have device memory");
 
   return this->allocateBytes(numBytes);
 }

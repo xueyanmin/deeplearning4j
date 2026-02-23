@@ -35,25 +35,60 @@ namespace sd {
  */
 class SD_LIB_EXPORT InteropDataBuffer {
  private:
-  std::shared_ptr<DataBuffer> _dataBuffer;
-  uint64_t _offset = 0;
-
+  DataBuffer *_dataBuffer = nullptr;
+  bool owner;
+  DataType _dataType = DataType::UNKNOWN;
  public:
-  InteropDataBuffer(InteropDataBuffer &dataBuffer, uint64_t length, uint64_t offset);
-  InteropDataBuffer(std::shared_ptr<DataBuffer> databuffer);
-  InteropDataBuffer(size_t elements, sd::DataType dtype, bool allocateBoth);
-  ~InteropDataBuffer() = default;
+  size_t _cachedLenInBytes = 0;
+  void* _cachedPrimaryPtr = nullptr;  // Cached for deallocation tracking
+  void* _cachedSpecialPtr = nullptr;  // Cached for deallocation tracking
+  bool _closed = false;
+  bool isConstant = false;
+
+  InteropDataBuffer(InteropDataBuffer *dataBuffer, uint64_t length);
+  InteropDataBuffer(DataBuffer * databuffer);
+  InteropDataBuffer(size_t lenInBytes, DataType dtype, bool allocateBoth);
+  ~InteropDataBuffer() {
+    // Mark as closed FIRST to prevent any concurrent access
+    _closed = true;
+    // If we own the DataBuffer and it's not constant, clean it up
+    if (owner && !isConstant && _dataBuffer != nullptr) {
+      delete _dataBuffer;
+    }
+    // Always null out the pointer to prevent use-after-free
+    _dataBuffer = nullptr;
+  }
 
 #ifndef __JAVACPP_HACK__
-  std::shared_ptr<DataBuffer> getDataBuffer() const;
-  std::shared_ptr<DataBuffer> dataBuffer();
+  DataBuffer * getDataBuffer() const;
+  DataBuffer * dataBuffer();
+  // In InteropDataBuffer class, add these public methods:
+  // Check if the underlying DataBuffer pointer is still valid
+  // by checking if it's non-null
+  bool hasValidDataBuffer() const { return _dataBuffer != nullptr; }
+
+  // Get the DataBuffer pointer directly without validation
+  DataBuffer* getDataBufferDirect() const { return _dataBuffer; }
+
+  // Mark the DataBuffer as invalid (set to null)
+  void invalidateDataBuffer() { _dataBuffer = nullptr; }
+  bool isOwner() const { return owner; }
+
+  // Safe accessor that doesn't touch other fields
+  DataBuffer* getDataBufferUnsafe() const {
+    return _dataBuffer;
+  }
 #endif
+
+  void printDbAllocationTrace();
 
   void *primary() const;
   void *special() const;
 
-  uint64_t offset() const;
-  void setOffset(uint64_t offset);
+  void markConstant(bool reallyConstant) {
+    isConstant = reallyConstant;
+    dataBuffer()->markConstant(reallyConstant);
+  }
 
   void setPrimary(void *ptr, size_t length);
   void setSpecial(void *ptr, size_t length);
@@ -62,6 +97,11 @@ class SD_LIB_EXPORT InteropDataBuffer {
 
   int deviceId() const;
   void setDeviceId(int deviceId);
+
+  //updates whether the buffer is the owner of its associated buffers or not.
+  void markOwner(bool owner);
+
+  int useCount() const;
 
   static void registerSpecialUse(const std::vector<const InteropDataBuffer *> &writeList,
                                  const std::vector<const InteropDataBuffer *> &readList);

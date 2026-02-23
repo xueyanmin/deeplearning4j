@@ -23,48 +23,65 @@
 #include <array/ShapeList.h>
 
 namespace sd {
-// ShapeList::ShapeList(bool autoRemovable) {
-//        _autoremovable = autoRemovable;
-//    }
 
-ShapeList::ShapeList(const sd::LongType* shape) {
-  if (shape != nullptr) _shapes.push_back(shape);
+
+ShapeList::ShapeList(LongType* shape) {
+  if (shape != nullptr) push_back(shape);
 }
 
 ShapeList::~ShapeList() {
   if (_autoremovable) destroy();
 }
 
-ShapeList::ShapeList(const std::vector<const sd::LongType*>& shapes, bool isWorkspace) : ShapeList(shapes) {
+ShapeList::ShapeList(const std::vector< LongType*>& shapes, bool isWorkspace)
+
+{
+  for (size_t i = 0; i < shapes.size(); i++) {
+    push_back(shapes[i]);
+  }
   _workspace = isWorkspace;
 }
 
-ShapeList::ShapeList(const std::vector<const sd::LongType*>& shapes) { _shapes = shapes; }
-
-std::vector<const sd::LongType*>* ShapeList::asVector() { return &_shapes; }
+ShapeList::ShapeList(const std::vector< LongType*>& shapes) {
+  _shapes = shapes;
+}
 
 void ShapeList::destroy() {
+
   if (_destroyed) return;
-
-  if (!_workspace)
-    for (auto v : _shapes)
-      if (v != nullptr) delete[] v;
-
+  if (!_workspace) {
+    for (int i = 0; i < size(); i++){
+      if (_shapes[i] != nullptr) delete[] _shapes[i];
+    }
+  }
   _destroyed = true;
 }
 
-int ShapeList::size() const { return (int)_shapes.size(); }
-
-const sd::LongType* ShapeList::at(int idx) {
-  if (_shapes.size() <= idx) throw std::runtime_error("Can't find requested variable by index");
-
-  return _shapes.at(idx);
+int ShapeList::size() const {
+  return (int)_shapes.size();
 }
 
-void ShapeList::push_back(const sd::LongType* shape) { _shapes.push_back(shape); }
+LongType* ShapeList::at(int idx) {
+  if(idx < 0) {
+    idx += _shapes.size();
+  }
+
+  if (size() <= idx) {
+    std::string errorMessage;
+    errorMessage += "Can't find requested variable by index: ";
+    errorMessage += std::to_string(idx);
+    THROW_EXCEPTION(errorMessage.c_str());
+  }
+
+  return _shapes[idx];
+}
+
+void ShapeList::push_back( LongType* shape) {
+  _shapes.push_back(shape);
+}
 
 void ShapeList::detach() {
-  for (int e = 0; e < _shapes.size(); e++) {
+  for (int e = 0; e < size(); e++) {
     _shapes[e] = shape::detachShape(_shapes[e]);
   }
 

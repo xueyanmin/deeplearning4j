@@ -23,7 +23,10 @@ package org.deeplearning4j.nn.modelimport.keras.layers.convolutional;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.ArrayUtils;
+import org.deeplearning4j.nn.modelimport.keras.KerasLayer;
+import org.deeplearning4j.nn.modelimport.keras.exceptions.InvalidKerasConfigurationException;
+import org.deeplearning4j.nn.modelimport.keras.exceptions.UnsupportedKerasConfigurationException;
+import org.deeplearning4j.nn.modelimport.keras.utils.KerasActivationUtils;
 import org.deeplearning4j.nn.api.layers.LayerConstraint;
 import org.deeplearning4j.nn.conf.CNN2DFormat;
 import org.deeplearning4j.nn.conf.InputPreProcessor;
@@ -31,22 +34,15 @@ import org.deeplearning4j.nn.conf.RNNFormat;
 import org.deeplearning4j.nn.conf.inputs.InputType;
 import org.deeplearning4j.nn.conf.layers.Convolution1DLayer;
 import org.deeplearning4j.nn.conf.layers.InputTypeUtil;
-import org.deeplearning4j.nn.modelimport.keras.exceptions.InvalidKerasConfigurationException;
-import org.deeplearning4j.nn.modelimport.keras.exceptions.UnsupportedKerasConfigurationException;
 import org.deeplearning4j.nn.modelimport.keras.utils.KerasConstraintUtils;
+import org.deeplearning4j.nn.modelimport.keras.utils.KerasInitilizationUtils;
 import org.deeplearning4j.nn.modelimport.keras.utils.KerasLayerUtils;
 import org.deeplearning4j.nn.params.ConvolutionParamInitializer;
 import org.deeplearning4j.nn.weights.IWeightInit;
 import org.nd4j.linalg.api.ndarray.INDArray;
-import org.nd4j.linalg.factory.Nd4j;
 
 import java.util.HashMap;
 import java.util.Map;
-
-import static org.deeplearning4j.nn.modelimport.keras.layers.convolutional.KerasConvolutionUtils.*;
-import static org.deeplearning4j.nn.modelimport.keras.utils.KerasActivationUtils.getIActivationFromConfig;
-import static org.deeplearning4j.nn.modelimport.keras.utils.KerasInitilizationUtils.getWeightInitFromConfig;
-import static org.deeplearning4j.nn.modelimport.keras.utils.KerasLayerUtils.*;
 
 @Slf4j
 @Data
@@ -84,29 +80,29 @@ public class KerasConvolution1D extends KerasConvolution {
      */
     public KerasConvolution1D(Map<String, Object> layerConfig, boolean enforceTrainingConfig)
             throws InvalidKerasConfigurationException, UnsupportedKerasConfigurationException {
+        //verify against python
         super(layerConfig, enforceTrainingConfig);
-        hasBias = getHasBiasFromConfig(layerConfig, conf);
-        //dl4j weights are 128,20,3,1 keras are 128,100,3,1
+        hasBias = KerasLayerUtils.getHasBiasFromConfig(layerConfig, conf);
         numTrainableParams = hasBias ? 2 : 1;
-        int[] dilationRate = getDilationRate(layerConfig, 1, conf, false);
+        int[] dilationRate = KerasConvolutionUtils.getDilationRate(layerConfig, 1, conf, false);
         LayerConstraint biasConstraint = KerasConstraintUtils.getConstraintsFromConfig(
                 layerConfig, conf.getLAYER_FIELD_B_CONSTRAINT(), conf, kerasMajorVersion);
         LayerConstraint weightConstraint = KerasConstraintUtils.getConstraintsFromConfig(
                 layerConfig, conf.getLAYER_FIELD_W_CONSTRAINT(), conf, kerasMajorVersion);
 
-        IWeightInit init = getWeightInitFromConfig(layerConfig, conf.getLAYER_FIELD_INIT(),
+        IWeightInit init = KerasInitilizationUtils.getWeightInitFromConfig(layerConfig, conf.getLAYER_FIELD_INIT(),
                 enforceTrainingConfig, conf, kerasMajorVersion);
         Convolution1DLayer.Builder builder = new Convolution1DLayer.Builder().name(this.layerName)
-                .nOut(getNOutFromConfig(layerConfig, conf)).dropOut(this.dropout)
-                .activation(getIActivationFromConfig(layerConfig, conf))
+                .nOut(KerasLayerUtils.getNOutFromConfig(layerConfig, conf)).dropOut(this.dropout)
+                .activation(KerasActivationUtils.getIActivationFromConfig(layerConfig, conf))
                 .weightInit(init)
                 .l1(this.weightL1Regularization).l2(this.weightL2Regularization)
-                .convolutionMode(getConvolutionModeFromConfig(layerConfig, conf))
-                .kernelSize(getKernelSizeFromConfig(layerConfig, 1,  conf, kerasMajorVersion)[0])
+                .convolutionMode(KerasConvolutionUtils.getConvolutionModeFromConfig(layerConfig, conf))
+                .kernelSize(KerasConvolutionUtils.getKernelSizeFromConfig(layerConfig, 1,  conf, kerasMajorVersion)[0])
                 .hasBias(hasBias)
-                .stride(getStrideFromConfig(layerConfig, 1, conf)[0])
-                .rnnDataFormat(dimOrder == DimOrder.TENSORFLOW ? RNNFormat.NWC: RNNFormat.NCW);
-        int[] padding = getPaddingFromBorderModeConfig(layerConfig, 1, conf, kerasMajorVersion);
+                .stride(KerasConvolutionUtils.getStrideFromConfig(layerConfig, 1, conf)[0])
+                .rnnDataFormat(dimOrder == KerasLayer.DimOrder.TENSORFLOW ? RNNFormat.NWC: RNNFormat.NCW);
+        int[] padding = KerasConvolutionUtils.getPaddingFromBorderModeConfig(layerConfig, 1, conf, kerasMajorVersion);
         if (hasBias)
             builder.biasInit(0.0);
         if (padding != null)
@@ -117,19 +113,11 @@ public class KerasConvolution1D extends KerasConvolution {
             builder.constrainBias(biasConstraint);
         if (weightConstraint != null)
             builder.constrainWeights(weightConstraint);
-        if(inputShape != null) {
-            if(dimOrder == DimOrder.THEANO) {
-                builder.nIn(inputShape[0]);
-            }
-            else {
-                builder.nIn(inputShape[1]);
-            }
-        }
 
         this.layer = builder.build();
         //set this in order to infer the dimensional format
         Convolution1DLayer convolution1DLayer = (Convolution1DLayer) this.layer;
-        convolution1DLayer.setCnn2dDataFormat(dimOrder == DimOrder.TENSORFLOW ? CNN2DFormat.NHWC : CNN2DFormat.NCHW);
+        convolution1DLayer.setCnn2dDataFormat(dimOrder == KerasLayer.DimOrder.TENSORFLOW ? CNN2DFormat.NHWC : CNN2DFormat.NCHW);
         convolution1DLayer.setDefaultValueOverriden(true);
     }
 
@@ -229,6 +217,6 @@ public class KerasConvolution1D extends KerasConvolution {
                 throw new InvalidKerasConfigurationException(
                         "Parameter " + conf.getKERAS_PARAM_NAME_B() + " does not exist in weights");
         }
-        removeDefaultWeights(weights, conf);
+        KerasLayerUtils.removeDefaultWeights(weights, conf);
     }
 }

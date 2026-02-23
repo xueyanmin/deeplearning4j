@@ -46,7 +46,7 @@ CUSTOM_OP_IMPL(rgb_to_grs, 1, 1, false, 0, 0) {
                input->sizeAt(dimC));
 
   helpers::transformRgbGrs(block.launchContext(), *input, *output, dimC);
-  return sd::Status::OK;
+  return Status::OK;
 }
 
 DECLARE_TYPES(rgb_to_grs) { getOpDescriptor()->setAllowedInputTypes({ALL_INTS, ALL_FLOATS})->setSameMode(true); }
@@ -66,10 +66,12 @@ DECLARE_SHAPE_FN(rgb_to_grs) {
   REQUIRE_TRUE(input->sizeAt(dimC) == 3, 0,
                "RGBtoGrayScale: operation expects 3 channels (R, B, G) in last dimention, but received %i", dimC);
 
-  auto nShape = input->getShapeAsVector();
-  nShape[dimC] = 1;
+  auto* inputShapeVec = input->getShapeAsVector();
+  (*inputShapeVec)[dimC] = 1;
 
-  return SHAPELIST(ConstantShapeHelper::getInstance().createShapeInfo(input->dataType(), input->ordering(), nShape));
+  auto result = SHAPELIST(ConstantShapeHelper::getInstance().createShapeInfo(input->dataType(), input->ordering(), *inputShapeVec));
+  delete inputShapeVec;
+  return result;
 }
 
 }  // namespace ops

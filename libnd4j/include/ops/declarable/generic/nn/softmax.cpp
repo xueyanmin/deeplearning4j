@@ -46,16 +46,17 @@ CONFIGURABLE_OP_IMPL(softmax, 1, 1, true, 0, 0) {
                "but got dimension = %i instead !",
                rank, dim);
 
-  helpers::softmax(block.launchContext(), *input, *output, dim);
+  helpers::softmax(block.launchContext(), input, output, dim);
 
   return sd::Status::OK;
 }
 
-CONFIGURABLE_OP_IMPL(softmax_bp, 2, 1, true, 0, 0) {
+CONFIGURABLE_OP_IMPL(softmax_bp, 3, 1, true, 0, 0) {
   auto input = INPUT_VARIABLE(0);
   auto gradO = INPUT_VARIABLE(1);
+  auto softmaxedOut = INPUT_VARIABLE(2);
   auto gradI = OUTPUT_VARIABLE(0);
-
+  
   const int rank = input->rankOf();
   const int dim = block.getIArguments()->size() > 0 ? INT_ARG(0) : rank - 1;
 
@@ -64,10 +65,33 @@ CONFIGURABLE_OP_IMPL(softmax_bp, 2, 1, true, 0, 0) {
                "but got dimension = %i instead !",
                rank, dim);
 
-  helpers::softmax(block.launchContext(), *input, *gradI, dim);
+  // Refactored to minimize temporary allocations and ensure proper cleanup
+  gradI->assign(softmaxedOut);
+  
+  // Perform operations with proper pointer management
+  std::vector<sd::LongType> dimVector = {dim};
+  
+  // Compute gradI * gradO - returns pointer
+  auto* temp = (*gradI) * (*gradO);
+  
+  // Reduce along dimension - returns pointer
+  auto* sumAlongDim = temp->reduceAlongDimension(reduce::Sum, &dimVector, true);
+  delete temp;
 
-  auto sumAlongDim = (*gradI * *gradO).reduceAlongDimension(reduce::Sum, {dim}, true);
-  gradI->assign(*gradI * (*gradO - sumAlongDim));
+  // Compute gradO - sumAlongDim - returns pointer
+  auto* diff = (*gradO) - (*sumAlongDim);
+  // FIXED: Add defensive check - reduceAlongDimension may return view
+  if (sumAlongDim != nullptr && !sumAlongDim->isView()) {
+    delete sumAlongDim;
+  }
+  
+  // Compute final result: gradI * diff - returns pointer
+  auto* result = (*gradI) * (*diff);
+  delete diff;
+  
+  // Assign result to output
+  gradI->assign(result);
+  delete result;
 
   return sd::Status::OK;
 }

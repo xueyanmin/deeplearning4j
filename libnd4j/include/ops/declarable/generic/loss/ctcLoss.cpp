@@ -65,17 +65,20 @@ CUSTOM_OP_IMPL(ctc_loss, 4, 1, false, 0, 1) {
                ShapeUtils::shapeAsString(targetLabelLengths).c_str(), ShapeUtils::shapeAsString(outputLosses).c_str());
 
   auto emptyGradients = NDArrayFactory::empty<float>();
-  sd::ops::helpers::ctcLoss(block, *logitInput, *targetLabels, *logitInputLengths, *targetLabelLengths, *outputLosses,
-                            emptyGradients, blankIndex);
+  helpers::ctcLoss(block, *logitInput, *targetLabels, *logitInputLengths, *targetLabelLengths, *outputLosses,
+                            *emptyGradients, blankIndex);
 
-  return sd::Status::OK;
+  delete emptyGradients;
+  return Status::OK;
 }
 
 //////////////////////////////////////////////////////////////////////////
 DECLARE_TYPES(ctc_loss) {
   getOpDescriptor()
-      ->setAllowedInputTypes({ALL_INDICES})
+      ->setAllowedInputTypes(0,{ALL_INDICES})
       ->setAllowedInputTypes(1, {ALL_FLOATS})
+      ->setAllowedInputTypes(2,{ALL_INDICES})
+      ->setAllowedInputTypes(3,{ALL_INDICES})
       ->setAllowedOutputTypes({ALL_FLOATS});
 }
 
@@ -85,7 +88,8 @@ DECLARE_SHAPE_FN(ctc_loss) {
   auto zShapeInfo = inputShape->at(2);
 
   auto dtype = ArrayOptions::dataType(yShapeInfo);
-  return SHAPELIST(ConstantShapeHelper::getInstance().createShapeInfo(ShapeDescriptor(zShapeInfo, dtype)));
+  auto ret = SHAPELIST(ConstantShapeHelper::getInstance().castToDataType(zShapeInfo, dtype));
+  return ret;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -127,10 +131,11 @@ CUSTOM_OP_IMPL(ctc_loss_grad, 4, 1, false, 0, 1) {
                ShapeUtils::shapeAsString(logitInput).c_str(), ShapeUtils::shapeAsString(outputGradients).c_str());
 
   auto emptyLoss = NDArrayFactory::empty<float>();
-  sd::ops::helpers::ctcLoss(block, *logitInput, *targetLabels, *logitInputLengths, *targetLabelLengths, emptyLoss,
+  helpers::ctcLoss(block, *logitInput, *targetLabels, *logitInputLengths, *targetLabelLengths, *emptyLoss,
                             *outputGradients, blankIndex);
+  delete emptyLoss;
 
-  return sd::Status::OK;
+  return Status::OK;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -145,7 +150,8 @@ DECLARE_TYPES(ctc_loss_grad) {
 DECLARE_SHAPE_FN(ctc_loss_grad) {
   auto yShapeInfo = inputShape->at(1);
   auto dtype = ArrayOptions::dataType(yShapeInfo);
-  return SHAPELIST(ConstantShapeHelper::getInstance().createShapeInfo(ShapeDescriptor(yShapeInfo, dtype)));
+  auto ret = SHAPELIST(ConstantShapeHelper::getInstance().castToDataType(yShapeInfo, dtype));
+  return ret;
 }
 
 }  // namespace ops

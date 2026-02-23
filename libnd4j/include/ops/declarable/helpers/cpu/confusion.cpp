@@ -21,7 +21,7 @@
 //
 #include <execution/Threads.h>
 #include <ops/declarable/helpers/confusion.h>
-
+#if NOT_EXCLUDED(OP_confusion_matrix)
 namespace sd {
 namespace ops {
 namespace helpers {
@@ -32,7 +32,7 @@ static void _confusionFunctor(NDArray* labels, NDArray* predictions, NDArray* we
   int lLen = labels->lengthOf();
 
   auto func = PRAGMA_THREADS_FOR {
-    for (int j = start; j < stop; j++) {
+    for (sd::LongType j = start; j < stop; j++) {
       auto label = labels->e<sd::LongType>(j);
       auto pred = predictions->e<sd::LongType>(j);
       T value = (weights == nullptr ? (T)1.0f : weights->e<T>(j));
@@ -51,10 +51,11 @@ void confusionFunctor(sd::LaunchContext* context, NDArray* labels, NDArray* pred
   BUILD_SINGLE_SELECTOR(xType, _confusionFunctor, (labels, predictions, weights, output), SD_NUMERIC_TYPES);
 }
 
-BUILD_SINGLE_TEMPLATE(template void _confusionFunctor,
+BUILD_SINGLE_TEMPLATE( void _confusionFunctor,
                       (NDArray * labels, NDArray* predictions, NDArray* weights, NDArray* output);
                       , SD_NUMERIC_TYPES);
 
 }  // namespace helpers
 }  // namespace ops
 }  // namespace sd
+#endif

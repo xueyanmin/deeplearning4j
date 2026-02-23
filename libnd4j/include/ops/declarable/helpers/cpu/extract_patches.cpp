@@ -21,7 +21,7 @@
 //
 #include <execution/Threads.h>
 #include <ops/declarable/helpers/axis.h>
-
+#if NOT_EXCLUDED(OP_extract_patches)
 namespace sd {
 namespace ops {
 namespace helpers {
@@ -29,7 +29,7 @@ namespace helpers {
 template <typename T>
 static void _extractPatches(NDArray* images, NDArray* output, int sizeRow, int sizeCol, int strideRow, int strideCol,
                             int rateRow, int rateCol, bool theSame) {
-  std::vector<int> restDims({1, 2, 3});  // the first and the last dims
+  std::vector<sd::LongType> restDims({1, 2, 3});  // the first and the last dims
   ResultSet listOfMatricies = images->allTensorsAlongDimension(restDims);
   ResultSet listOfOutputs = output->allTensorsAlongDimension(restDims);
   // 3D matricies - 2D matricies of vectors (if last dim is greater than 1)
@@ -92,14 +92,15 @@ void extractPatches(sd::LaunchContext* context, NDArray* images, NDArray* output
 
   BUILD_SINGLE_SELECTOR(xType, _extractPatches,
                         (images, output, sizeRow, sizeCol, stradeRow, stradeCol, rateRow, rateCol, theSame),
-                        SD_COMMON_TYPES);
+                        SD_NUMERIC_TYPES);
 }
 
-BUILD_SINGLE_TEMPLATE(template void _extractPatches,
+BUILD_SINGLE_TEMPLATE( void _extractPatches,
                       (NDArray * input, NDArray* output, int sizeRow, int sizeCol, int stradeRow, int stradeCol,
                        int rateRow, int rateCol, bool theSame),
-                      SD_COMMON_TYPES);
+                      SD_NUMERIC_TYPES);
 
 }  // namespace helpers
 }  // namespace ops
 }  // namespace sd
+#endif

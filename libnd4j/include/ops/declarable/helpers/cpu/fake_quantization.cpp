@@ -104,9 +104,9 @@ void fakeQuantWithMinMaxVars_(NDArray* input, NDArray* min, NDArray* max, int nu
     // converse value with scale and shifted with nudged min
     val -= nudgedMin;
     return (sd::math::sd_floor<T, T>(val / scale + T(0.5f)) * scale + nudgedMin);
-  };
+  });
 
-  input->applyLambda<T>(fakeQuantizationWithMinMax, *output);
+  input->applyLambda<T>(fakeQuantizationWithMinMax, output);
 }
 
 void fakeQuantWithMinMaxVars(NDArray* input, NDArray* min, NDArray* max, int numBits, bool narrowed, NDArray* output) {
@@ -119,7 +119,7 @@ void fakeQuantWithMinMaxVarsPerChannel(LaunchContext* context, NDArray* input, N
                         (input, min, max, numBits, narrowed, output), SD_FLOAT_TYPES);
 }
 
-BUILD_SINGLE_TEMPLATE(template void fakeQuantWithMinMaxVars_,
+BUILD_SINGLE_TEMPLATE( void fakeQuantWithMinMaxVars_,
                       (NDArray * input, NDArray* min, NDArray* max, int numBits, bool narrowed, NDArray* output),
                       SD_FLOAT_TYPES);
 

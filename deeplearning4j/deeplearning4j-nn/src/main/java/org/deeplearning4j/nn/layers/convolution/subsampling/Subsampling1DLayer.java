@@ -24,7 +24,6 @@ import org.deeplearning4j.exception.DL4JInvalidInputException;
 import org.deeplearning4j.nn.api.MaskState;
 import org.deeplearning4j.nn.conf.CNN2DFormat;
 import org.deeplearning4j.nn.conf.NeuralNetConfiguration;
-import org.deeplearning4j.nn.conf.RNNFormat;
 import org.deeplearning4j.nn.gradient.Gradient;
 import org.deeplearning4j.util.ConvolutionUtils;
 import org.nd4j.common.base.Preconditions;
@@ -129,7 +128,7 @@ public class Subsampling1DLayer extends SubsamplingLayer {
     @Override
     public Pair<INDArray, MaskState> feedForwardMaskArray(INDArray maskArray, MaskState currentMaskState,
                                                           int minibatchSize) {
-        INDArray reduced = ConvolutionUtils.cnn1dMaskReduction(maskArray, layerConf().getKernelSize()[0],
+        INDArray reduced = ConvolutionUtils.cnn1dMaskReductionLong(maskArray, layerConf().getKernelSize()[0],
                 layerConf().getStride()[0], layerConf().getPadding()[0], layerConf().getDilation()[0],
                 layerConf().getConvolutionMode());
         return new Pair<>(reduced, currentMaskState);

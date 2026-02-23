@@ -19,6 +19,8 @@
 // @author AbdelRauf
 //
 #include <ops/declarable/helpers/cpu/indexReductions.hpp>
+#include <system/op_boilerplate.h>
+#if NOT_EXCLUDED(OP_argamax)
 
 
 #cmakedefine SD_COMMON_TYPES_GEN 
@@ -27,10 +29,9 @@
 namespace sd {
     namespace ops {
         namespace helpers {
-
-            BUILD_DOUBLE_TEMPLATE(template SD_LIB_HIDDEN void argAbsMax_, (const NDArray& input, NDArray& output, const std::vector<int>& dimensions), SD_COMMON_TYPES_@FL_TYPE_INDEX@, SD_INDEXING_TYPES);
- 
+            BUILD_DOUBLE_TEMPLATE( SD_LIB_HIDDEN void argAbsMax_, (NDArray& input, NDArray& output, const std::vector<sd::LongType>& dimensions), SD_COMMON_TYPES_@FL_TYPE_INDEX@, SD_INDEXING_TYPES);
         }
     }
 }
+#endif
 #endif

@@ -23,6 +23,7 @@ package org.nd4j.linalg.ops.transforms;
 import lombok.NonNull;
 import lombok.val;
 import org.nd4j.common.base.Preconditions;
+import org.nd4j.linalg.api.buffer.DataBuffer;
 import org.nd4j.linalg.api.buffer.DataType;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.api.ops.CustomOp;
@@ -73,34 +74,54 @@ public class Transforms {
      * @return the cosine similarities between the 2 arrays
      */
     public static double cosineSim(@NonNull INDArray d1, @NonNull INDArray d2) {
-        return Nd4j.getExecutioner().exec(new CosineSimilarity(d1, d2)).getDouble(0);
+        INDArray result = Nd4j.getExecutioner().exec(new CosineSimilarity(d1, d2));
+        try {
+            return result.getDouble(0);
+        } finally {
+            result.close();
+        }
     }
 
     public static double cosineDistance(@NonNull INDArray d1, @NonNull INDArray d2) {
-        return Nd4j.getExecutioner().exec(new CosineDistance(d1, d2)).getDouble(0);
+        INDArray result = Nd4j.getExecutioner().exec(new CosineDistance(d1, d2));
+        try {
+            return result.getDouble(0);
+        } finally {
+            result.close();
+        }
     }
 
     public static double hammingDistance(@NonNull INDArray d1, @NonNull INDArray d2) {
-        return Nd4j.getExecutioner().exec(new HammingDistance(d1, d2)).getDouble(0);
+        INDArray result = Nd4j.getExecutioner().exec(new HammingDistance(d1, d2));
+        try {
+            return result.getDouble(0);
+        } finally {
+            result.close();
+        }
     }
 
     public static double jaccardDistance(@NonNull INDArray d1, @NonNull INDArray d2) {
-        return Nd4j.getExecutioner().exec(new JaccardDistance(d1, d2)).getDouble(0);
+        INDArray result = Nd4j.getExecutioner().exec(new JaccardDistance(d1, d2));
+        try {
+            return result.getDouble(0);
+        } finally {
+            result.close();
+        }
     }
 
-    public static INDArray allCosineSimilarities(@NonNull INDArray d1, @NonNull INDArray d2, int... dimensions) {
+    public static INDArray allCosineSimilarities(@NonNull INDArray d1, @NonNull INDArray d2, long... dimensions) {
         return Nd4j.getExecutioner().exec(new CosineSimilarity(d1, d2, true, dimensions));
     }
 
-    public static INDArray allCosineDistances(@NonNull INDArray d1, @NonNull INDArray d2, int... dimensions) {
+    public static INDArray allCosineDistances(@NonNull INDArray d1, @NonNull INDArray d2, long... dimensions) {
         return Nd4j.getExecutioner().exec(new CosineDistance(d1, d2, true, dimensions));
     }
 
-    public static INDArray allEuclideanDistances(@NonNull INDArray d1, @NonNull INDArray d2, int... dimensions) {
+    public static INDArray allEuclideanDistances(@NonNull INDArray d1, @NonNull INDArray d2, long... dimensions) {
         return Nd4j.getExecutioner().exec(new EuclideanDistance(d1, d2, true, dimensions));
     }
 
-    public static INDArray allManhattanDistances(@NonNull INDArray d1, @NonNull INDArray d2, int... dimensions) {
+    public static INDArray allManhattanDistances(@NonNull INDArray d1, @NonNull INDArray d2, long... dimensions) {
         return Nd4j.getExecutioner().exec(new ManhattanDistance(d1, d2, true, dimensions));
     }
 
@@ -124,11 +145,25 @@ public class Transforms {
 
     public static INDArray cross(INDArray x, INDArray y) {
         Cross c = new Cross(x, y, null);
-        List<LongShapeDescriptor> shape = c.calculateOutputShape();
-        INDArray out = Nd4j.create(shape.get(0));
-        c.addOutputArgument(out);
-        Nd4j.getExecutioner().exec(c);
-        return out;
+        List<DataBuffer> shape = c.calculateOutputShape();
+        INDArray out = null;
+        boolean firstBufferUsed = false;
+        try {
+            out = Nd4j.create(shape.get(0));
+            firstBufferUsed = true;
+            c.addOutputArgument(out);
+            Nd4j.getExecutioner().exec(c);
+            return out;
+        } finally {
+            // Clean up unused shape buffers to prevent memory leak
+            int startIndex = firstBufferUsed ? 1 : 0;
+            for (int i = startIndex; i < shape.size(); i++) {
+                DataBuffer db = shape.get(i);
+                if (db != null) {
+                    db.close();
+                }
+            }
+        }
     }
 
     /**
@@ -142,7 +177,7 @@ public class Transforms {
 
     /**
      * Atan2 operation, new INDArray instance will be returned
-     * Note the order of x and y parameters is opposite to that of {@link java.lang.Math#atan2(double, double)}
+     * Note the order of x and y parameters is opposite to that of {@link Math#atan2(double, double)}
      *
      * @param x the abscissa coordinate
      * @param y the ordinate coordinate

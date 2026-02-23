@@ -35,43 +35,51 @@ CUSTOM_OP_IMPL(sufficient_statistics, 2, 3, false, 0, 0) {
   auto sum = OUTPUT_VARIABLE(1);
   auto squares = OUTPUT_VARIABLE(2);
 
-  std::vector<int> axis(axisVector->lengthOf());  //*block.getIArguments();
+  std::vector<LongType> axis(axisVector->lengthOf());
 
   // axis might be dynamic (i.e. tf mode)
   helpers::adjustAxis(input->rankOf(), axisVector, axis);
 
-  input->reduceAlongDimension(reduce::SquaredNorm, *squares, axis);
-  input->reduceAlongDimension(reduce::Sum, *sum, axis);
+  input->reduceAlongDimension(reduce::SquaredNorm, squares, &axis);
+  input->reduceAlongDimension(reduce::Sum, sum, &axis);
   auto count = NDArrayFactory::create(input->dataType(), input->lengthOf() / sum->lengthOf());
   dataCount->assign(count);
   if (block.numT() > 0) {
     auto shift = OUTPUT_VARIABLE(3);
-    shift->assign(T_ARG(0));
+#ifdef HAS_DOUBLE
+    double shiftValue = static_cast<double>(T_ARG(0));
+    shift->assign(shiftValue);
+#elif defined(HAS_FLOAT32)
+    float shiftValue = static_cast<float>(T_ARG(0));
+    shift->assign(shiftValue);
+#else
+#error "No floating-point type available for sufficient_statistics operation"
+#endif
   }
 
-  return sd::Status::OK;
+  delete count;
+  return Status::OK;
 }
 
 DECLARE_TYPES(sufficient_statistics) {
   getOpDescriptor()->setAllowedInputTypes(0, {ALL_INTS, ALL_FLOATS});
-  getOpDescriptor()->setAllowedInputTypes(1, {DataType::INT32, DataType::INT64});
-  getOpDescriptor()->setAllowedOutputTypes(0, DataType::INHERIT);
-  getOpDescriptor()->setAllowedOutputTypes(1, DataType::INHERIT);
-  getOpDescriptor()->setAllowedOutputTypes(2, DataType::INHERIT);
+  getOpDescriptor()->setAllowedInputTypes(1, {INT32, INT64});
+  getOpDescriptor()->setAllowedOutputTypes(0, INHERIT);
+  getOpDescriptor()->setAllowedOutputTypes(1, INHERIT);
+  getOpDescriptor()->setAllowedOutputTypes(2, INHERIT);
 }
 
 DECLARE_SHAPE_FN(sufficient_statistics) {
   auto axisVector = INPUT_VARIABLE(1);
-  std::vector<int> axis(axisVector->lengthOf());
+  std::vector<LongType> axis(axisVector->lengthOf());
 
   auto input = INPUT_VARIABLE(0);
   helpers::adjustAxis(input->rankOf(), axisVector, axis);
 
-  // std::vector<int> dims = ShapeUtils::evalDimsToExclude(input->rankOf(), {axis});
   auto scalarShape = ConstantShapeHelper::getInstance().scalarShapeInfo(ArrayOptions::dataType(inputShape->at(0)));
-  auto sumShape = ShapeUtils::evalReduceShapeInfo('c', axis, *input, false, false, block.workspace());
+  auto sumShape = ShapeUtils::evalReduceShapeInfo('c', &axis, *input, false, false, block.workspace());
 
-  auto squareShape = ShapeUtils::evalReduceShapeInfo('c', axis, *input, false, false, block.workspace());
+  auto squareShape = ShapeUtils::evalReduceShapeInfo('c', &axis, *input, false, false, block.workspace());
 
   auto shapeList = SHAPELIST(scalarShape, sumShape, squareShape);
   if (block.numT() > 0)

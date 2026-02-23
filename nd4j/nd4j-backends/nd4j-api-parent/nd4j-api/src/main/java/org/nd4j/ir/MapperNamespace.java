@@ -89,6 +89,8 @@ public final class MapperNamespace {
     }
 
     /**
+     * @param value The numeric wire value of the corresponding enum entry.
+     * @return The enum associated with the given numeric wire value.
      * @deprecated Use {@link #forNumber(int)} instead.
      */
     @java.lang.Deprecated
@@ -96,6 +98,10 @@ public final class MapperNamespace {
       return forNumber(value);
     }
 
+    /**
+     * @param value The numeric wire value of the corresponding enum entry.
+     * @return The enum associated with the given numeric wire value.
+     */
     public static OpListType forNumber(int value) {
       switch (value) {
         case 0: return TARG;
@@ -123,6 +129,10 @@ public final class MapperNamespace {
 
     public final org.nd4j.shade.protobuf.Descriptors.EnumValueDescriptor
         getValueDescriptor() {
+      if (this == UNRECOGNIZED) {
+        throw new java.lang.IllegalStateException(
+            "Can't get the descriptor of an unrecognized enum value.");
+      }
       return getDescriptor().getValues().get(ordinal());
     }
     public final org.nd4j.shade.protobuf.Descriptors.EnumDescriptor
@@ -200,6 +210,8 @@ public final class MapperNamespace {
     }
 
     /**
+     * @param value The numeric wire value of the corresponding enum entry.
+     * @return The enum associated with the given numeric wire value.
      * @deprecated Use {@link #forNumber(int)} instead.
      */
     @java.lang.Deprecated
@@ -207,6 +219,10 @@ public final class MapperNamespace {
       return forNumber(value);
     }
 
+    /**
+     * @param value The numeric wire value of the corresponding enum entry.
+     * @return The enum associated with the given numeric wire value.
+     */
     public static VariableResolutionType forNumber(int value) {
       switch (value) {
         case 0: return DIRECT;
@@ -230,6 +246,10 @@ public final class MapperNamespace {
 
     public final org.nd4j.shade.protobuf.Descriptors.EnumValueDescriptor
         getValueDescriptor() {
+      if (this == UNRECOGNIZED) {
+        throw new java.lang.IllegalStateException(
+            "Can't get the descriptor of an unrecognized enum value.");
+      }
       return getDescriptor().getValues().get(ordinal());
     }
     public final org.nd4j.shade.protobuf.Descriptors.EnumDescriptor
@@ -270,286 +290,374 @@ public final class MapperNamespace {
 
     /**
      * <code>string ruleName = 1;</code>
+     * @return The ruleName.
      */
     java.lang.String getRuleName();
     /**
      * <code>string ruleName = 1;</code>
+     * @return The bytes for ruleName.
      */
     org.nd4j.shade.protobuf.ByteString
         getRuleNameBytes();
 
     /**
      * <code>string functionName = 2;</code>
+     * @return The functionName.
      */
     java.lang.String getFunctionName();
     /**
      * <code>string functionName = 2;</code>
+     * @return The bytes for functionName.
      */
     org.nd4j.shade.protobuf.ByteString
         getFunctionNameBytes();
 
     /**
      * <code>repeated string inputStringAttrName = 3;</code>
+     * @return A list containing the inputStringAttrName.
      */
     java.util.List<java.lang.String>
         getInputStringAttrNameList();
     /**
      * <code>repeated string inputStringAttrName = 3;</code>
+     * @return The count of inputStringAttrName.
      */
     int getInputStringAttrNameCount();
     /**
      * <code>repeated string inputStringAttrName = 3;</code>
+     * @param index The index of the element to return.
+     * @return The inputStringAttrName at the given index.
      */
     java.lang.String getInputStringAttrName(int index);
     /**
      * <code>repeated string inputStringAttrName = 3;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the inputStringAttrName at the given index.
      */
     org.nd4j.shade.protobuf.ByteString
         getInputStringAttrNameBytes(int index);
 
     /**
      * <code>repeated string outputStringAttrName = 4;</code>
+     * @return A list containing the outputStringAttrName.
      */
     java.util.List<java.lang.String>
         getOutputStringAttrNameList();
     /**
      * <code>repeated string outputStringAttrName = 4;</code>
+     * @return The count of outputStringAttrName.
      */
     int getOutputStringAttrNameCount();
     /**
      * <code>repeated string outputStringAttrName = 4;</code>
+     * @param index The index of the element to return.
+     * @return The outputStringAttrName at the given index.
      */
     java.lang.String getOutputStringAttrName(int index);
     /**
      * <code>repeated string outputStringAttrName = 4;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the outputStringAttrName at the given index.
      */
     org.nd4j.shade.protobuf.ByteString
         getOutputStringAttrNameBytes(int index);
 
     /**
      * <code>repeated string inputIntName = 5;</code>
+     * @return A list containing the inputIntName.
      */
     java.util.List<java.lang.String>
         getInputIntNameList();
     /**
      * <code>repeated string inputIntName = 5;</code>
+     * @return The count of inputIntName.
      */
     int getInputIntNameCount();
     /**
      * <code>repeated string inputIntName = 5;</code>
+     * @param index The index of the element to return.
+     * @return The inputIntName at the given index.
      */
     java.lang.String getInputIntName(int index);
     /**
      * <code>repeated string inputIntName = 5;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the inputIntName at the given index.
      */
     org.nd4j.shade.protobuf.ByteString
         getInputIntNameBytes(int index);
 
     /**
      * <code>repeated string outputIntName = 6;</code>
+     * @return A list containing the outputIntName.
      */
     java.util.List<java.lang.String>
         getOutputIntNameList();
     /**
      * <code>repeated string outputIntName = 6;</code>
+     * @return The count of outputIntName.
      */
     int getOutputIntNameCount();
     /**
      * <code>repeated string outputIntName = 6;</code>
+     * @param index The index of the element to return.
+     * @return The outputIntName at the given index.
      */
     java.lang.String getOutputIntName(int index);
     /**
      * <code>repeated string outputIntName = 6;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the outputIntName at the given index.
      */
     org.nd4j.shade.protobuf.ByteString
         getOutputIntNameBytes(int index);
 
     /**
      * <code>repeated string inputFloatName = 7;</code>
+     * @return A list containing the inputFloatName.
      */
     java.util.List<java.lang.String>
         getInputFloatNameList();
     /**
      * <code>repeated string inputFloatName = 7;</code>
+     * @return The count of inputFloatName.
      */
     int getInputFloatNameCount();
     /**
      * <code>repeated string inputFloatName = 7;</code>
+     * @param index The index of the element to return.
+     * @return The inputFloatName at the given index.
      */
     java.lang.String getInputFloatName(int index);
     /**
      * <code>repeated string inputFloatName = 7;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the inputFloatName at the given index.
      */
     org.nd4j.shade.protobuf.ByteString
         getInputFloatNameBytes(int index);
 
     /**
      * <code>repeated string outputFloatName = 8;</code>
+     * @return A list containing the outputFloatName.
      */
     java.util.List<java.lang.String>
         getOutputFloatNameList();
     /**
      * <code>repeated string outputFloatName = 8;</code>
+     * @return The count of outputFloatName.
      */
     int getOutputFloatNameCount();
     /**
      * <code>repeated string outputFloatName = 8;</code>
+     * @param index The index of the element to return.
+     * @return The outputFloatName at the given index.
      */
     java.lang.String getOutputFloatName(int index);
     /**
      * <code>repeated string outputFloatName = 8;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the outputFloatName at the given index.
      */
     org.nd4j.shade.protobuf.ByteString
         getOutputFloatNameBytes(int index);
 
     /**
      * <code>repeated string inputDoubleName = 9;</code>
+     * @return A list containing the inputDoubleName.
      */
     java.util.List<java.lang.String>
         getInputDoubleNameList();
     /**
      * <code>repeated string inputDoubleName = 9;</code>
+     * @return The count of inputDoubleName.
      */
     int getInputDoubleNameCount();
     /**
      * <code>repeated string inputDoubleName = 9;</code>
+     * @param index The index of the element to return.
+     * @return The inputDoubleName at the given index.
      */
     java.lang.String getInputDoubleName(int index);
     /**
      * <code>repeated string inputDoubleName = 9;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the inputDoubleName at the given index.
      */
     org.nd4j.shade.protobuf.ByteString
         getInputDoubleNameBytes(int index);
 
     /**
      * <code>repeated string outputDoubleName = 10;</code>
+     * @return A list containing the outputDoubleName.
      */
     java.util.List<java.lang.String>
         getOutputDoubleNameList();
     /**
      * <code>repeated string outputDoubleName = 10;</code>
+     * @return The count of outputDoubleName.
      */
     int getOutputDoubleNameCount();
     /**
      * <code>repeated string outputDoubleName = 10;</code>
+     * @param index The index of the element to return.
+     * @return The outputDoubleName at the given index.
      */
     java.lang.String getOutputDoubleName(int index);
     /**
      * <code>repeated string outputDoubleName = 10;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the outputDoubleName at the given index.
      */
     org.nd4j.shade.protobuf.ByteString
         getOutputDoubleNameBytes(int index);
 
     /**
      * <code>repeated string inputBooleanName = 11;</code>
+     * @return A list containing the inputBooleanName.
      */
     java.util.List<java.lang.String>
         getInputBooleanNameList();
     /**
      * <code>repeated string inputBooleanName = 11;</code>
+     * @return The count of inputBooleanName.
      */
     int getInputBooleanNameCount();
     /**
      * <code>repeated string inputBooleanName = 11;</code>
+     * @param index The index of the element to return.
+     * @return The inputBooleanName at the given index.
      */
     java.lang.String getInputBooleanName(int index);
     /**
      * <code>repeated string inputBooleanName = 11;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the inputBooleanName at the given index.
      */
     org.nd4j.shade.protobuf.ByteString
         getInputBooleanNameBytes(int index);
 
     /**
      * <code>repeated string outputBooleanName = 12;</code>
+     * @return A list containing the outputBooleanName.
      */
     java.util.List<java.lang.String>
         getOutputBooleanNameList();
     /**
      * <code>repeated string outputBooleanName = 12;</code>
+     * @return The count of outputBooleanName.
      */
     int getOutputBooleanNameCount();
     /**
      * <code>repeated string outputBooleanName = 12;</code>
+     * @param index The index of the element to return.
+     * @return The outputBooleanName at the given index.
      */
     java.lang.String getOutputBooleanName(int index);
     /**
      * <code>repeated string outputBooleanName = 12;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the outputBooleanName at the given index.
      */
     org.nd4j.shade.protobuf.ByteString
         getOutputBooleanNameBytes(int index);
 
     /**
      * <code>repeated string inputTensorName = 13;</code>
+     * @return A list containing the inputTensorName.
      */
     java.util.List<java.lang.String>
         getInputTensorNameList();
     /**
      * <code>repeated string inputTensorName = 13;</code>
+     * @return The count of inputTensorName.
      */
     int getInputTensorNameCount();
     /**
      * <code>repeated string inputTensorName = 13;</code>
+     * @param index The index of the element to return.
+     * @return The inputTensorName at the given index.
      */
     java.lang.String getInputTensorName(int index);
     /**
      * <code>repeated string inputTensorName = 13;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the inputTensorName at the given index.
      */
     org.nd4j.shade.protobuf.ByteString
         getInputTensorNameBytes(int index);
 
     /**
      * <code>repeated string outputTensorName = 14;</code>
+     * @return A list containing the outputTensorName.
      */
     java.util.List<java.lang.String>
         getOutputTensorNameList();
     /**
      * <code>repeated string outputTensorName = 14;</code>
+     * @return The count of outputTensorName.
      */
     int getOutputTensorNameCount();
     /**
      * <code>repeated string outputTensorName = 14;</code>
+     * @param index The index of the element to return.
+     * @return The outputTensorName at the given index.
      */
     java.lang.String getOutputTensorName(int index);
     /**
      * <code>repeated string outputTensorName = 14;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the outputTensorName at the given index.
      */
     org.nd4j.shade.protobuf.ByteString
         getOutputTensorNameBytes(int index);
 
     /**
      * <code>repeated string inputDataTypeName = 15;</code>
+     * @return A list containing the inputDataTypeName.
      */
     java.util.List<java.lang.String>
         getInputDataTypeNameList();
     /**
      * <code>repeated string inputDataTypeName = 15;</code>
+     * @return The count of inputDataTypeName.
      */
     int getInputDataTypeNameCount();
     /**
      * <code>repeated string inputDataTypeName = 15;</code>
+     * @param index The index of the element to return.
+     * @return The inputDataTypeName at the given index.
      */
     java.lang.String getInputDataTypeName(int index);
     /**
      * <code>repeated string inputDataTypeName = 15;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the inputDataTypeName at the given index.
      */
     org.nd4j.shade.protobuf.ByteString
         getInputDataTypeNameBytes(int index);
 
     /**
      * <code>repeated string outputDataTypeName = 16;</code>
+     * @return A list containing the outputDataTypeName.
      */
     java.util.List<java.lang.String>
         getOutputDataTypeNameList();
     /**
      * <code>repeated string outputDataTypeName = 16;</code>
+     * @return The count of outputDataTypeName.
      */
     int getOutputDataTypeNameCount();
     /**
      * <code>repeated string outputDataTypeName = 16;</code>
+     * @param index The index of the element to return.
+     * @return The outputDataTypeName at the given index.
      */
     java.lang.String getOutputDataTypeName(int index);
     /**
      * <code>repeated string outputDataTypeName = 16;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the outputDataTypeName at the given index.
      */
     org.nd4j.shade.protobuf.ByteString
         getOutputDataTypeNameBytes(int index);
@@ -578,9 +686,11 @@ public final class MapperNamespace {
      * <code>map&lt;string, string&gt; inputToOutput = 17;</code>
      */
 
-    java.lang.String getInputToOutputOrDefault(
+    /* nullable */
+java.lang.String getInputToOutputOrDefault(
         java.lang.String key,
-        java.lang.String defaultValue);
+        /* nullable */
+java.lang.String defaultValue);
     /**
      * <code>map&lt;string, string&gt; inputToOutput = 17;</code>
      */
@@ -590,10 +700,12 @@ public final class MapperNamespace {
 
     /**
      * <code>string ruleType = 18;</code>
+     * @return The ruleType.
      */
     java.lang.String getRuleType();
     /**
      * <code>string ruleType = 18;</code>
+     * @return The bytes for ruleType.
      */
     org.nd4j.shade.protobuf.ByteString
         getRuleTypeBytes();
@@ -624,10 +736,12 @@ public final class MapperNamespace {
 
     /**
      * <code>string inputFrameworkOpName = 20;</code>
+     * @return The inputFrameworkOpName.
      */
     java.lang.String getInputFrameworkOpName();
     /**
      * <code>string inputFrameworkOpName = 20;</code>
+     * @return The bytes for inputFrameworkOpName.
      */
     org.nd4j.shade.protobuf.ByteString
         getInputFrameworkOpNameBytes();
@@ -635,7 +749,7 @@ public final class MapperNamespace {
   /**
    * Protobuf type {@code org.nd4j.ir.MappingRule}
    */
-  public  static final class MappingRule extends
+  public static final class MappingRule extends
       org.nd4j.shade.protobuf.GeneratedMessageV3 implements
       // @@protoc_insertion_point(message_implements:org.nd4j.ir.MappingRule)
       MappingRuleOrBuilder {
@@ -678,261 +792,6 @@ public final class MapperNamespace {
     getUnknownFields() {
       return this.unknownFields;
     }
-    private MappingRule(
-        org.nd4j.shade.protobuf.CodedInputStream input,
-        org.nd4j.shade.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws org.nd4j.shade.protobuf.InvalidProtocolBufferException {
-      this();
-      if (extensionRegistry == null) {
-        throw new java.lang.NullPointerException();
-      }
-      int mutable_bitField0_ = 0;
-      org.nd4j.shade.protobuf.UnknownFieldSet.Builder unknownFields =
-          org.nd4j.shade.protobuf.UnknownFieldSet.newBuilder();
-      try {
-        boolean done = false;
-        while (!done) {
-          int tag = input.readTag();
-          switch (tag) {
-            case 0:
-              done = true;
-              break;
-            case 10: {
-              java.lang.String s = input.readStringRequireUtf8();
-
-              ruleName_ = s;
-              break;
-            }
-            case 18: {
-              java.lang.String s = input.readStringRequireUtf8();
-
-              functionName_ = s;
-              break;
-            }
-            case 26: {
-              java.lang.String s = input.readStringRequireUtf8();
-              if (!((mutable_bitField0_ & 0x00000001) != 0)) {
-                inputStringAttrName_ = new org.nd4j.shade.protobuf.LazyStringArrayList();
-                mutable_bitField0_ |= 0x00000001;
-              }
-              inputStringAttrName_.add(s);
-              break;
-            }
-            case 34: {
-              java.lang.String s = input.readStringRequireUtf8();
-              if (!((mutable_bitField0_ & 0x00000002) != 0)) {
-                outputStringAttrName_ = new org.nd4j.shade.protobuf.LazyStringArrayList();
-                mutable_bitField0_ |= 0x00000002;
-              }
-              outputStringAttrName_.add(s);
-              break;
-            }
-            case 42: {
-              java.lang.String s = input.readStringRequireUtf8();
-              if (!((mutable_bitField0_ & 0x00000004) != 0)) {
-                inputIntName_ = new org.nd4j.shade.protobuf.LazyStringArrayList();
-                mutable_bitField0_ |= 0x00000004;
-              }
-              inputIntName_.add(s);
-              break;
-            }
-            case 50: {
-              java.lang.String s = input.readStringRequireUtf8();
-              if (!((mutable_bitField0_ & 0x00000008) != 0)) {
-                outputIntName_ = new org.nd4j.shade.protobuf.LazyStringArrayList();
-                mutable_bitField0_ |= 0x00000008;
-              }
-              outputIntName_.add(s);
-              break;
-            }
-            case 58: {
-              java.lang.String s = input.readStringRequireUtf8();
-              if (!((mutable_bitField0_ & 0x00000010) != 0)) {
-                inputFloatName_ = new org.nd4j.shade.protobuf.LazyStringArrayList();
-                mutable_bitField0_ |= 0x00000010;
-              }
-              inputFloatName_.add(s);
-              break;
-            }
-            case 66: {
-              java.lang.String s = input.readStringRequireUtf8();
-              if (!((mutable_bitField0_ & 0x00000020) != 0)) {
-                outputFloatName_ = new org.nd4j.shade.protobuf.LazyStringArrayList();
-                mutable_bitField0_ |= 0x00000020;
-              }
-              outputFloatName_.add(s);
-              break;
-            }
-            case 74: {
-              java.lang.String s = input.readStringRequireUtf8();
-              if (!((mutable_bitField0_ & 0x00000040) != 0)) {
-                inputDoubleName_ = new org.nd4j.shade.protobuf.LazyStringArrayList();
-                mutable_bitField0_ |= 0x00000040;
-              }
-              inputDoubleName_.add(s);
-              break;
-            }
-            case 82: {
-              java.lang.String s = input.readStringRequireUtf8();
-              if (!((mutable_bitField0_ & 0x00000080) != 0)) {
-                outputDoubleName_ = new org.nd4j.shade.protobuf.LazyStringArrayList();
-                mutable_bitField0_ |= 0x00000080;
-              }
-              outputDoubleName_.add(s);
-              break;
-            }
-            case 90: {
-              java.lang.String s = input.readStringRequireUtf8();
-              if (!((mutable_bitField0_ & 0x00000100) != 0)) {
-                inputBooleanName_ = new org.nd4j.shade.protobuf.LazyStringArrayList();
-                mutable_bitField0_ |= 0x00000100;
-              }
-              inputBooleanName_.add(s);
-              break;
-            }
-            case 98: {
-              java.lang.String s = input.readStringRequireUtf8();
-              if (!((mutable_bitField0_ & 0x00000200) != 0)) {
-                outputBooleanName_ = new org.nd4j.shade.protobuf.LazyStringArrayList();
-                mutable_bitField0_ |= 0x00000200;
-              }
-              outputBooleanName_.add(s);
-              break;
-            }
-            case 106: {
-              java.lang.String s = input.readStringRequireUtf8();
-              if (!((mutable_bitField0_ & 0x00000400) != 0)) {
-                inputTensorName_ = new org.nd4j.shade.protobuf.LazyStringArrayList();
-                mutable_bitField0_ |= 0x00000400;
-              }
-              inputTensorName_.add(s);
-              break;
-            }
-            case 114: {
-              java.lang.String s = input.readStringRequireUtf8();
-              if (!((mutable_bitField0_ & 0x00000800) != 0)) {
-                outputTensorName_ = new org.nd4j.shade.protobuf.LazyStringArrayList();
-                mutable_bitField0_ |= 0x00000800;
-              }
-              outputTensorName_.add(s);
-              break;
-            }
-            case 122: {
-              java.lang.String s = input.readStringRequireUtf8();
-              if (!((mutable_bitField0_ & 0x00001000) != 0)) {
-                inputDataTypeName_ = new org.nd4j.shade.protobuf.LazyStringArrayList();
-                mutable_bitField0_ |= 0x00001000;
-              }
-              inputDataTypeName_.add(s);
-              break;
-            }
-            case 130: {
-              java.lang.String s = input.readStringRequireUtf8();
-              if (!((mutable_bitField0_ & 0x00002000) != 0)) {
-                outputDataTypeName_ = new org.nd4j.shade.protobuf.LazyStringArrayList();
-                mutable_bitField0_ |= 0x00002000;
-              }
-              outputDataTypeName_.add(s);
-              break;
-            }
-            case 138: {
-              if (!((mutable_bitField0_ & 0x00004000) != 0)) {
-                inputToOutput_ = org.nd4j.shade.protobuf.MapField.newMapField(
-                    InputToOutputDefaultEntryHolder.defaultEntry);
-                mutable_bitField0_ |= 0x00004000;
-              }
-              org.nd4j.shade.protobuf.MapEntry<java.lang.String, java.lang.String>
-              inputToOutput__ = input.readMessage(
-                  InputToOutputDefaultEntryHolder.defaultEntry.getParserForType(), extensionRegistry);
-              inputToOutput_.getMutableMap().put(
-                  inputToOutput__.getKey(), inputToOutput__.getValue());
-              break;
-            }
-            case 146: {
-              java.lang.String s = input.readStringRequireUtf8();
-
-              ruleType_ = s;
-              break;
-            }
-            case 154: {
-              if (!((mutable_bitField0_ & 0x00008000) != 0)) {
-                transformerArgs_ = new java.util.ArrayList<org.nd4j.ir.MapperNamespace.TransformerArgs>();
-                mutable_bitField0_ |= 0x00008000;
-              }
-              transformerArgs_.add(
-                  input.readMessage(org.nd4j.ir.MapperNamespace.TransformerArgs.parser(), extensionRegistry));
-              break;
-            }
-            case 162: {
-              java.lang.String s = input.readStringRequireUtf8();
-
-              inputFrameworkOpName_ = s;
-              break;
-            }
-            default: {
-              if (!parseUnknownField(
-                  input, unknownFields, extensionRegistry, tag)) {
-                done = true;
-              }
-              break;
-            }
-          }
-        }
-      } catch (org.nd4j.shade.protobuf.InvalidProtocolBufferException e) {
-        throw e.setUnfinishedMessage(this);
-      } catch (java.io.IOException e) {
-        throw new org.nd4j.shade.protobuf.InvalidProtocolBufferException(
-            e).setUnfinishedMessage(this);
-      } finally {
-        if (((mutable_bitField0_ & 0x00000001) != 0)) {
-          inputStringAttrName_ = inputStringAttrName_.getUnmodifiableView();
-        }
-        if (((mutable_bitField0_ & 0x00000002) != 0)) {
-          outputStringAttrName_ = outputStringAttrName_.getUnmodifiableView();
-        }
-        if (((mutable_bitField0_ & 0x00000004) != 0)) {
-          inputIntName_ = inputIntName_.getUnmodifiableView();
-        }
-        if (((mutable_bitField0_ & 0x00000008) != 0)) {
-          outputIntName_ = outputIntName_.getUnmodifiableView();
-        }
-        if (((mutable_bitField0_ & 0x00000010) != 0)) {
-          inputFloatName_ = inputFloatName_.getUnmodifiableView();
-        }
-        if (((mutable_bitField0_ & 0x00000020) != 0)) {
-          outputFloatName_ = outputFloatName_.getUnmodifiableView();
-        }
-        if (((mutable_bitField0_ & 0x00000040) != 0)) {
-          inputDoubleName_ = inputDoubleName_.getUnmodifiableView();
-        }
-        if (((mutable_bitField0_ & 0x00000080) != 0)) {
-          outputDoubleName_ = outputDoubleName_.getUnmodifiableView();
-        }
-        if (((mutable_bitField0_ & 0x00000100) != 0)) {
-          inputBooleanName_ = inputBooleanName_.getUnmodifiableView();
-        }
-        if (((mutable_bitField0_ & 0x00000200) != 0)) {
-          outputBooleanName_ = outputBooleanName_.getUnmodifiableView();
-        }
-        if (((mutable_bitField0_ & 0x00000400) != 0)) {
-          inputTensorName_ = inputTensorName_.getUnmodifiableView();
-        }
-        if (((mutable_bitField0_ & 0x00000800) != 0)) {
-          outputTensorName_ = outputTensorName_.getUnmodifiableView();
-        }
-        if (((mutable_bitField0_ & 0x00001000) != 0)) {
-          inputDataTypeName_ = inputDataTypeName_.getUnmodifiableView();
-        }
-        if (((mutable_bitField0_ & 0x00002000) != 0)) {
-          outputDataTypeName_ = outputDataTypeName_.getUnmodifiableView();
-        }
-        if (((mutable_bitField0_ & 0x00008000) != 0)) {
-          transformerArgs_ = java.util.Collections.unmodifiableList(transformerArgs_);
-        }
-        this.unknownFields = unknownFields.build();
-        makeExtensionsImmutable();
-      }
-    }
     public static final org.nd4j.shade.protobuf.Descriptors.Descriptor
         getDescriptor() {
       return org.nd4j.ir.MapperNamespace.internal_static_org_nd4j_ir_MappingRule_descriptor;
@@ -962,7 +821,9 @@ public final class MapperNamespace {
     private volatile java.lang.Object ruleName_;
     /**
      * <code>string ruleName = 1;</code>
+     * @return The ruleName.
      */
+    @java.lang.Override
     public java.lang.String getRuleName() {
       java.lang.Object ref = ruleName_;
       if (ref instanceof java.lang.String) {
@@ -977,7 +838,9 @@ public final class MapperNamespace {
     }
     /**
      * <code>string ruleName = 1;</code>
+     * @return The bytes for ruleName.
      */
+    @java.lang.Override
     public org.nd4j.shade.protobuf.ByteString
         getRuleNameBytes() {
       java.lang.Object ref = ruleName_;
@@ -996,7 +859,9 @@ public final class MapperNamespace {
     private volatile java.lang.Object functionName_;
     /**
      * <code>string functionName = 2;</code>
+     * @return The functionName.
      */
+    @java.lang.Override
     public java.lang.String getFunctionName() {
       java.lang.Object ref = functionName_;
       if (ref instanceof java.lang.String) {
@@ -1011,7 +876,9 @@ public final class MapperNamespace {
     }
     /**
      * <code>string functionName = 2;</code>
+     * @return The bytes for functionName.
      */
+    @java.lang.Override
     public org.nd4j.shade.protobuf.ByteString
         getFunctionNameBytes() {
       java.lang.Object ref = functionName_;
@@ -1030,6 +897,7 @@ public final class MapperNamespace {
     private org.nd4j.shade.protobuf.LazyStringList inputStringAttrName_;
     /**
      * <code>repeated string inputStringAttrName = 3;</code>
+     * @return A list containing the inputStringAttrName.
      */
     public org.nd4j.shade.protobuf.ProtocolStringList
         getInputStringAttrNameList() {
@@ -1037,18 +905,23 @@ public final class MapperNamespace {
     }
     /**
      * <code>repeated string inputStringAttrName = 3;</code>
+     * @return The count of inputStringAttrName.
      */
     public int getInputStringAttrNameCount() {
       return inputStringAttrName_.size();
     }
     /**
      * <code>repeated string inputStringAttrName = 3;</code>
+     * @param index The index of the element to return.
+     * @return The inputStringAttrName at the given index.
      */
     public java.lang.String getInputStringAttrName(int index) {
       return inputStringAttrName_.get(index);
     }
     /**
      * <code>repeated string inputStringAttrName = 3;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the inputStringAttrName at the given index.
      */
     public org.nd4j.shade.protobuf.ByteString
         getInputStringAttrNameBytes(int index) {
@@ -1059,6 +932,7 @@ public final class MapperNamespace {
     private org.nd4j.shade.protobuf.LazyStringList outputStringAttrName_;
     /**
      * <code>repeated string outputStringAttrName = 4;</code>
+     * @return A list containing the outputStringAttrName.
      */
     public org.nd4j.shade.protobuf.ProtocolStringList
         getOutputStringAttrNameList() {
@@ -1066,18 +940,23 @@ public final class MapperNamespace {
     }
     /**
      * <code>repeated string outputStringAttrName = 4;</code>
+     * @return The count of outputStringAttrName.
      */
     public int getOutputStringAttrNameCount() {
       return outputStringAttrName_.size();
     }
     /**
      * <code>repeated string outputStringAttrName = 4;</code>
+     * @param index The index of the element to return.
+     * @return The outputStringAttrName at the given index.
      */
     public java.lang.String getOutputStringAttrName(int index) {
       return outputStringAttrName_.get(index);
     }
     /**
      * <code>repeated string outputStringAttrName = 4;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the outputStringAttrName at the given index.
      */
     public org.nd4j.shade.protobuf.ByteString
         getOutputStringAttrNameBytes(int index) {
@@ -1088,6 +967,7 @@ public final class MapperNamespace {
     private org.nd4j.shade.protobuf.LazyStringList inputIntName_;
     /**
      * <code>repeated string inputIntName = 5;</code>
+     * @return A list containing the inputIntName.
      */
     public org.nd4j.shade.protobuf.ProtocolStringList
         getInputIntNameList() {
@@ -1095,18 +975,23 @@ public final class MapperNamespace {
     }
     /**
      * <code>repeated string inputIntName = 5;</code>
+     * @return The count of inputIntName.
      */
     public int getInputIntNameCount() {
       return inputIntName_.size();
     }
     /**
      * <code>repeated string inputIntName = 5;</code>
+     * @param index The index of the element to return.
+     * @return The inputIntName at the given index.
      */
     public java.lang.String getInputIntName(int index) {
       return inputIntName_.get(index);
     }
     /**
      * <code>repeated string inputIntName = 5;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the inputIntName at the given index.
      */
     public org.nd4j.shade.protobuf.ByteString
         getInputIntNameBytes(int index) {
@@ -1117,6 +1002,7 @@ public final class MapperNamespace {
     private org.nd4j.shade.protobuf.LazyStringList outputIntName_;
     /**
      * <code>repeated string outputIntName = 6;</code>
+     * @return A list containing the outputIntName.
      */
     public org.nd4j.shade.protobuf.ProtocolStringList
         getOutputIntNameList() {
@@ -1124,18 +1010,23 @@ public final class MapperNamespace {
     }
     /**
      * <code>repeated string outputIntName = 6;</code>
+     * @return The count of outputIntName.
      */
     public int getOutputIntNameCount() {
       return outputIntName_.size();
     }
     /**
      * <code>repeated string outputIntName = 6;</code>
+     * @param index The index of the element to return.
+     * @return The outputIntName at the given index.
      */
     public java.lang.String getOutputIntName(int index) {
       return outputIntName_.get(index);
     }
     /**
      * <code>repeated string outputIntName = 6;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the outputIntName at the given index.
      */
     public org.nd4j.shade.protobuf.ByteString
         getOutputIntNameBytes(int index) {
@@ -1146,6 +1037,7 @@ public final class MapperNamespace {
     private org.nd4j.shade.protobuf.LazyStringList inputFloatName_;
     /**
      * <code>repeated string inputFloatName = 7;</code>
+     * @return A list containing the inputFloatName.
      */
     public org.nd4j.shade.protobuf.ProtocolStringList
         getInputFloatNameList() {
@@ -1153,18 +1045,23 @@ public final class MapperNamespace {
     }
     /**
      * <code>repeated string inputFloatName = 7;</code>
+     * @return The count of inputFloatName.
      */
     public int getInputFloatNameCount() {
       return inputFloatName_.size();
     }
     /**
      * <code>repeated string inputFloatName = 7;</code>
+     * @param index The index of the element to return.
+     * @return The inputFloatName at the given index.
      */
     public java.lang.String getInputFloatName(int index) {
       return inputFloatName_.get(index);
     }
     /**
      * <code>repeated string inputFloatName = 7;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the inputFloatName at the given index.
      */
     public org.nd4j.shade.protobuf.ByteString
         getInputFloatNameBytes(int index) {
@@ -1175,6 +1072,7 @@ public final class MapperNamespace {
     private org.nd4j.shade.protobuf.LazyStringList outputFloatName_;
     /**
      * <code>repeated string outputFloatName = 8;</code>
+     * @return A list containing the outputFloatName.
      */
     public org.nd4j.shade.protobuf.ProtocolStringList
         getOutputFloatNameList() {
@@ -1182,18 +1080,23 @@ public final class MapperNamespace {
     }
     /**
      * <code>repeated string outputFloatName = 8;</code>
+     * @return The count of outputFloatName.
      */
     public int getOutputFloatNameCount() {
       return outputFloatName_.size();
     }
     /**
      * <code>repeated string outputFloatName = 8;</code>
+     * @param index The index of the element to return.
+     * @return The outputFloatName at the given index.
      */
     public java.lang.String getOutputFloatName(int index) {
       return outputFloatName_.get(index);
     }
     /**
      * <code>repeated string outputFloatName = 8;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the outputFloatName at the given index.
      */
     public org.nd4j.shade.protobuf.ByteString
         getOutputFloatNameBytes(int index) {
@@ -1204,6 +1107,7 @@ public final class MapperNamespace {
     private org.nd4j.shade.protobuf.LazyStringList inputDoubleName_;
     /**
      * <code>repeated string inputDoubleName = 9;</code>
+     * @return A list containing the inputDoubleName.
      */
     public org.nd4j.shade.protobuf.ProtocolStringList
         getInputDoubleNameList() {
@@ -1211,18 +1115,23 @@ public final class MapperNamespace {
     }
     /**
      * <code>repeated string inputDoubleName = 9;</code>
+     * @return The count of inputDoubleName.
      */
     public int getInputDoubleNameCount() {
       return inputDoubleName_.size();
     }
     /**
      * <code>repeated string inputDoubleName = 9;</code>
+     * @param index The index of the element to return.
+     * @return The inputDoubleName at the given index.
      */
     public java.lang.String getInputDoubleName(int index) {
       return inputDoubleName_.get(index);
     }
     /**
      * <code>repeated string inputDoubleName = 9;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the inputDoubleName at the given index.
      */
     public org.nd4j.shade.protobuf.ByteString
         getInputDoubleNameBytes(int index) {
@@ -1233,6 +1142,7 @@ public final class MapperNamespace {
     private org.nd4j.shade.protobuf.LazyStringList outputDoubleName_;
     /**
      * <code>repeated string outputDoubleName = 10;</code>
+     * @return A list containing the outputDoubleName.
      */
     public org.nd4j.shade.protobuf.ProtocolStringList
         getOutputDoubleNameList() {
@@ -1240,18 +1150,23 @@ public final class MapperNamespace {
     }
     /**
      * <code>repeated string outputDoubleName = 10;</code>
+     * @return The count of outputDoubleName.
      */
     public int getOutputDoubleNameCount() {
       return outputDoubleName_.size();
     }
     /**
      * <code>repeated string outputDoubleName = 10;</code>
+     * @param index The index of the element to return.
+     * @return The outputDoubleName at the given index.
      */
     public java.lang.String getOutputDoubleName(int index) {
       return outputDoubleName_.get(index);
     }
     /**
      * <code>repeated string outputDoubleName = 10;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the outputDoubleName at the given index.
      */
     public org.nd4j.shade.protobuf.ByteString
         getOutputDoubleNameBytes(int index) {
@@ -1262,6 +1177,7 @@ public final class MapperNamespace {
     private org.nd4j.shade.protobuf.LazyStringList inputBooleanName_;
     /**
      * <code>repeated string inputBooleanName = 11;</code>
+     * @return A list containing the inputBooleanName.
      */
     public org.nd4j.shade.protobuf.ProtocolStringList
         getInputBooleanNameList() {
@@ -1269,18 +1185,23 @@ public final class MapperNamespace {
     }
     /**
      * <code>repeated string inputBooleanName = 11;</code>
+     * @return The count of inputBooleanName.
      */
     public int getInputBooleanNameCount() {
       return inputBooleanName_.size();
     }
     /**
      * <code>repeated string inputBooleanName = 11;</code>
+     * @param index The index of the element to return.
+     * @return The inputBooleanName at the given index.
      */
     public java.lang.String getInputBooleanName(int index) {
       return inputBooleanName_.get(index);
     }
     /**
      * <code>repeated string inputBooleanName = 11;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the inputBooleanName at the given index.
      */
     public org.nd4j.shade.protobuf.ByteString
         getInputBooleanNameBytes(int index) {
@@ -1291,6 +1212,7 @@ public final class MapperNamespace {
     private org.nd4j.shade.protobuf.LazyStringList outputBooleanName_;
     /**
      * <code>repeated string outputBooleanName = 12;</code>
+     * @return A list containing the outputBooleanName.
      */
     public org.nd4j.shade.protobuf.ProtocolStringList
         getOutputBooleanNameList() {
@@ -1298,18 +1220,23 @@ public final class MapperNamespace {
     }
     /**
      * <code>repeated string outputBooleanName = 12;</code>
+     * @return The count of outputBooleanName.
      */
     public int getOutputBooleanNameCount() {
       return outputBooleanName_.size();
     }
     /**
      * <code>repeated string outputBooleanName = 12;</code>
+     * @param index The index of the element to return.
+     * @return The outputBooleanName at the given index.
      */
     public java.lang.String getOutputBooleanName(int index) {
       return outputBooleanName_.get(index);
     }
     /**
      * <code>repeated string outputBooleanName = 12;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the outputBooleanName at the given index.
      */
     public org.nd4j.shade.protobuf.ByteString
         getOutputBooleanNameBytes(int index) {
@@ -1320,6 +1247,7 @@ public final class MapperNamespace {
     private org.nd4j.shade.protobuf.LazyStringList inputTensorName_;
     /**
      * <code>repeated string inputTensorName = 13;</code>
+     * @return A list containing the inputTensorName.
      */
     public org.nd4j.shade.protobuf.ProtocolStringList
         getInputTensorNameList() {
@@ -1327,18 +1255,23 @@ public final class MapperNamespace {
     }
     /**
      * <code>repeated string inputTensorName = 13;</code>
+     * @return The count of inputTensorName.
      */
     public int getInputTensorNameCount() {
       return inputTensorName_.size();
     }
     /**
      * <code>repeated string inputTensorName = 13;</code>
+     * @param index The index of the element to return.
+     * @return The inputTensorName at the given index.
      */
     public java.lang.String getInputTensorName(int index) {
       return inputTensorName_.get(index);
     }
     /**
      * <code>repeated string inputTensorName = 13;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the inputTensorName at the given index.
      */
     public org.nd4j.shade.protobuf.ByteString
         getInputTensorNameBytes(int index) {
@@ -1349,6 +1282,7 @@ public final class MapperNamespace {
     private org.nd4j.shade.protobuf.LazyStringList outputTensorName_;
     /**
      * <code>repeated string outputTensorName = 14;</code>
+     * @return A list containing the outputTensorName.
      */
     public org.nd4j.shade.protobuf.ProtocolStringList
         getOutputTensorNameList() {
@@ -1356,18 +1290,23 @@ public final class MapperNamespace {
     }
     /**
      * <code>repeated string outputTensorName = 14;</code>
+     * @return The count of outputTensorName.
      */
     public int getOutputTensorNameCount() {
       return outputTensorName_.size();
     }
     /**
      * <code>repeated string outputTensorName = 14;</code>
+     * @param index The index of the element to return.
+     * @return The outputTensorName at the given index.
      */
     public java.lang.String getOutputTensorName(int index) {
       return outputTensorName_.get(index);
     }
     /**
      * <code>repeated string outputTensorName = 14;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the outputTensorName at the given index.
      */
     public org.nd4j.shade.protobuf.ByteString
         getOutputTensorNameBytes(int index) {
@@ -1378,6 +1317,7 @@ public final class MapperNamespace {
     private org.nd4j.shade.protobuf.LazyStringList inputDataTypeName_;
     /**
      * <code>repeated string inputDataTypeName = 15;</code>
+     * @return A list containing the inputDataTypeName.
      */
     public org.nd4j.shade.protobuf.ProtocolStringList
         getInputDataTypeNameList() {
@@ -1385,18 +1325,23 @@ public final class MapperNamespace {
     }
     /**
      * <code>repeated string inputDataTypeName = 15;</code>
+     * @return The count of inputDataTypeName.
      */
     public int getInputDataTypeNameCount() {
       return inputDataTypeName_.size();
     }
     /**
      * <code>repeated string inputDataTypeName = 15;</code>
+     * @param index The index of the element to return.
+     * @return The inputDataTypeName at the given index.
      */
     public java.lang.String getInputDataTypeName(int index) {
       return inputDataTypeName_.get(index);
     }
     /**
      * <code>repeated string inputDataTypeName = 15;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the inputDataTypeName at the given index.
      */
     public org.nd4j.shade.protobuf.ByteString
         getInputDataTypeNameBytes(int index) {
@@ -1407,6 +1352,7 @@ public final class MapperNamespace {
     private org.nd4j.shade.protobuf.LazyStringList outputDataTypeName_;
     /**
      * <code>repeated string outputDataTypeName = 16;</code>
+     * @return A list containing the outputDataTypeName.
      */
     public org.nd4j.shade.protobuf.ProtocolStringList
         getOutputDataTypeNameList() {
@@ -1414,18 +1360,23 @@ public final class MapperNamespace {
     }
     /**
      * <code>repeated string outputDataTypeName = 16;</code>
+     * @return The count of outputDataTypeName.
      */
     public int getOutputDataTypeNameCount() {
       return outputDataTypeName_.size();
     }
     /**
      * <code>repeated string outputDataTypeName = 16;</code>
+     * @param index The index of the element to return.
+     * @return The outputDataTypeName at the given index.
      */
     public java.lang.String getOutputDataTypeName(int index) {
       return outputDataTypeName_.get(index);
     }
     /**
      * <code>repeated string outputDataTypeName = 16;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the outputDataTypeName at the given index.
      */
     public org.nd4j.shade.protobuf.ByteString
         getOutputDataTypeNameBytes(int index) {
@@ -1462,14 +1413,16 @@ public final class MapperNamespace {
      * <code>map&lt;string, string&gt; inputToOutput = 17;</code>
      */
 
+    @java.lang.Override
     public boolean containsInputToOutput(
         java.lang.String key) {
-      if (key == null) { throw new java.lang.NullPointerException(); }
+      if (key == null) { throw new NullPointerException("map key"); }
       return internalGetInputToOutput().getMap().containsKey(key);
     }
     /**
      * Use {@link #getInputToOutputMap()} instead.
      */
+    @java.lang.Override
     @java.lang.Deprecated
     public java.util.Map<java.lang.String, java.lang.String> getInputToOutput() {
       return getInputToOutputMap();
@@ -1477,6 +1430,7 @@ public final class MapperNamespace {
     /**
      * <code>map&lt;string, string&gt; inputToOutput = 17;</code>
      */
+    @java.lang.Override
 
     public java.util.Map<java.lang.String, java.lang.String> getInputToOutputMap() {
       return internalGetInputToOutput().getMap();
@@ -1484,11 +1438,12 @@ public final class MapperNamespace {
     /**
      * <code>map&lt;string, string&gt; inputToOutput = 17;</code>
      */
+    @java.lang.Override
 
     public java.lang.String getInputToOutputOrDefault(
         java.lang.String key,
         java.lang.String defaultValue) {
-      if (key == null) { throw new java.lang.NullPointerException(); }
+      if (key == null) { throw new NullPointerException("map key"); }
       java.util.Map<java.lang.String, java.lang.String> map =
           internalGetInputToOutput().getMap();
       return map.containsKey(key) ? map.get(key) : defaultValue;
@@ -1496,10 +1451,11 @@ public final class MapperNamespace {
     /**
      * <code>map&lt;string, string&gt; inputToOutput = 17;</code>
      */
+    @java.lang.Override
 
     public java.lang.String getInputToOutputOrThrow(
         java.lang.String key) {
-      if (key == null) { throw new java.lang.NullPointerException(); }
+      if (key == null) { throw new NullPointerException("map key"); }
       java.util.Map<java.lang.String, java.lang.String> map =
           internalGetInputToOutput().getMap();
       if (!map.containsKey(key)) {
@@ -1512,7 +1468,9 @@ public final class MapperNamespace {
     private volatile java.lang.Object ruleType_;
     /**
      * <code>string ruleType = 18;</code>
+     * @return The ruleType.
      */
+    @java.lang.Override
     public java.lang.String getRuleType() {
       java.lang.Object ref = ruleType_;
       if (ref instanceof java.lang.String) {
@@ -1527,7 +1485,9 @@ public final class MapperNamespace {
     }
     /**
      * <code>string ruleType = 18;</code>
+     * @return The bytes for ruleType.
      */
+    @java.lang.Override
     public org.nd4j.shade.protobuf.ByteString
         getRuleTypeBytes() {
       java.lang.Object ref = ruleType_;
@@ -1547,12 +1507,14 @@ public final class MapperNamespace {
     /**
      * <code>repeated .org.nd4j.ir.TransformerArgs transformerArgs = 19;</code>
      */
+    @java.lang.Override
     public java.util.List<org.nd4j.ir.MapperNamespace.TransformerArgs> getTransformerArgsList() {
       return transformerArgs_;
     }
     /**
      * <code>repeated .org.nd4j.ir.TransformerArgs transformerArgs = 19;</code>
      */
+    @java.lang.Override
     public java.util.List<? extends org.nd4j.ir.MapperNamespace.TransformerArgsOrBuilder> 
         getTransformerArgsOrBuilderList() {
       return transformerArgs_;
@@ -1560,18 +1522,21 @@ public final class MapperNamespace {
     /**
      * <code>repeated .org.nd4j.ir.TransformerArgs transformerArgs = 19;</code>
      */
+    @java.lang.Override
     public int getTransformerArgsCount() {
       return transformerArgs_.size();
     }
     /**
      * <code>repeated .org.nd4j.ir.TransformerArgs transformerArgs = 19;</code>
      */
+    @java.lang.Override
     public org.nd4j.ir.MapperNamespace.TransformerArgs getTransformerArgs(int index) {
       return transformerArgs_.get(index);
     }
     /**
      * <code>repeated .org.nd4j.ir.TransformerArgs transformerArgs = 19;</code>
      */
+    @java.lang.Override
     public org.nd4j.ir.MapperNamespace.TransformerArgsOrBuilder getTransformerArgsOrBuilder(
         int index) {
       return transformerArgs_.get(index);
@@ -1581,7 +1546,9 @@ public final class MapperNamespace {
     private volatile java.lang.Object inputFrameworkOpName_;
     /**
      * <code>string inputFrameworkOpName = 20;</code>
+     * @return The inputFrameworkOpName.
      */
+    @java.lang.Override
     public java.lang.String getInputFrameworkOpName() {
       java.lang.Object ref = inputFrameworkOpName_;
       if (ref instanceof java.lang.String) {
@@ -1596,7 +1563,9 @@ public final class MapperNamespace {
     }
     /**
      * <code>string inputFrameworkOpName = 20;</code>
+     * @return The bytes for inputFrameworkOpName.
      */
+    @java.lang.Override
     public org.nd4j.shade.protobuf.ByteString
         getInputFrameworkOpNameBytes() {
       java.lang.Object ref = inputFrameworkOpName_;
@@ -1625,10 +1594,10 @@ public final class MapperNamespace {
     @java.lang.Override
     public void writeTo(org.nd4j.shade.protobuf.CodedOutputStream output)
                         throws java.io.IOException {
-      if (!getRuleNameBytes().isEmpty()) {
+      if (!org.nd4j.shade.protobuf.GeneratedMessageV3.isStringEmpty(ruleName_)) {
         org.nd4j.shade.protobuf.GeneratedMessageV3.writeString(output, 1, ruleName_);
       }
-      if (!getFunctionNameBytes().isEmpty()) {
+      if (!org.nd4j.shade.protobuf.GeneratedMessageV3.isStringEmpty(functionName_)) {
         org.nd4j.shade.protobuf.GeneratedMessageV3.writeString(output, 2, functionName_);
       }
       for (int i = 0; i < inputStringAttrName_.size(); i++) {
@@ -1679,16 +1648,16 @@ public final class MapperNamespace {
           internalGetInputToOutput(),
           InputToOutputDefaultEntryHolder.defaultEntry,
           17);
-      if (!getRuleTypeBytes().isEmpty()) {
+      if (!org.nd4j.shade.protobuf.GeneratedMessageV3.isStringEmpty(ruleType_)) {
         org.nd4j.shade.protobuf.GeneratedMessageV3.writeString(output, 18, ruleType_);
       }
       for (int i = 0; i < transformerArgs_.size(); i++) {
         output.writeMessage(19, transformerArgs_.get(i));
       }
-      if (!getInputFrameworkOpNameBytes().isEmpty()) {
+      if (!org.nd4j.shade.protobuf.GeneratedMessageV3.isStringEmpty(inputFrameworkOpName_)) {
         org.nd4j.shade.protobuf.GeneratedMessageV3.writeString(output, 20, inputFrameworkOpName_);
       }
-      unknownFields.writeTo(output);
+      getUnknownFields().writeTo(output);
     }
 
     @java.lang.Override
@@ -1697,10 +1666,10 @@ public final class MapperNamespace {
       if (size != -1) return size;
 
       size = 0;
-      if (!getRuleNameBytes().isEmpty()) {
+      if (!org.nd4j.shade.protobuf.GeneratedMessageV3.isStringEmpty(ruleName_)) {
         size += org.nd4j.shade.protobuf.GeneratedMessageV3.computeStringSize(1, ruleName_);
       }
-      if (!getFunctionNameBytes().isEmpty()) {
+      if (!org.nd4j.shade.protobuf.GeneratedMessageV3.isStringEmpty(functionName_)) {
         size += org.nd4j.shade.protobuf.GeneratedMessageV3.computeStringSize(2, functionName_);
       }
       {
@@ -1825,17 +1794,17 @@ public final class MapperNamespace {
         size += org.nd4j.shade.protobuf.CodedOutputStream
             .computeMessageSize(17, inputToOutput__);
       }
-      if (!getRuleTypeBytes().isEmpty()) {
+      if (!org.nd4j.shade.protobuf.GeneratedMessageV3.isStringEmpty(ruleType_)) {
         size += org.nd4j.shade.protobuf.GeneratedMessageV3.computeStringSize(18, ruleType_);
       }
       for (int i = 0; i < transformerArgs_.size(); i++) {
         size += org.nd4j.shade.protobuf.CodedOutputStream
           .computeMessageSize(19, transformerArgs_.get(i));
       }
-      if (!getInputFrameworkOpNameBytes().isEmpty()) {
+      if (!org.nd4j.shade.protobuf.GeneratedMessageV3.isStringEmpty(inputFrameworkOpName_)) {
         size += org.nd4j.shade.protobuf.GeneratedMessageV3.computeStringSize(20, inputFrameworkOpName_);
       }
-      size += unknownFields.getSerializedSize();
+      size += getUnknownFields().getSerializedSize();
       memoizedSize = size;
       return size;
     }
@@ -1890,7 +1859,7 @@ public final class MapperNamespace {
           .equals(other.getTransformerArgsList())) return false;
       if (!getInputFrameworkOpName()
           .equals(other.getInputFrameworkOpName())) return false;
-      if (!unknownFields.equals(other.unknownFields)) return false;
+      if (!getUnknownFields().equals(other.getUnknownFields())) return false;
       return true;
     }
 
@@ -1973,7 +1942,7 @@ public final class MapperNamespace {
       }
       hash = (37 * hash) + INPUTFRAMEWORKOPNAME_FIELD_NUMBER;
       hash = (53 * hash) + getInputFrameworkOpName().hashCode();
-      hash = (29 * hash) + unknownFields.hashCode();
+      hash = (29 * hash) + getUnknownFields().hashCode();
       memoizedHashCode = hash;
       return hash;
     }
@@ -2112,19 +2081,13 @@ public final class MapperNamespace {
 
       // Construct using org.nd4j.ir.MapperNamespace.MappingRule.newBuilder()
       private Builder() {
-        maybeForceBuilderInitialization();
+
       }
 
       private Builder(
           org.nd4j.shade.protobuf.GeneratedMessageV3.BuilderParent parent) {
         super(parent);
-        maybeForceBuilderInitialization();
-      }
-      private void maybeForceBuilderInitialization() {
-        if (org.nd4j.shade.protobuf.GeneratedMessageV3
-                .alwaysUseFieldBuilders) {
-          getTransformerArgsFieldBuilder();
-        }
+
       }
       @java.lang.Override
       public Builder clear() {
@@ -2166,10 +2129,11 @@ public final class MapperNamespace {
 
         if (transformerArgsBuilder_ == null) {
           transformerArgs_ = java.util.Collections.emptyList();
-          bitField0_ = (bitField0_ & ~0x00008000);
         } else {
+          transformerArgs_ = null;
           transformerArgsBuilder_.clear();
         }
+        bitField0_ = (bitField0_ & ~0x00008000);
         inputFrameworkOpName_ = "";
 
         return this;
@@ -2516,7 +2480,7 @@ public final class MapperNamespace {
           inputFrameworkOpName_ = other.inputFrameworkOpName_;
           onChanged();
         }
-        this.mergeUnknownFields(other.unknownFields);
+        this.mergeUnknownFields(other.getUnknownFields());
         onChanged();
         return this;
       }
@@ -2531,17 +2495,155 @@ public final class MapperNamespace {
           org.nd4j.shade.protobuf.CodedInputStream input,
           org.nd4j.shade.protobuf.ExtensionRegistryLite extensionRegistry)
           throws java.io.IOException {
-        org.nd4j.ir.MapperNamespace.MappingRule parsedMessage = null;
+        if (extensionRegistry == null) {
+          throw new java.lang.NullPointerException();
+        }
         try {
-          parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
+          boolean done = false;
+          while (!done) {
+            int tag = input.readTag();
+            switch (tag) {
+              case 0:
+                done = true;
+                break;
+              case 10: {
+                ruleName_ = input.readStringRequireUtf8();
+
+                break;
+              } // case 10
+              case 18: {
+                functionName_ = input.readStringRequireUtf8();
+
+                break;
+              } // case 18
+              case 26: {
+                java.lang.String s = input.readStringRequireUtf8();
+                ensureInputStringAttrNameIsMutable();
+                inputStringAttrName_.add(s);
+                break;
+              } // case 26
+              case 34: {
+                java.lang.String s = input.readStringRequireUtf8();
+                ensureOutputStringAttrNameIsMutable();
+                outputStringAttrName_.add(s);
+                break;
+              } // case 34
+              case 42: {
+                java.lang.String s = input.readStringRequireUtf8();
+                ensureInputIntNameIsMutable();
+                inputIntName_.add(s);
+                break;
+              } // case 42
+              case 50: {
+                java.lang.String s = input.readStringRequireUtf8();
+                ensureOutputIntNameIsMutable();
+                outputIntName_.add(s);
+                break;
+              } // case 50
+              case 58: {
+                java.lang.String s = input.readStringRequireUtf8();
+                ensureInputFloatNameIsMutable();
+                inputFloatName_.add(s);
+                break;
+              } // case 58
+              case 66: {
+                java.lang.String s = input.readStringRequireUtf8();
+                ensureOutputFloatNameIsMutable();
+                outputFloatName_.add(s);
+                break;
+              } // case 66
+              case 74: {
+                java.lang.String s = input.readStringRequireUtf8();
+                ensureInputDoubleNameIsMutable();
+                inputDoubleName_.add(s);
+                break;
+              } // case 74
+              case 82: {
+                java.lang.String s = input.readStringRequireUtf8();
+                ensureOutputDoubleNameIsMutable();
+                outputDoubleName_.add(s);
+                break;
+              } // case 82
+              case 90: {
+                java.lang.String s = input.readStringRequireUtf8();
+                ensureInputBooleanNameIsMutable();
+                inputBooleanName_.add(s);
+                break;
+              } // case 90
+              case 98: {
+                java.lang.String s = input.readStringRequireUtf8();
+                ensureOutputBooleanNameIsMutable();
+                outputBooleanName_.add(s);
+                break;
+              } // case 98
+              case 106: {
+                java.lang.String s = input.readStringRequireUtf8();
+                ensureInputTensorNameIsMutable();
+                inputTensorName_.add(s);
+                break;
+              } // case 106
+              case 114: {
+                java.lang.String s = input.readStringRequireUtf8();
+                ensureOutputTensorNameIsMutable();
+                outputTensorName_.add(s);
+                break;
+              } // case 114
+              case 122: {
+                java.lang.String s = input.readStringRequireUtf8();
+                ensureInputDataTypeNameIsMutable();
+                inputDataTypeName_.add(s);
+                break;
+              } // case 122
+              case 130: {
+                java.lang.String s = input.readStringRequireUtf8();
+                ensureOutputDataTypeNameIsMutable();
+                outputDataTypeName_.add(s);
+                break;
+              } // case 130
+              case 138: {
+                org.nd4j.shade.protobuf.MapEntry<java.lang.String, java.lang.String>
+                inputToOutput__ = input.readMessage(
+                    InputToOutputDefaultEntryHolder.defaultEntry.getParserForType(), extensionRegistry);
+                internalGetMutableInputToOutput().getMutableMap().put(
+                    inputToOutput__.getKey(), inputToOutput__.getValue());
+                break;
+              } // case 138
+              case 146: {
+                ruleType_ = input.readStringRequireUtf8();
+
+                break;
+              } // case 146
+              case 154: {
+                org.nd4j.ir.MapperNamespace.TransformerArgs m =
+                    input.readMessage(
+                        org.nd4j.ir.MapperNamespace.TransformerArgs.parser(),
+                        extensionRegistry);
+                if (transformerArgsBuilder_ == null) {
+                  ensureTransformerArgsIsMutable();
+                  transformerArgs_.add(m);
+                } else {
+                  transformerArgsBuilder_.addMessage(m);
+                }
+                break;
+              } // case 154
+              case 162: {
+                inputFrameworkOpName_ = input.readStringRequireUtf8();
+
+                break;
+              } // case 162
+              default: {
+                if (!super.parseUnknownField(input, extensionRegistry, tag)) {
+                  done = true; // was an endgroup tag
+                }
+                break;
+              } // default:
+            } // switch (tag)
+          } // while (!done)
         } catch (org.nd4j.shade.protobuf.InvalidProtocolBufferException e) {
-          parsedMessage = (org.nd4j.ir.MapperNamespace.MappingRule) e.getUnfinishedMessage();
           throw e.unwrapIOException();
         } finally {
-          if (parsedMessage != null) {
-            mergeFrom(parsedMessage);
-          }
-        }
+          onChanged();
+        } // finally
         return this;
       }
       private int bitField0_;
@@ -2549,6 +2651,7 @@ public final class MapperNamespace {
       private java.lang.Object ruleName_ = "";
       /**
        * <code>string ruleName = 1;</code>
+       * @return The ruleName.
        */
       public java.lang.String getRuleName() {
         java.lang.Object ref = ruleName_;
@@ -2564,6 +2667,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>string ruleName = 1;</code>
+       * @return The bytes for ruleName.
        */
       public org.nd4j.shade.protobuf.ByteString
           getRuleNameBytes() {
@@ -2580,6 +2684,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>string ruleName = 1;</code>
+       * @param value The ruleName to set.
+       * @return This builder for chaining.
        */
       public Builder setRuleName(
           java.lang.String value) {
@@ -2593,6 +2699,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>string ruleName = 1;</code>
+       * @return This builder for chaining.
        */
       public Builder clearRuleName() {
         
@@ -2602,6 +2709,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>string ruleName = 1;</code>
+       * @param value The bytes for ruleName to set.
+       * @return This builder for chaining.
        */
       public Builder setRuleNameBytes(
           org.nd4j.shade.protobuf.ByteString value) {
@@ -2618,6 +2727,7 @@ public final class MapperNamespace {
       private java.lang.Object functionName_ = "";
       /**
        * <code>string functionName = 2;</code>
+       * @return The functionName.
        */
       public java.lang.String getFunctionName() {
         java.lang.Object ref = functionName_;
@@ -2633,6 +2743,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>string functionName = 2;</code>
+       * @return The bytes for functionName.
        */
       public org.nd4j.shade.protobuf.ByteString
           getFunctionNameBytes() {
@@ -2649,6 +2760,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>string functionName = 2;</code>
+       * @param value The functionName to set.
+       * @return This builder for chaining.
        */
       public Builder setFunctionName(
           java.lang.String value) {
@@ -2662,6 +2775,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>string functionName = 2;</code>
+       * @return This builder for chaining.
        */
       public Builder clearFunctionName() {
         
@@ -2671,6 +2785,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>string functionName = 2;</code>
+       * @param value The bytes for functionName to set.
+       * @return This builder for chaining.
        */
       public Builder setFunctionNameBytes(
           org.nd4j.shade.protobuf.ByteString value) {
@@ -2693,6 +2809,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputStringAttrName = 3;</code>
+       * @return A list containing the inputStringAttrName.
        */
       public org.nd4j.shade.protobuf.ProtocolStringList
           getInputStringAttrNameList() {
@@ -2700,18 +2817,23 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputStringAttrName = 3;</code>
+       * @return The count of inputStringAttrName.
        */
       public int getInputStringAttrNameCount() {
         return inputStringAttrName_.size();
       }
       /**
        * <code>repeated string inputStringAttrName = 3;</code>
+       * @param index The index of the element to return.
+       * @return The inputStringAttrName at the given index.
        */
       public java.lang.String getInputStringAttrName(int index) {
         return inputStringAttrName_.get(index);
       }
       /**
        * <code>repeated string inputStringAttrName = 3;</code>
+       * @param index The index of the value to return.
+       * @return The bytes of the inputStringAttrName at the given index.
        */
       public org.nd4j.shade.protobuf.ByteString
           getInputStringAttrNameBytes(int index) {
@@ -2719,6 +2841,9 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputStringAttrName = 3;</code>
+       * @param index The index to set the value at.
+       * @param value The inputStringAttrName to set.
+       * @return This builder for chaining.
        */
       public Builder setInputStringAttrName(
           int index, java.lang.String value) {
@@ -2732,6 +2857,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputStringAttrName = 3;</code>
+       * @param value The inputStringAttrName to add.
+       * @return This builder for chaining.
        */
       public Builder addInputStringAttrName(
           java.lang.String value) {
@@ -2745,6 +2872,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputStringAttrName = 3;</code>
+       * @param values The inputStringAttrName to add.
+       * @return This builder for chaining.
        */
       public Builder addAllInputStringAttrName(
           java.lang.Iterable<java.lang.String> values) {
@@ -2756,6 +2885,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputStringAttrName = 3;</code>
+       * @return This builder for chaining.
        */
       public Builder clearInputStringAttrName() {
         inputStringAttrName_ = org.nd4j.shade.protobuf.LazyStringArrayList.EMPTY;
@@ -2765,6 +2895,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputStringAttrName = 3;</code>
+       * @param value The bytes of the inputStringAttrName to add.
+       * @return This builder for chaining.
        */
       public Builder addInputStringAttrNameBytes(
           org.nd4j.shade.protobuf.ByteString value) {
@@ -2787,6 +2919,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputStringAttrName = 4;</code>
+       * @return A list containing the outputStringAttrName.
        */
       public org.nd4j.shade.protobuf.ProtocolStringList
           getOutputStringAttrNameList() {
@@ -2794,18 +2927,23 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputStringAttrName = 4;</code>
+       * @return The count of outputStringAttrName.
        */
       public int getOutputStringAttrNameCount() {
         return outputStringAttrName_.size();
       }
       /**
        * <code>repeated string outputStringAttrName = 4;</code>
+       * @param index The index of the element to return.
+       * @return The outputStringAttrName at the given index.
        */
       public java.lang.String getOutputStringAttrName(int index) {
         return outputStringAttrName_.get(index);
       }
       /**
        * <code>repeated string outputStringAttrName = 4;</code>
+       * @param index The index of the value to return.
+       * @return The bytes of the outputStringAttrName at the given index.
        */
       public org.nd4j.shade.protobuf.ByteString
           getOutputStringAttrNameBytes(int index) {
@@ -2813,6 +2951,9 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputStringAttrName = 4;</code>
+       * @param index The index to set the value at.
+       * @param value The outputStringAttrName to set.
+       * @return This builder for chaining.
        */
       public Builder setOutputStringAttrName(
           int index, java.lang.String value) {
@@ -2826,6 +2967,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputStringAttrName = 4;</code>
+       * @param value The outputStringAttrName to add.
+       * @return This builder for chaining.
        */
       public Builder addOutputStringAttrName(
           java.lang.String value) {
@@ -2839,6 +2982,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputStringAttrName = 4;</code>
+       * @param values The outputStringAttrName to add.
+       * @return This builder for chaining.
        */
       public Builder addAllOutputStringAttrName(
           java.lang.Iterable<java.lang.String> values) {
@@ -2850,6 +2995,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputStringAttrName = 4;</code>
+       * @return This builder for chaining.
        */
       public Builder clearOutputStringAttrName() {
         outputStringAttrName_ = org.nd4j.shade.protobuf.LazyStringArrayList.EMPTY;
@@ -2859,6 +3005,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputStringAttrName = 4;</code>
+       * @param value The bytes of the outputStringAttrName to add.
+       * @return This builder for chaining.
        */
       public Builder addOutputStringAttrNameBytes(
           org.nd4j.shade.protobuf.ByteString value) {
@@ -2881,6 +3029,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputIntName = 5;</code>
+       * @return A list containing the inputIntName.
        */
       public org.nd4j.shade.protobuf.ProtocolStringList
           getInputIntNameList() {
@@ -2888,18 +3037,23 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputIntName = 5;</code>
+       * @return The count of inputIntName.
        */
       public int getInputIntNameCount() {
         return inputIntName_.size();
       }
       /**
        * <code>repeated string inputIntName = 5;</code>
+       * @param index The index of the element to return.
+       * @return The inputIntName at the given index.
        */
       public java.lang.String getInputIntName(int index) {
         return inputIntName_.get(index);
       }
       /**
        * <code>repeated string inputIntName = 5;</code>
+       * @param index The index of the value to return.
+       * @return The bytes of the inputIntName at the given index.
        */
       public org.nd4j.shade.protobuf.ByteString
           getInputIntNameBytes(int index) {
@@ -2907,6 +3061,9 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputIntName = 5;</code>
+       * @param index The index to set the value at.
+       * @param value The inputIntName to set.
+       * @return This builder for chaining.
        */
       public Builder setInputIntName(
           int index, java.lang.String value) {
@@ -2920,6 +3077,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputIntName = 5;</code>
+       * @param value The inputIntName to add.
+       * @return This builder for chaining.
        */
       public Builder addInputIntName(
           java.lang.String value) {
@@ -2933,6 +3092,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputIntName = 5;</code>
+       * @param values The inputIntName to add.
+       * @return This builder for chaining.
        */
       public Builder addAllInputIntName(
           java.lang.Iterable<java.lang.String> values) {
@@ -2944,6 +3105,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputIntName = 5;</code>
+       * @return This builder for chaining.
        */
       public Builder clearInputIntName() {
         inputIntName_ = org.nd4j.shade.protobuf.LazyStringArrayList.EMPTY;
@@ -2953,6 +3115,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputIntName = 5;</code>
+       * @param value The bytes of the inputIntName to add.
+       * @return This builder for chaining.
        */
       public Builder addInputIntNameBytes(
           org.nd4j.shade.protobuf.ByteString value) {
@@ -2975,6 +3139,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputIntName = 6;</code>
+       * @return A list containing the outputIntName.
        */
       public org.nd4j.shade.protobuf.ProtocolStringList
           getOutputIntNameList() {
@@ -2982,18 +3147,23 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputIntName = 6;</code>
+       * @return The count of outputIntName.
        */
       public int getOutputIntNameCount() {
         return outputIntName_.size();
       }
       /**
        * <code>repeated string outputIntName = 6;</code>
+       * @param index The index of the element to return.
+       * @return The outputIntName at the given index.
        */
       public java.lang.String getOutputIntName(int index) {
         return outputIntName_.get(index);
       }
       /**
        * <code>repeated string outputIntName = 6;</code>
+       * @param index The index of the value to return.
+       * @return The bytes of the outputIntName at the given index.
        */
       public org.nd4j.shade.protobuf.ByteString
           getOutputIntNameBytes(int index) {
@@ -3001,6 +3171,9 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputIntName = 6;</code>
+       * @param index The index to set the value at.
+       * @param value The outputIntName to set.
+       * @return This builder for chaining.
        */
       public Builder setOutputIntName(
           int index, java.lang.String value) {
@@ -3014,6 +3187,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputIntName = 6;</code>
+       * @param value The outputIntName to add.
+       * @return This builder for chaining.
        */
       public Builder addOutputIntName(
           java.lang.String value) {
@@ -3027,6 +3202,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputIntName = 6;</code>
+       * @param values The outputIntName to add.
+       * @return This builder for chaining.
        */
       public Builder addAllOutputIntName(
           java.lang.Iterable<java.lang.String> values) {
@@ -3038,6 +3215,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputIntName = 6;</code>
+       * @return This builder for chaining.
        */
       public Builder clearOutputIntName() {
         outputIntName_ = org.nd4j.shade.protobuf.LazyStringArrayList.EMPTY;
@@ -3047,6 +3225,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputIntName = 6;</code>
+       * @param value The bytes of the outputIntName to add.
+       * @return This builder for chaining.
        */
       public Builder addOutputIntNameBytes(
           org.nd4j.shade.protobuf.ByteString value) {
@@ -3069,6 +3249,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputFloatName = 7;</code>
+       * @return A list containing the inputFloatName.
        */
       public org.nd4j.shade.protobuf.ProtocolStringList
           getInputFloatNameList() {
@@ -3076,18 +3257,23 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputFloatName = 7;</code>
+       * @return The count of inputFloatName.
        */
       public int getInputFloatNameCount() {
         return inputFloatName_.size();
       }
       /**
        * <code>repeated string inputFloatName = 7;</code>
+       * @param index The index of the element to return.
+       * @return The inputFloatName at the given index.
        */
       public java.lang.String getInputFloatName(int index) {
         return inputFloatName_.get(index);
       }
       /**
        * <code>repeated string inputFloatName = 7;</code>
+       * @param index The index of the value to return.
+       * @return The bytes of the inputFloatName at the given index.
        */
       public org.nd4j.shade.protobuf.ByteString
           getInputFloatNameBytes(int index) {
@@ -3095,6 +3281,9 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputFloatName = 7;</code>
+       * @param index The index to set the value at.
+       * @param value The inputFloatName to set.
+       * @return This builder for chaining.
        */
       public Builder setInputFloatName(
           int index, java.lang.String value) {
@@ -3108,6 +3297,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputFloatName = 7;</code>
+       * @param value The inputFloatName to add.
+       * @return This builder for chaining.
        */
       public Builder addInputFloatName(
           java.lang.String value) {
@@ -3121,6 +3312,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputFloatName = 7;</code>
+       * @param values The inputFloatName to add.
+       * @return This builder for chaining.
        */
       public Builder addAllInputFloatName(
           java.lang.Iterable<java.lang.String> values) {
@@ -3132,6 +3325,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputFloatName = 7;</code>
+       * @return This builder for chaining.
        */
       public Builder clearInputFloatName() {
         inputFloatName_ = org.nd4j.shade.protobuf.LazyStringArrayList.EMPTY;
@@ -3141,6 +3335,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputFloatName = 7;</code>
+       * @param value The bytes of the inputFloatName to add.
+       * @return This builder for chaining.
        */
       public Builder addInputFloatNameBytes(
           org.nd4j.shade.protobuf.ByteString value) {
@@ -3163,6 +3359,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputFloatName = 8;</code>
+       * @return A list containing the outputFloatName.
        */
       public org.nd4j.shade.protobuf.ProtocolStringList
           getOutputFloatNameList() {
@@ -3170,18 +3367,23 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputFloatName = 8;</code>
+       * @return The count of outputFloatName.
        */
       public int getOutputFloatNameCount() {
         return outputFloatName_.size();
       }
       /**
        * <code>repeated string outputFloatName = 8;</code>
+       * @param index The index of the element to return.
+       * @return The outputFloatName at the given index.
        */
       public java.lang.String getOutputFloatName(int index) {
         return outputFloatName_.get(index);
       }
       /**
        * <code>repeated string outputFloatName = 8;</code>
+       * @param index The index of the value to return.
+       * @return The bytes of the outputFloatName at the given index.
        */
       public org.nd4j.shade.protobuf.ByteString
           getOutputFloatNameBytes(int index) {
@@ -3189,6 +3391,9 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputFloatName = 8;</code>
+       * @param index The index to set the value at.
+       * @param value The outputFloatName to set.
+       * @return This builder for chaining.
        */
       public Builder setOutputFloatName(
           int index, java.lang.String value) {
@@ -3202,6 +3407,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputFloatName = 8;</code>
+       * @param value The outputFloatName to add.
+       * @return This builder for chaining.
        */
       public Builder addOutputFloatName(
           java.lang.String value) {
@@ -3215,6 +3422,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputFloatName = 8;</code>
+       * @param values The outputFloatName to add.
+       * @return This builder for chaining.
        */
       public Builder addAllOutputFloatName(
           java.lang.Iterable<java.lang.String> values) {
@@ -3226,6 +3435,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputFloatName = 8;</code>
+       * @return This builder for chaining.
        */
       public Builder clearOutputFloatName() {
         outputFloatName_ = org.nd4j.shade.protobuf.LazyStringArrayList.EMPTY;
@@ -3235,6 +3445,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputFloatName = 8;</code>
+       * @param value The bytes of the outputFloatName to add.
+       * @return This builder for chaining.
        */
       public Builder addOutputFloatNameBytes(
           org.nd4j.shade.protobuf.ByteString value) {
@@ -3257,6 +3469,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputDoubleName = 9;</code>
+       * @return A list containing the inputDoubleName.
        */
       public org.nd4j.shade.protobuf.ProtocolStringList
           getInputDoubleNameList() {
@@ -3264,18 +3477,23 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputDoubleName = 9;</code>
+       * @return The count of inputDoubleName.
        */
       public int getInputDoubleNameCount() {
         return inputDoubleName_.size();
       }
       /**
        * <code>repeated string inputDoubleName = 9;</code>
+       * @param index The index of the element to return.
+       * @return The inputDoubleName at the given index.
        */
       public java.lang.String getInputDoubleName(int index) {
         return inputDoubleName_.get(index);
       }
       /**
        * <code>repeated string inputDoubleName = 9;</code>
+       * @param index The index of the value to return.
+       * @return The bytes of the inputDoubleName at the given index.
        */
       public org.nd4j.shade.protobuf.ByteString
           getInputDoubleNameBytes(int index) {
@@ -3283,6 +3501,9 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputDoubleName = 9;</code>
+       * @param index The index to set the value at.
+       * @param value The inputDoubleName to set.
+       * @return This builder for chaining.
        */
       public Builder setInputDoubleName(
           int index, java.lang.String value) {
@@ -3296,6 +3517,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputDoubleName = 9;</code>
+       * @param value The inputDoubleName to add.
+       * @return This builder for chaining.
        */
       public Builder addInputDoubleName(
           java.lang.String value) {
@@ -3309,6 +3532,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputDoubleName = 9;</code>
+       * @param values The inputDoubleName to add.
+       * @return This builder for chaining.
        */
       public Builder addAllInputDoubleName(
           java.lang.Iterable<java.lang.String> values) {
@@ -3320,6 +3545,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputDoubleName = 9;</code>
+       * @return This builder for chaining.
        */
       public Builder clearInputDoubleName() {
         inputDoubleName_ = org.nd4j.shade.protobuf.LazyStringArrayList.EMPTY;
@@ -3329,6 +3555,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputDoubleName = 9;</code>
+       * @param value The bytes of the inputDoubleName to add.
+       * @return This builder for chaining.
        */
       public Builder addInputDoubleNameBytes(
           org.nd4j.shade.protobuf.ByteString value) {
@@ -3351,6 +3579,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputDoubleName = 10;</code>
+       * @return A list containing the outputDoubleName.
        */
       public org.nd4j.shade.protobuf.ProtocolStringList
           getOutputDoubleNameList() {
@@ -3358,18 +3587,23 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputDoubleName = 10;</code>
+       * @return The count of outputDoubleName.
        */
       public int getOutputDoubleNameCount() {
         return outputDoubleName_.size();
       }
       /**
        * <code>repeated string outputDoubleName = 10;</code>
+       * @param index The index of the element to return.
+       * @return The outputDoubleName at the given index.
        */
       public java.lang.String getOutputDoubleName(int index) {
         return outputDoubleName_.get(index);
       }
       /**
        * <code>repeated string outputDoubleName = 10;</code>
+       * @param index The index of the value to return.
+       * @return The bytes of the outputDoubleName at the given index.
        */
       public org.nd4j.shade.protobuf.ByteString
           getOutputDoubleNameBytes(int index) {
@@ -3377,6 +3611,9 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputDoubleName = 10;</code>
+       * @param index The index to set the value at.
+       * @param value The outputDoubleName to set.
+       * @return This builder for chaining.
        */
       public Builder setOutputDoubleName(
           int index, java.lang.String value) {
@@ -3390,6 +3627,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputDoubleName = 10;</code>
+       * @param value The outputDoubleName to add.
+       * @return This builder for chaining.
        */
       public Builder addOutputDoubleName(
           java.lang.String value) {
@@ -3403,6 +3642,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputDoubleName = 10;</code>
+       * @param values The outputDoubleName to add.
+       * @return This builder for chaining.
        */
       public Builder addAllOutputDoubleName(
           java.lang.Iterable<java.lang.String> values) {
@@ -3414,6 +3655,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputDoubleName = 10;</code>
+       * @return This builder for chaining.
        */
       public Builder clearOutputDoubleName() {
         outputDoubleName_ = org.nd4j.shade.protobuf.LazyStringArrayList.EMPTY;
@@ -3423,6 +3665,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputDoubleName = 10;</code>
+       * @param value The bytes of the outputDoubleName to add.
+       * @return This builder for chaining.
        */
       public Builder addOutputDoubleNameBytes(
           org.nd4j.shade.protobuf.ByteString value) {
@@ -3445,6 +3689,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputBooleanName = 11;</code>
+       * @return A list containing the inputBooleanName.
        */
       public org.nd4j.shade.protobuf.ProtocolStringList
           getInputBooleanNameList() {
@@ -3452,18 +3697,23 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputBooleanName = 11;</code>
+       * @return The count of inputBooleanName.
        */
       public int getInputBooleanNameCount() {
         return inputBooleanName_.size();
       }
       /**
        * <code>repeated string inputBooleanName = 11;</code>
+       * @param index The index of the element to return.
+       * @return The inputBooleanName at the given index.
        */
       public java.lang.String getInputBooleanName(int index) {
         return inputBooleanName_.get(index);
       }
       /**
        * <code>repeated string inputBooleanName = 11;</code>
+       * @param index The index of the value to return.
+       * @return The bytes of the inputBooleanName at the given index.
        */
       public org.nd4j.shade.protobuf.ByteString
           getInputBooleanNameBytes(int index) {
@@ -3471,6 +3721,9 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputBooleanName = 11;</code>
+       * @param index The index to set the value at.
+       * @param value The inputBooleanName to set.
+       * @return This builder for chaining.
        */
       public Builder setInputBooleanName(
           int index, java.lang.String value) {
@@ -3484,6 +3737,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputBooleanName = 11;</code>
+       * @param value The inputBooleanName to add.
+       * @return This builder for chaining.
        */
       public Builder addInputBooleanName(
           java.lang.String value) {
@@ -3497,6 +3752,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputBooleanName = 11;</code>
+       * @param values The inputBooleanName to add.
+       * @return This builder for chaining.
        */
       public Builder addAllInputBooleanName(
           java.lang.Iterable<java.lang.String> values) {
@@ -3508,6 +3765,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputBooleanName = 11;</code>
+       * @return This builder for chaining.
        */
       public Builder clearInputBooleanName() {
         inputBooleanName_ = org.nd4j.shade.protobuf.LazyStringArrayList.EMPTY;
@@ -3517,6 +3775,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputBooleanName = 11;</code>
+       * @param value The bytes of the inputBooleanName to add.
+       * @return This builder for chaining.
        */
       public Builder addInputBooleanNameBytes(
           org.nd4j.shade.protobuf.ByteString value) {
@@ -3539,6 +3799,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputBooleanName = 12;</code>
+       * @return A list containing the outputBooleanName.
        */
       public org.nd4j.shade.protobuf.ProtocolStringList
           getOutputBooleanNameList() {
@@ -3546,18 +3807,23 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputBooleanName = 12;</code>
+       * @return The count of outputBooleanName.
        */
       public int getOutputBooleanNameCount() {
         return outputBooleanName_.size();
       }
       /**
        * <code>repeated string outputBooleanName = 12;</code>
+       * @param index The index of the element to return.
+       * @return The outputBooleanName at the given index.
        */
       public java.lang.String getOutputBooleanName(int index) {
         return outputBooleanName_.get(index);
       }
       /**
        * <code>repeated string outputBooleanName = 12;</code>
+       * @param index The index of the value to return.
+       * @return The bytes of the outputBooleanName at the given index.
        */
       public org.nd4j.shade.protobuf.ByteString
           getOutputBooleanNameBytes(int index) {
@@ -3565,6 +3831,9 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputBooleanName = 12;</code>
+       * @param index The index to set the value at.
+       * @param value The outputBooleanName to set.
+       * @return This builder for chaining.
        */
       public Builder setOutputBooleanName(
           int index, java.lang.String value) {
@@ -3578,6 +3847,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputBooleanName = 12;</code>
+       * @param value The outputBooleanName to add.
+       * @return This builder for chaining.
        */
       public Builder addOutputBooleanName(
           java.lang.String value) {
@@ -3591,6 +3862,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputBooleanName = 12;</code>
+       * @param values The outputBooleanName to add.
+       * @return This builder for chaining.
        */
       public Builder addAllOutputBooleanName(
           java.lang.Iterable<java.lang.String> values) {
@@ -3602,6 +3875,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputBooleanName = 12;</code>
+       * @return This builder for chaining.
        */
       public Builder clearOutputBooleanName() {
         outputBooleanName_ = org.nd4j.shade.protobuf.LazyStringArrayList.EMPTY;
@@ -3611,6 +3885,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputBooleanName = 12;</code>
+       * @param value The bytes of the outputBooleanName to add.
+       * @return This builder for chaining.
        */
       public Builder addOutputBooleanNameBytes(
           org.nd4j.shade.protobuf.ByteString value) {
@@ -3633,6 +3909,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputTensorName = 13;</code>
+       * @return A list containing the inputTensorName.
        */
       public org.nd4j.shade.protobuf.ProtocolStringList
           getInputTensorNameList() {
@@ -3640,18 +3917,23 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputTensorName = 13;</code>
+       * @return The count of inputTensorName.
        */
       public int getInputTensorNameCount() {
         return inputTensorName_.size();
       }
       /**
        * <code>repeated string inputTensorName = 13;</code>
+       * @param index The index of the element to return.
+       * @return The inputTensorName at the given index.
        */
       public java.lang.String getInputTensorName(int index) {
         return inputTensorName_.get(index);
       }
       /**
        * <code>repeated string inputTensorName = 13;</code>
+       * @param index The index of the value to return.
+       * @return The bytes of the inputTensorName at the given index.
        */
       public org.nd4j.shade.protobuf.ByteString
           getInputTensorNameBytes(int index) {
@@ -3659,6 +3941,9 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputTensorName = 13;</code>
+       * @param index The index to set the value at.
+       * @param value The inputTensorName to set.
+       * @return This builder for chaining.
        */
       public Builder setInputTensorName(
           int index, java.lang.String value) {
@@ -3672,6 +3957,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputTensorName = 13;</code>
+       * @param value The inputTensorName to add.
+       * @return This builder for chaining.
        */
       public Builder addInputTensorName(
           java.lang.String value) {
@@ -3685,6 +3972,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputTensorName = 13;</code>
+       * @param values The inputTensorName to add.
+       * @return This builder for chaining.
        */
       public Builder addAllInputTensorName(
           java.lang.Iterable<java.lang.String> values) {
@@ -3696,6 +3985,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputTensorName = 13;</code>
+       * @return This builder for chaining.
        */
       public Builder clearInputTensorName() {
         inputTensorName_ = org.nd4j.shade.protobuf.LazyStringArrayList.EMPTY;
@@ -3705,6 +3995,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputTensorName = 13;</code>
+       * @param value The bytes of the inputTensorName to add.
+       * @return This builder for chaining.
        */
       public Builder addInputTensorNameBytes(
           org.nd4j.shade.protobuf.ByteString value) {
@@ -3727,6 +4019,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputTensorName = 14;</code>
+       * @return A list containing the outputTensorName.
        */
       public org.nd4j.shade.protobuf.ProtocolStringList
           getOutputTensorNameList() {
@@ -3734,18 +4027,23 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputTensorName = 14;</code>
+       * @return The count of outputTensorName.
        */
       public int getOutputTensorNameCount() {
         return outputTensorName_.size();
       }
       /**
        * <code>repeated string outputTensorName = 14;</code>
+       * @param index The index of the element to return.
+       * @return The outputTensorName at the given index.
        */
       public java.lang.String getOutputTensorName(int index) {
         return outputTensorName_.get(index);
       }
       /**
        * <code>repeated string outputTensorName = 14;</code>
+       * @param index The index of the value to return.
+       * @return The bytes of the outputTensorName at the given index.
        */
       public org.nd4j.shade.protobuf.ByteString
           getOutputTensorNameBytes(int index) {
@@ -3753,6 +4051,9 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputTensorName = 14;</code>
+       * @param index The index to set the value at.
+       * @param value The outputTensorName to set.
+       * @return This builder for chaining.
        */
       public Builder setOutputTensorName(
           int index, java.lang.String value) {
@@ -3766,6 +4067,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputTensorName = 14;</code>
+       * @param value The outputTensorName to add.
+       * @return This builder for chaining.
        */
       public Builder addOutputTensorName(
           java.lang.String value) {
@@ -3779,6 +4082,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputTensorName = 14;</code>
+       * @param values The outputTensorName to add.
+       * @return This builder for chaining.
        */
       public Builder addAllOutputTensorName(
           java.lang.Iterable<java.lang.String> values) {
@@ -3790,6 +4095,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputTensorName = 14;</code>
+       * @return This builder for chaining.
        */
       public Builder clearOutputTensorName() {
         outputTensorName_ = org.nd4j.shade.protobuf.LazyStringArrayList.EMPTY;
@@ -3799,6 +4105,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputTensorName = 14;</code>
+       * @param value The bytes of the outputTensorName to add.
+       * @return This builder for chaining.
        */
       public Builder addOutputTensorNameBytes(
           org.nd4j.shade.protobuf.ByteString value) {
@@ -3821,6 +4129,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputDataTypeName = 15;</code>
+       * @return A list containing the inputDataTypeName.
        */
       public org.nd4j.shade.protobuf.ProtocolStringList
           getInputDataTypeNameList() {
@@ -3828,18 +4137,23 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputDataTypeName = 15;</code>
+       * @return The count of inputDataTypeName.
        */
       public int getInputDataTypeNameCount() {
         return inputDataTypeName_.size();
       }
       /**
        * <code>repeated string inputDataTypeName = 15;</code>
+       * @param index The index of the element to return.
+       * @return The inputDataTypeName at the given index.
        */
       public java.lang.String getInputDataTypeName(int index) {
         return inputDataTypeName_.get(index);
       }
       /**
        * <code>repeated string inputDataTypeName = 15;</code>
+       * @param index The index of the value to return.
+       * @return The bytes of the inputDataTypeName at the given index.
        */
       public org.nd4j.shade.protobuf.ByteString
           getInputDataTypeNameBytes(int index) {
@@ -3847,6 +4161,9 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputDataTypeName = 15;</code>
+       * @param index The index to set the value at.
+       * @param value The inputDataTypeName to set.
+       * @return This builder for chaining.
        */
       public Builder setInputDataTypeName(
           int index, java.lang.String value) {
@@ -3860,6 +4177,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputDataTypeName = 15;</code>
+       * @param value The inputDataTypeName to add.
+       * @return This builder for chaining.
        */
       public Builder addInputDataTypeName(
           java.lang.String value) {
@@ -3873,6 +4192,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputDataTypeName = 15;</code>
+       * @param values The inputDataTypeName to add.
+       * @return This builder for chaining.
        */
       public Builder addAllInputDataTypeName(
           java.lang.Iterable<java.lang.String> values) {
@@ -3884,6 +4205,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputDataTypeName = 15;</code>
+       * @return This builder for chaining.
        */
       public Builder clearInputDataTypeName() {
         inputDataTypeName_ = org.nd4j.shade.protobuf.LazyStringArrayList.EMPTY;
@@ -3893,6 +4215,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string inputDataTypeName = 15;</code>
+       * @param value The bytes of the inputDataTypeName to add.
+       * @return This builder for chaining.
        */
       public Builder addInputDataTypeNameBytes(
           org.nd4j.shade.protobuf.ByteString value) {
@@ -3915,6 +4239,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputDataTypeName = 16;</code>
+       * @return A list containing the outputDataTypeName.
        */
       public org.nd4j.shade.protobuf.ProtocolStringList
           getOutputDataTypeNameList() {
@@ -3922,18 +4247,23 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputDataTypeName = 16;</code>
+       * @return The count of outputDataTypeName.
        */
       public int getOutputDataTypeNameCount() {
         return outputDataTypeName_.size();
       }
       /**
        * <code>repeated string outputDataTypeName = 16;</code>
+       * @param index The index of the element to return.
+       * @return The outputDataTypeName at the given index.
        */
       public java.lang.String getOutputDataTypeName(int index) {
         return outputDataTypeName_.get(index);
       }
       /**
        * <code>repeated string outputDataTypeName = 16;</code>
+       * @param index The index of the value to return.
+       * @return The bytes of the outputDataTypeName at the given index.
        */
       public org.nd4j.shade.protobuf.ByteString
           getOutputDataTypeNameBytes(int index) {
@@ -3941,6 +4271,9 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputDataTypeName = 16;</code>
+       * @param index The index to set the value at.
+       * @param value The outputDataTypeName to set.
+       * @return This builder for chaining.
        */
       public Builder setOutputDataTypeName(
           int index, java.lang.String value) {
@@ -3954,6 +4287,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputDataTypeName = 16;</code>
+       * @param value The outputDataTypeName to add.
+       * @return This builder for chaining.
        */
       public Builder addOutputDataTypeName(
           java.lang.String value) {
@@ -3967,6 +4302,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputDataTypeName = 16;</code>
+       * @param values The outputDataTypeName to add.
+       * @return This builder for chaining.
        */
       public Builder addAllOutputDataTypeName(
           java.lang.Iterable<java.lang.String> values) {
@@ -3978,6 +4315,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputDataTypeName = 16;</code>
+       * @return This builder for chaining.
        */
       public Builder clearOutputDataTypeName() {
         outputDataTypeName_ = org.nd4j.shade.protobuf.LazyStringArrayList.EMPTY;
@@ -3987,6 +4325,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string outputDataTypeName = 16;</code>
+       * @param value The bytes of the outputDataTypeName to add.
+       * @return This builder for chaining.
        */
       public Builder addOutputDataTypeNameBytes(
           org.nd4j.shade.protobuf.ByteString value) {
@@ -4030,14 +4370,16 @@ public final class MapperNamespace {
        * <code>map&lt;string, string&gt; inputToOutput = 17;</code>
        */
 
+      @java.lang.Override
       public boolean containsInputToOutput(
           java.lang.String key) {
-        if (key == null) { throw new java.lang.NullPointerException(); }
+        if (key == null) { throw new NullPointerException("map key"); }
         return internalGetInputToOutput().getMap().containsKey(key);
       }
       /**
        * Use {@link #getInputToOutputMap()} instead.
        */
+      @java.lang.Override
       @java.lang.Deprecated
       public java.util.Map<java.lang.String, java.lang.String> getInputToOutput() {
         return getInputToOutputMap();
@@ -4045,6 +4387,7 @@ public final class MapperNamespace {
       /**
        * <code>map&lt;string, string&gt; inputToOutput = 17;</code>
        */
+      @java.lang.Override
 
       public java.util.Map<java.lang.String, java.lang.String> getInputToOutputMap() {
         return internalGetInputToOutput().getMap();
@@ -4052,11 +4395,12 @@ public final class MapperNamespace {
       /**
        * <code>map&lt;string, string&gt; inputToOutput = 17;</code>
        */
+      @java.lang.Override
 
       public java.lang.String getInputToOutputOrDefault(
           java.lang.String key,
           java.lang.String defaultValue) {
-        if (key == null) { throw new java.lang.NullPointerException(); }
+        if (key == null) { throw new NullPointerException("map key"); }
         java.util.Map<java.lang.String, java.lang.String> map =
             internalGetInputToOutput().getMap();
         return map.containsKey(key) ? map.get(key) : defaultValue;
@@ -4064,10 +4408,11 @@ public final class MapperNamespace {
       /**
        * <code>map&lt;string, string&gt; inputToOutput = 17;</code>
        */
+      @java.lang.Override
 
       public java.lang.String getInputToOutputOrThrow(
           java.lang.String key) {
-        if (key == null) { throw new java.lang.NullPointerException(); }
+        if (key == null) { throw new NullPointerException("map key"); }
         java.util.Map<java.lang.String, java.lang.String> map =
             internalGetInputToOutput().getMap();
         if (!map.containsKey(key)) {
@@ -4087,7 +4432,7 @@ public final class MapperNamespace {
 
       public Builder removeInputToOutput(
           java.lang.String key) {
-        if (key == null) { throw new java.lang.NullPointerException(); }
+        if (key == null) { throw new NullPointerException("map key"); }
         internalGetMutableInputToOutput().getMutableMap()
             .remove(key);
         return this;
@@ -4106,8 +4451,11 @@ public final class MapperNamespace {
       public Builder putInputToOutput(
           java.lang.String key,
           java.lang.String value) {
-        if (key == null) { throw new java.lang.NullPointerException(); }
-        if (value == null) { throw new java.lang.NullPointerException(); }
+        if (key == null) { throw new NullPointerException("map key"); }
+        if (value == null) {
+  throw new NullPointerException("map value");
+}
+
         internalGetMutableInputToOutput().getMutableMap()
             .put(key, value);
         return this;
@@ -4126,6 +4474,7 @@ public final class MapperNamespace {
       private java.lang.Object ruleType_ = "";
       /**
        * <code>string ruleType = 18;</code>
+       * @return The ruleType.
        */
       public java.lang.String getRuleType() {
         java.lang.Object ref = ruleType_;
@@ -4141,6 +4490,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>string ruleType = 18;</code>
+       * @return The bytes for ruleType.
        */
       public org.nd4j.shade.protobuf.ByteString
           getRuleTypeBytes() {
@@ -4157,6 +4507,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>string ruleType = 18;</code>
+       * @param value The ruleType to set.
+       * @return This builder for chaining.
        */
       public Builder setRuleType(
           java.lang.String value) {
@@ -4170,6 +4522,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>string ruleType = 18;</code>
+       * @return This builder for chaining.
        */
       public Builder clearRuleType() {
         
@@ -4179,6 +4532,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>string ruleType = 18;</code>
+       * @param value The bytes for ruleType to set.
+       * @return This builder for chaining.
        */
       public Builder setRuleTypeBytes(
           org.nd4j.shade.protobuf.ByteString value) {
@@ -4435,6 +4790,7 @@ public final class MapperNamespace {
       private java.lang.Object inputFrameworkOpName_ = "";
       /**
        * <code>string inputFrameworkOpName = 20;</code>
+       * @return The inputFrameworkOpName.
        */
       public java.lang.String getInputFrameworkOpName() {
         java.lang.Object ref = inputFrameworkOpName_;
@@ -4450,6 +4806,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>string inputFrameworkOpName = 20;</code>
+       * @return The bytes for inputFrameworkOpName.
        */
       public org.nd4j.shade.protobuf.ByteString
           getInputFrameworkOpNameBytes() {
@@ -4466,6 +4823,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>string inputFrameworkOpName = 20;</code>
+       * @param value The inputFrameworkOpName to set.
+       * @return This builder for chaining.
        */
       public Builder setInputFrameworkOpName(
           java.lang.String value) {
@@ -4479,6 +4838,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>string inputFrameworkOpName = 20;</code>
+       * @return This builder for chaining.
        */
       public Builder clearInputFrameworkOpName() {
         
@@ -4488,6 +4848,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>string inputFrameworkOpName = 20;</code>
+       * @param value The bytes for inputFrameworkOpName to set.
+       * @return This builder for chaining.
        */
       public Builder setInputFrameworkOpNameBytes(
           org.nd4j.shade.protobuf.ByteString value) {
@@ -4533,7 +4895,18 @@ public final class MapperNamespace {
           org.nd4j.shade.protobuf.CodedInputStream input,
           org.nd4j.shade.protobuf.ExtensionRegistryLite extensionRegistry)
           throws org.nd4j.shade.protobuf.InvalidProtocolBufferException {
-        return new MappingRule(input, extensionRegistry);
+        Builder builder = newBuilder();
+        try {
+          builder.mergeFrom(input, extensionRegistry);
+        } catch (org.nd4j.shade.protobuf.InvalidProtocolBufferException e) {
+          throw e.setUnfinishedMessage(builder.buildPartial());
+        } catch (org.nd4j.shade.protobuf.UninitializedMessageException e) {
+          throw e.asInvalidProtocolBufferException().setUnfinishedMessage(builder.buildPartial());
+        } catch (java.io.IOException e) {
+          throw new org.nd4j.shade.protobuf.InvalidProtocolBufferException(e)
+              .setUnfinishedMessage(builder.buildPartial());
+        }
+        return builder.buildPartial();
       }
     };
 
@@ -4559,10 +4932,12 @@ public final class MapperNamespace {
 
     /**
      * <code>string key = 1;</code>
+     * @return The key.
      */
     java.lang.String getKey();
     /**
      * <code>string key = 1;</code>
+     * @return The bytes for key.
      */
     org.nd4j.shade.protobuf.ByteString
         getKeyBytes();
@@ -4594,7 +4969,7 @@ public final class MapperNamespace {
   /**
    * Protobuf type {@code org.nd4j.ir.TransformerArgs}
    */
-  public  static final class TransformerArgs extends
+  public static final class TransformerArgs extends
       org.nd4j.shade.protobuf.GeneratedMessageV3 implements
       // @@protoc_insertion_point(message_implements:org.nd4j.ir.TransformerArgs)
       TransformerArgsOrBuilder {
@@ -4620,62 +4995,6 @@ public final class MapperNamespace {
     getUnknownFields() {
       return this.unknownFields;
     }
-    private TransformerArgs(
-        org.nd4j.shade.protobuf.CodedInputStream input,
-        org.nd4j.shade.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws org.nd4j.shade.protobuf.InvalidProtocolBufferException {
-      this();
-      if (extensionRegistry == null) {
-        throw new java.lang.NullPointerException();
-      }
-      int mutable_bitField0_ = 0;
-      org.nd4j.shade.protobuf.UnknownFieldSet.Builder unknownFields =
-          org.nd4j.shade.protobuf.UnknownFieldSet.newBuilder();
-      try {
-        boolean done = false;
-        while (!done) {
-          int tag = input.readTag();
-          switch (tag) {
-            case 0:
-              done = true;
-              break;
-            case 10: {
-              java.lang.String s = input.readStringRequireUtf8();
-
-              key_ = s;
-              break;
-            }
-            case 18: {
-              if (!((mutable_bitField0_ & 0x00000001) != 0)) {
-                transformerArgs_ = new java.util.ArrayList<org.nd4j.ir.OpNamespace.ArgDescriptor>();
-                mutable_bitField0_ |= 0x00000001;
-              }
-              transformerArgs_.add(
-                  input.readMessage(org.nd4j.ir.OpNamespace.ArgDescriptor.parser(), extensionRegistry));
-              break;
-            }
-            default: {
-              if (!parseUnknownField(
-                  input, unknownFields, extensionRegistry, tag)) {
-                done = true;
-              }
-              break;
-            }
-          }
-        }
-      } catch (org.nd4j.shade.protobuf.InvalidProtocolBufferException e) {
-        throw e.setUnfinishedMessage(this);
-      } catch (java.io.IOException e) {
-        throw new org.nd4j.shade.protobuf.InvalidProtocolBufferException(
-            e).setUnfinishedMessage(this);
-      } finally {
-        if (((mutable_bitField0_ & 0x00000001) != 0)) {
-          transformerArgs_ = java.util.Collections.unmodifiableList(transformerArgs_);
-        }
-        this.unknownFields = unknownFields.build();
-        makeExtensionsImmutable();
-      }
-    }
     public static final org.nd4j.shade.protobuf.Descriptors.Descriptor
         getDescriptor() {
       return org.nd4j.ir.MapperNamespace.internal_static_org_nd4j_ir_TransformerArgs_descriptor;
@@ -4693,7 +5012,9 @@ public final class MapperNamespace {
     private volatile java.lang.Object key_;
     /**
      * <code>string key = 1;</code>
+     * @return The key.
      */
+    @java.lang.Override
     public java.lang.String getKey() {
       java.lang.Object ref = key_;
       if (ref instanceof java.lang.String) {
@@ -4708,7 +5029,9 @@ public final class MapperNamespace {
     }
     /**
      * <code>string key = 1;</code>
+     * @return The bytes for key.
      */
+    @java.lang.Override
     public org.nd4j.shade.protobuf.ByteString
         getKeyBytes() {
       java.lang.Object ref = key_;
@@ -4728,12 +5051,14 @@ public final class MapperNamespace {
     /**
      * <code>repeated .org.nd4j.ir.ArgDescriptor transformerArgs = 2;</code>
      */
+    @java.lang.Override
     public java.util.List<org.nd4j.ir.OpNamespace.ArgDescriptor> getTransformerArgsList() {
       return transformerArgs_;
     }
     /**
      * <code>repeated .org.nd4j.ir.ArgDescriptor transformerArgs = 2;</code>
      */
+    @java.lang.Override
     public java.util.List<? extends org.nd4j.ir.OpNamespace.ArgDescriptorOrBuilder> 
         getTransformerArgsOrBuilderList() {
       return transformerArgs_;
@@ -4741,18 +5066,21 @@ public final class MapperNamespace {
     /**
      * <code>repeated .org.nd4j.ir.ArgDescriptor transformerArgs = 2;</code>
      */
+    @java.lang.Override
     public int getTransformerArgsCount() {
       return transformerArgs_.size();
     }
     /**
      * <code>repeated .org.nd4j.ir.ArgDescriptor transformerArgs = 2;</code>
      */
+    @java.lang.Override
     public org.nd4j.ir.OpNamespace.ArgDescriptor getTransformerArgs(int index) {
       return transformerArgs_.get(index);
     }
     /**
      * <code>repeated .org.nd4j.ir.ArgDescriptor transformerArgs = 2;</code>
      */
+    @java.lang.Override
     public org.nd4j.ir.OpNamespace.ArgDescriptorOrBuilder getTransformerArgsOrBuilder(
         int index) {
       return transformerArgs_.get(index);
@@ -4772,13 +5100,13 @@ public final class MapperNamespace {
     @java.lang.Override
     public void writeTo(org.nd4j.shade.protobuf.CodedOutputStream output)
                         throws java.io.IOException {
-      if (!getKeyBytes().isEmpty()) {
+      if (!org.nd4j.shade.protobuf.GeneratedMessageV3.isStringEmpty(key_)) {
         org.nd4j.shade.protobuf.GeneratedMessageV3.writeString(output, 1, key_);
       }
       for (int i = 0; i < transformerArgs_.size(); i++) {
         output.writeMessage(2, transformerArgs_.get(i));
       }
-      unknownFields.writeTo(output);
+      getUnknownFields().writeTo(output);
     }
 
     @java.lang.Override
@@ -4787,14 +5115,14 @@ public final class MapperNamespace {
       if (size != -1) return size;
 
       size = 0;
-      if (!getKeyBytes().isEmpty()) {
+      if (!org.nd4j.shade.protobuf.GeneratedMessageV3.isStringEmpty(key_)) {
         size += org.nd4j.shade.protobuf.GeneratedMessageV3.computeStringSize(1, key_);
       }
       for (int i = 0; i < transformerArgs_.size(); i++) {
         size += org.nd4j.shade.protobuf.CodedOutputStream
           .computeMessageSize(2, transformerArgs_.get(i));
       }
-      size += unknownFields.getSerializedSize();
+      size += getUnknownFields().getSerializedSize();
       memoizedSize = size;
       return size;
     }
@@ -4813,7 +5141,7 @@ public final class MapperNamespace {
           .equals(other.getKey())) return false;
       if (!getTransformerArgsList()
           .equals(other.getTransformerArgsList())) return false;
-      if (!unknownFields.equals(other.unknownFields)) return false;
+      if (!getUnknownFields().equals(other.getUnknownFields())) return false;
       return true;
     }
 
@@ -4830,7 +5158,7 @@ public final class MapperNamespace {
         hash = (37 * hash) + TRANSFORMERARGS_FIELD_NUMBER;
         hash = (53 * hash) + getTransformerArgsList().hashCode();
       }
-      hash = (29 * hash) + unknownFields.hashCode();
+      hash = (29 * hash) + getUnknownFields().hashCode();
       memoizedHashCode = hash;
       return hash;
     }
@@ -4947,19 +5275,13 @@ public final class MapperNamespace {
 
       // Construct using org.nd4j.ir.MapperNamespace.TransformerArgs.newBuilder()
       private Builder() {
-        maybeForceBuilderInitialization();
+
       }
 
       private Builder(
           org.nd4j.shade.protobuf.GeneratedMessageV3.BuilderParent parent) {
         super(parent);
-        maybeForceBuilderInitialization();
-      }
-      private void maybeForceBuilderInitialization() {
-        if (org.nd4j.shade.protobuf.GeneratedMessageV3
-                .alwaysUseFieldBuilders) {
-          getTransformerArgsFieldBuilder();
-        }
+
       }
       @java.lang.Override
       public Builder clear() {
@@ -4968,10 +5290,11 @@ public final class MapperNamespace {
 
         if (transformerArgsBuilder_ == null) {
           transformerArgs_ = java.util.Collections.emptyList();
-          bitField0_ = (bitField0_ & ~0x00000001);
         } else {
+          transformerArgs_ = null;
           transformerArgsBuilder_.clear();
         }
+        bitField0_ = (bitField0_ & ~0x00000001);
         return this;
       }
 
@@ -5087,7 +5410,7 @@ public final class MapperNamespace {
             }
           }
         }
-        this.mergeUnknownFields(other.unknownFields);
+        this.mergeUnknownFields(other.getUnknownFields());
         onChanged();
         return this;
       }
@@ -5102,17 +5425,48 @@ public final class MapperNamespace {
           org.nd4j.shade.protobuf.CodedInputStream input,
           org.nd4j.shade.protobuf.ExtensionRegistryLite extensionRegistry)
           throws java.io.IOException {
-        org.nd4j.ir.MapperNamespace.TransformerArgs parsedMessage = null;
+        if (extensionRegistry == null) {
+          throw new java.lang.NullPointerException();
+        }
         try {
-          parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
+          boolean done = false;
+          while (!done) {
+            int tag = input.readTag();
+            switch (tag) {
+              case 0:
+                done = true;
+                break;
+              case 10: {
+                key_ = input.readStringRequireUtf8();
+
+                break;
+              } // case 10
+              case 18: {
+                org.nd4j.ir.OpNamespace.ArgDescriptor m =
+                    input.readMessage(
+                        org.nd4j.ir.OpNamespace.ArgDescriptor.parser(),
+                        extensionRegistry);
+                if (transformerArgsBuilder_ == null) {
+                  ensureTransformerArgsIsMutable();
+                  transformerArgs_.add(m);
+                } else {
+                  transformerArgsBuilder_.addMessage(m);
+                }
+                break;
+              } // case 18
+              default: {
+                if (!super.parseUnknownField(input, extensionRegistry, tag)) {
+                  done = true; // was an endgroup tag
+                }
+                break;
+              } // default:
+            } // switch (tag)
+          } // while (!done)
         } catch (org.nd4j.shade.protobuf.InvalidProtocolBufferException e) {
-          parsedMessage = (org.nd4j.ir.MapperNamespace.TransformerArgs) e.getUnfinishedMessage();
           throw e.unwrapIOException();
         } finally {
-          if (parsedMessage != null) {
-            mergeFrom(parsedMessage);
-          }
-        }
+          onChanged();
+        } // finally
         return this;
       }
       private int bitField0_;
@@ -5120,6 +5474,7 @@ public final class MapperNamespace {
       private java.lang.Object key_ = "";
       /**
        * <code>string key = 1;</code>
+       * @return The key.
        */
       public java.lang.String getKey() {
         java.lang.Object ref = key_;
@@ -5135,6 +5490,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>string key = 1;</code>
+       * @return The bytes for key.
        */
       public org.nd4j.shade.protobuf.ByteString
           getKeyBytes() {
@@ -5151,6 +5507,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>string key = 1;</code>
+       * @param value The key to set.
+       * @return This builder for chaining.
        */
       public Builder setKey(
           java.lang.String value) {
@@ -5164,6 +5522,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>string key = 1;</code>
+       * @return This builder for chaining.
        */
       public Builder clearKey() {
         
@@ -5173,6 +5532,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>string key = 1;</code>
+       * @param value The bytes for key to set.
+       * @return This builder for chaining.
        */
       public Builder setKeyBytes(
           org.nd4j.shade.protobuf.ByteString value) {
@@ -5458,7 +5819,18 @@ public final class MapperNamespace {
           org.nd4j.shade.protobuf.CodedInputStream input,
           org.nd4j.shade.protobuf.ExtensionRegistryLite extensionRegistry)
           throws org.nd4j.shade.protobuf.InvalidProtocolBufferException {
-        return new TransformerArgs(input, extensionRegistry);
+        Builder builder = newBuilder();
+        try {
+          builder.mergeFrom(input, extensionRegistry);
+        } catch (org.nd4j.shade.protobuf.InvalidProtocolBufferException e) {
+          throw e.setUnfinishedMessage(builder.buildPartial());
+        } catch (org.nd4j.shade.protobuf.UninitializedMessageException e) {
+          throw e.asInvalidProtocolBufferException().setUnfinishedMessage(builder.buildPartial());
+        } catch (java.io.IOException e) {
+          throw new org.nd4j.shade.protobuf.InvalidProtocolBufferException(e)
+              .setUnfinishedMessage(builder.buildPartial());
+        }
+        return builder.buildPartial();
       }
     };
 
@@ -5508,19 +5880,25 @@ public final class MapperNamespace {
 
     /**
      * <code>repeated string name = 2;</code>
+     * @return A list containing the name.
      */
     java.util.List<java.lang.String>
         getNameList();
     /**
      * <code>repeated string name = 2;</code>
+     * @return The count of name.
      */
     int getNameCount();
     /**
      * <code>repeated string name = 2;</code>
+     * @param index The index of the element to return.
+     * @return The name at the given index.
      */
     java.lang.String getName(int index);
     /**
      * <code>repeated string name = 2;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the name at the given index.
      */
     org.nd4j.shade.protobuf.ByteString
         getNameBytes(int index);
@@ -5528,7 +5906,7 @@ public final class MapperNamespace {
   /**
    * Protobuf type {@code org.nd4j.ir.MappingDefinitionSet}
    */
-  public  static final class MappingDefinitionSet extends
+  public static final class MappingDefinitionSet extends
       org.nd4j.shade.protobuf.GeneratedMessageV3 implements
       // @@protoc_insertion_point(message_implements:org.nd4j.ir.MappingDefinitionSet)
       MappingDefinitionSetOrBuilder {
@@ -5554,68 +5932,6 @@ public final class MapperNamespace {
     getUnknownFields() {
       return this.unknownFields;
     }
-    private MappingDefinitionSet(
-        org.nd4j.shade.protobuf.CodedInputStream input,
-        org.nd4j.shade.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws org.nd4j.shade.protobuf.InvalidProtocolBufferException {
-      this();
-      if (extensionRegistry == null) {
-        throw new java.lang.NullPointerException();
-      }
-      int mutable_bitField0_ = 0;
-      org.nd4j.shade.protobuf.UnknownFieldSet.Builder unknownFields =
-          org.nd4j.shade.protobuf.UnknownFieldSet.newBuilder();
-      try {
-        boolean done = false;
-        while (!done) {
-          int tag = input.readTag();
-          switch (tag) {
-            case 0:
-              done = true;
-              break;
-            case 10: {
-              if (!((mutable_bitField0_ & 0x00000001) != 0)) {
-                mappings_ = new java.util.ArrayList<org.nd4j.ir.MapperNamespace.MapperDeclaration>();
-                mutable_bitField0_ |= 0x00000001;
-              }
-              mappings_.add(
-                  input.readMessage(org.nd4j.ir.MapperNamespace.MapperDeclaration.parser(), extensionRegistry));
-              break;
-            }
-            case 18: {
-              java.lang.String s = input.readStringRequireUtf8();
-              if (!((mutable_bitField0_ & 0x00000002) != 0)) {
-                name_ = new org.nd4j.shade.protobuf.LazyStringArrayList();
-                mutable_bitField0_ |= 0x00000002;
-              }
-              name_.add(s);
-              break;
-            }
-            default: {
-              if (!parseUnknownField(
-                  input, unknownFields, extensionRegistry, tag)) {
-                done = true;
-              }
-              break;
-            }
-          }
-        }
-      } catch (org.nd4j.shade.protobuf.InvalidProtocolBufferException e) {
-        throw e.setUnfinishedMessage(this);
-      } catch (java.io.IOException e) {
-        throw new org.nd4j.shade.protobuf.InvalidProtocolBufferException(
-            e).setUnfinishedMessage(this);
-      } finally {
-        if (((mutable_bitField0_ & 0x00000001) != 0)) {
-          mappings_ = java.util.Collections.unmodifiableList(mappings_);
-        }
-        if (((mutable_bitField0_ & 0x00000002) != 0)) {
-          name_ = name_.getUnmodifiableView();
-        }
-        this.unknownFields = unknownFields.build();
-        makeExtensionsImmutable();
-      }
-    }
     public static final org.nd4j.shade.protobuf.Descriptors.Descriptor
         getDescriptor() {
       return org.nd4j.ir.MapperNamespace.internal_static_org_nd4j_ir_MappingDefinitionSet_descriptor;
@@ -5634,12 +5950,14 @@ public final class MapperNamespace {
     /**
      * <code>repeated .org.nd4j.ir.MapperDeclaration mappings = 1;</code>
      */
+    @java.lang.Override
     public java.util.List<org.nd4j.ir.MapperNamespace.MapperDeclaration> getMappingsList() {
       return mappings_;
     }
     /**
      * <code>repeated .org.nd4j.ir.MapperDeclaration mappings = 1;</code>
      */
+    @java.lang.Override
     public java.util.List<? extends org.nd4j.ir.MapperNamespace.MapperDeclarationOrBuilder> 
         getMappingsOrBuilderList() {
       return mappings_;
@@ -5647,18 +5965,21 @@ public final class MapperNamespace {
     /**
      * <code>repeated .org.nd4j.ir.MapperDeclaration mappings = 1;</code>
      */
+    @java.lang.Override
     public int getMappingsCount() {
       return mappings_.size();
     }
     /**
      * <code>repeated .org.nd4j.ir.MapperDeclaration mappings = 1;</code>
      */
+    @java.lang.Override
     public org.nd4j.ir.MapperNamespace.MapperDeclaration getMappings(int index) {
       return mappings_.get(index);
     }
     /**
      * <code>repeated .org.nd4j.ir.MapperDeclaration mappings = 1;</code>
      */
+    @java.lang.Override
     public org.nd4j.ir.MapperNamespace.MapperDeclarationOrBuilder getMappingsOrBuilder(
         int index) {
       return mappings_.get(index);
@@ -5668,6 +5989,7 @@ public final class MapperNamespace {
     private org.nd4j.shade.protobuf.LazyStringList name_;
     /**
      * <code>repeated string name = 2;</code>
+     * @return A list containing the name.
      */
     public org.nd4j.shade.protobuf.ProtocolStringList
         getNameList() {
@@ -5675,18 +5997,23 @@ public final class MapperNamespace {
     }
     /**
      * <code>repeated string name = 2;</code>
+     * @return The count of name.
      */
     public int getNameCount() {
       return name_.size();
     }
     /**
      * <code>repeated string name = 2;</code>
+     * @param index The index of the element to return.
+     * @return The name at the given index.
      */
     public java.lang.String getName(int index) {
       return name_.get(index);
     }
     /**
      * <code>repeated string name = 2;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the name at the given index.
      */
     public org.nd4j.shade.protobuf.ByteString
         getNameBytes(int index) {
@@ -5713,7 +6040,7 @@ public final class MapperNamespace {
       for (int i = 0; i < name_.size(); i++) {
         org.nd4j.shade.protobuf.GeneratedMessageV3.writeString(output, 2, name_.getRaw(i));
       }
-      unknownFields.writeTo(output);
+      getUnknownFields().writeTo(output);
     }
 
     @java.lang.Override
@@ -5734,7 +6061,7 @@ public final class MapperNamespace {
         size += dataSize;
         size += 1 * getNameList().size();
       }
-      size += unknownFields.getSerializedSize();
+      size += getUnknownFields().getSerializedSize();
       memoizedSize = size;
       return size;
     }
@@ -5753,7 +6080,7 @@ public final class MapperNamespace {
           .equals(other.getMappingsList())) return false;
       if (!getNameList()
           .equals(other.getNameList())) return false;
-      if (!unknownFields.equals(other.unknownFields)) return false;
+      if (!getUnknownFields().equals(other.getUnknownFields())) return false;
       return true;
     }
 
@@ -5772,7 +6099,7 @@ public final class MapperNamespace {
         hash = (37 * hash) + NAME_FIELD_NUMBER;
         hash = (53 * hash) + getNameList().hashCode();
       }
-      hash = (29 * hash) + unknownFields.hashCode();
+      hash = (29 * hash) + getUnknownFields().hashCode();
       memoizedHashCode = hash;
       return hash;
     }
@@ -5889,29 +6216,24 @@ public final class MapperNamespace {
 
       // Construct using org.nd4j.ir.MapperNamespace.MappingDefinitionSet.newBuilder()
       private Builder() {
-        maybeForceBuilderInitialization();
+
       }
 
       private Builder(
           org.nd4j.shade.protobuf.GeneratedMessageV3.BuilderParent parent) {
         super(parent);
-        maybeForceBuilderInitialization();
-      }
-      private void maybeForceBuilderInitialization() {
-        if (org.nd4j.shade.protobuf.GeneratedMessageV3
-                .alwaysUseFieldBuilders) {
-          getMappingsFieldBuilder();
-        }
+
       }
       @java.lang.Override
       public Builder clear() {
         super.clear();
         if (mappingsBuilder_ == null) {
           mappings_ = java.util.Collections.emptyList();
-          bitField0_ = (bitField0_ & ~0x00000001);
         } else {
+          mappings_ = null;
           mappingsBuilder_.clear();
         }
+        bitField0_ = (bitField0_ & ~0x00000001);
         name_ = org.nd4j.shade.protobuf.LazyStringArrayList.EMPTY;
         bitField0_ = (bitField0_ & ~0x00000002);
         return this;
@@ -6039,7 +6361,7 @@ public final class MapperNamespace {
           }
           onChanged();
         }
-        this.mergeUnknownFields(other.unknownFields);
+        this.mergeUnknownFields(other.getUnknownFields());
         onChanged();
         return this;
       }
@@ -6054,17 +6376,49 @@ public final class MapperNamespace {
           org.nd4j.shade.protobuf.CodedInputStream input,
           org.nd4j.shade.protobuf.ExtensionRegistryLite extensionRegistry)
           throws java.io.IOException {
-        org.nd4j.ir.MapperNamespace.MappingDefinitionSet parsedMessage = null;
+        if (extensionRegistry == null) {
+          throw new java.lang.NullPointerException();
+        }
         try {
-          parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
+          boolean done = false;
+          while (!done) {
+            int tag = input.readTag();
+            switch (tag) {
+              case 0:
+                done = true;
+                break;
+              case 10: {
+                org.nd4j.ir.MapperNamespace.MapperDeclaration m =
+                    input.readMessage(
+                        org.nd4j.ir.MapperNamespace.MapperDeclaration.parser(),
+                        extensionRegistry);
+                if (mappingsBuilder_ == null) {
+                  ensureMappingsIsMutable();
+                  mappings_.add(m);
+                } else {
+                  mappingsBuilder_.addMessage(m);
+                }
+                break;
+              } // case 10
+              case 18: {
+                java.lang.String s = input.readStringRequireUtf8();
+                ensureNameIsMutable();
+                name_.add(s);
+                break;
+              } // case 18
+              default: {
+                if (!super.parseUnknownField(input, extensionRegistry, tag)) {
+                  done = true; // was an endgroup tag
+                }
+                break;
+              } // default:
+            } // switch (tag)
+          } // while (!done)
         } catch (org.nd4j.shade.protobuf.InvalidProtocolBufferException e) {
-          parsedMessage = (org.nd4j.ir.MapperNamespace.MappingDefinitionSet) e.getUnfinishedMessage();
           throw e.unwrapIOException();
         } finally {
-          if (parsedMessage != null) {
-            mergeFrom(parsedMessage);
-          }
-        }
+          onChanged();
+        } // finally
         return this;
       }
       private int bitField0_;
@@ -6318,6 +6672,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string name = 2;</code>
+       * @return A list containing the name.
        */
       public org.nd4j.shade.protobuf.ProtocolStringList
           getNameList() {
@@ -6325,18 +6680,23 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string name = 2;</code>
+       * @return The count of name.
        */
       public int getNameCount() {
         return name_.size();
       }
       /**
        * <code>repeated string name = 2;</code>
+       * @param index The index of the element to return.
+       * @return The name at the given index.
        */
       public java.lang.String getName(int index) {
         return name_.get(index);
       }
       /**
        * <code>repeated string name = 2;</code>
+       * @param index The index of the value to return.
+       * @return The bytes of the name at the given index.
        */
       public org.nd4j.shade.protobuf.ByteString
           getNameBytes(int index) {
@@ -6344,6 +6704,9 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string name = 2;</code>
+       * @param index The index to set the value at.
+       * @param value The name to set.
+       * @return This builder for chaining.
        */
       public Builder setName(
           int index, java.lang.String value) {
@@ -6357,6 +6720,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string name = 2;</code>
+       * @param value The name to add.
+       * @return This builder for chaining.
        */
       public Builder addName(
           java.lang.String value) {
@@ -6370,6 +6735,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string name = 2;</code>
+       * @param values The name to add.
+       * @return This builder for chaining.
        */
       public Builder addAllName(
           java.lang.Iterable<java.lang.String> values) {
@@ -6381,6 +6748,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string name = 2;</code>
+       * @return This builder for chaining.
        */
       public Builder clearName() {
         name_ = org.nd4j.shade.protobuf.LazyStringArrayList.EMPTY;
@@ -6390,6 +6758,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>repeated string name = 2;</code>
+       * @param value The bytes of the name to add.
+       * @return This builder for chaining.
        */
       public Builder addNameBytes(
           org.nd4j.shade.protobuf.ByteString value) {
@@ -6435,7 +6805,18 @@ public final class MapperNamespace {
           org.nd4j.shade.protobuf.CodedInputStream input,
           org.nd4j.shade.protobuf.ExtensionRegistryLite extensionRegistry)
           throws org.nd4j.shade.protobuf.InvalidProtocolBufferException {
-        return new MappingDefinitionSet(input, extensionRegistry);
+        Builder builder = newBuilder();
+        try {
+          builder.mergeFrom(input, extensionRegistry);
+        } catch (org.nd4j.shade.protobuf.InvalidProtocolBufferException e) {
+          throw e.setUnfinishedMessage(builder.buildPartial());
+        } catch (org.nd4j.shade.protobuf.UninitializedMessageException e) {
+          throw e.asInvalidProtocolBufferException().setUnfinishedMessage(builder.buildPartial());
+        } catch (java.io.IOException e) {
+          throw new org.nd4j.shade.protobuf.InvalidProtocolBufferException(e)
+              .setUnfinishedMessage(builder.buildPartial());
+        }
+        return builder.buildPartial();
       }
     };
 
@@ -6461,30 +6842,36 @@ public final class MapperNamespace {
 
     /**
      * <code>string frameworkName = 1;</code>
+     * @return The frameworkName.
      */
     java.lang.String getFrameworkName();
     /**
      * <code>string frameworkName = 1;</code>
+     * @return The bytes for frameworkName.
      */
     org.nd4j.shade.protobuf.ByteString
         getFrameworkNameBytes();
 
     /**
      * <code>string opName = 2;</code>
+     * @return The opName.
      */
     java.lang.String getOpName();
     /**
      * <code>string opName = 2;</code>
+     * @return The bytes for opName.
      */
     org.nd4j.shade.protobuf.ByteString
         getOpNameBytes();
 
     /**
      * <code>string inputFrameworkOpName = 3;</code>
+     * @return The inputFrameworkOpName.
      */
     java.lang.String getInputFrameworkOpName();
     /**
      * <code>string inputFrameworkOpName = 3;</code>
+     * @return The bytes for inputFrameworkOpName.
      */
     org.nd4j.shade.protobuf.ByteString
         getInputFrameworkOpNameBytes();
@@ -6569,17 +6956,19 @@ public final class MapperNamespace {
 
     /**
      * <code>.org.nd4j.ir.VariableResolutionType variableResolutionType = 6;</code>
+     * @return The enum numeric value on the wire for variableResolutionType.
      */
     int getVariableResolutionTypeValue();
     /**
      * <code>.org.nd4j.ir.VariableResolutionType variableResolutionType = 6;</code>
+     * @return The variableResolutionType.
      */
     org.nd4j.ir.MapperNamespace.VariableResolutionType getVariableResolutionType();
   }
   /**
    * Protobuf type {@code org.nd4j.ir.MapperDeclaration}
    */
-  public  static final class MapperDeclaration extends
+  public static final class MapperDeclaration extends
       org.nd4j.shade.protobuf.GeneratedMessageV3 implements
       // @@protoc_insertion_point(message_implements:org.nd4j.ir.MapperDeclaration)
       MapperDeclarationOrBuilder {
@@ -6607,93 +6996,6 @@ public final class MapperNamespace {
     public final org.nd4j.shade.protobuf.UnknownFieldSet
     getUnknownFields() {
       return this.unknownFields;
-    }
-    private MapperDeclaration(
-        org.nd4j.shade.protobuf.CodedInputStream input,
-        org.nd4j.shade.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws org.nd4j.shade.protobuf.InvalidProtocolBufferException {
-      this();
-      if (extensionRegistry == null) {
-        throw new java.lang.NullPointerException();
-      }
-      int mutable_bitField0_ = 0;
-      org.nd4j.shade.protobuf.UnknownFieldSet.Builder unknownFields =
-          org.nd4j.shade.protobuf.UnknownFieldSet.newBuilder();
-      try {
-        boolean done = false;
-        while (!done) {
-          int tag = input.readTag();
-          switch (tag) {
-            case 0:
-              done = true;
-              break;
-            case 10: {
-              java.lang.String s = input.readStringRequireUtf8();
-
-              frameworkName_ = s;
-              break;
-            }
-            case 18: {
-              java.lang.String s = input.readStringRequireUtf8();
-
-              opName_ = s;
-              break;
-            }
-            case 26: {
-              java.lang.String s = input.readStringRequireUtf8();
-
-              inputFrameworkOpName_ = s;
-              break;
-            }
-            case 34: {
-              if (!((mutable_bitField0_ & 0x00000001) != 0)) {
-                rule_ = new java.util.ArrayList<org.nd4j.ir.MapperNamespace.MappingRule>();
-                mutable_bitField0_ |= 0x00000001;
-              }
-              rule_.add(
-                  input.readMessage(org.nd4j.ir.MapperNamespace.MappingRule.parser(), extensionRegistry));
-              break;
-            }
-            case 42: {
-              if (!((mutable_bitField0_ & 0x00000002) != 0)) {
-                indexOverrides_ = org.nd4j.shade.protobuf.MapField.newMapField(
-                    IndexOverridesDefaultEntryHolder.defaultEntry);
-                mutable_bitField0_ |= 0x00000002;
-              }
-              org.nd4j.shade.protobuf.MapEntry<java.lang.Long, java.lang.Long>
-              indexOverrides__ = input.readMessage(
-                  IndexOverridesDefaultEntryHolder.defaultEntry.getParserForType(), extensionRegistry);
-              indexOverrides_.getMutableMap().put(
-                  indexOverrides__.getKey(), indexOverrides__.getValue());
-              break;
-            }
-            case 48: {
-              int rawValue = input.readEnum();
-
-              variableResolutionType_ = rawValue;
-              break;
-            }
-            default: {
-              if (!parseUnknownField(
-                  input, unknownFields, extensionRegistry, tag)) {
-                done = true;
-              }
-              break;
-            }
-          }
-        }
-      } catch (org.nd4j.shade.protobuf.InvalidProtocolBufferException e) {
-        throw e.setUnfinishedMessage(this);
-      } catch (java.io.IOException e) {
-        throw new org.nd4j.shade.protobuf.InvalidProtocolBufferException(
-            e).setUnfinishedMessage(this);
-      } finally {
-        if (((mutable_bitField0_ & 0x00000001) != 0)) {
-          rule_ = java.util.Collections.unmodifiableList(rule_);
-        }
-        this.unknownFields = unknownFields.build();
-        makeExtensionsImmutable();
-      }
     }
     public static final org.nd4j.shade.protobuf.Descriptors.Descriptor
         getDescriptor() {
@@ -6724,7 +7026,9 @@ public final class MapperNamespace {
     private volatile java.lang.Object frameworkName_;
     /**
      * <code>string frameworkName = 1;</code>
+     * @return The frameworkName.
      */
+    @java.lang.Override
     public java.lang.String getFrameworkName() {
       java.lang.Object ref = frameworkName_;
       if (ref instanceof java.lang.String) {
@@ -6739,7 +7043,9 @@ public final class MapperNamespace {
     }
     /**
      * <code>string frameworkName = 1;</code>
+     * @return The bytes for frameworkName.
      */
+    @java.lang.Override
     public org.nd4j.shade.protobuf.ByteString
         getFrameworkNameBytes() {
       java.lang.Object ref = frameworkName_;
@@ -6758,7 +7064,9 @@ public final class MapperNamespace {
     private volatile java.lang.Object opName_;
     /**
      * <code>string opName = 2;</code>
+     * @return The opName.
      */
+    @java.lang.Override
     public java.lang.String getOpName() {
       java.lang.Object ref = opName_;
       if (ref instanceof java.lang.String) {
@@ -6773,7 +7081,9 @@ public final class MapperNamespace {
     }
     /**
      * <code>string opName = 2;</code>
+     * @return The bytes for opName.
      */
+    @java.lang.Override
     public org.nd4j.shade.protobuf.ByteString
         getOpNameBytes() {
       java.lang.Object ref = opName_;
@@ -6792,7 +7102,9 @@ public final class MapperNamespace {
     private volatile java.lang.Object inputFrameworkOpName_;
     /**
      * <code>string inputFrameworkOpName = 3;</code>
+     * @return The inputFrameworkOpName.
      */
+    @java.lang.Override
     public java.lang.String getInputFrameworkOpName() {
       java.lang.Object ref = inputFrameworkOpName_;
       if (ref instanceof java.lang.String) {
@@ -6807,7 +7119,9 @@ public final class MapperNamespace {
     }
     /**
      * <code>string inputFrameworkOpName = 3;</code>
+     * @return The bytes for inputFrameworkOpName.
      */
+    @java.lang.Override
     public org.nd4j.shade.protobuf.ByteString
         getInputFrameworkOpNameBytes() {
       java.lang.Object ref = inputFrameworkOpName_;
@@ -6831,6 +7145,7 @@ public final class MapperNamespace {
      *
      * <code>repeated .org.nd4j.ir.MappingRule rule = 4;</code>
      */
+    @java.lang.Override
     public java.util.List<org.nd4j.ir.MapperNamespace.MappingRule> getRuleList() {
       return rule_;
     }
@@ -6841,6 +7156,7 @@ public final class MapperNamespace {
      *
      * <code>repeated .org.nd4j.ir.MappingRule rule = 4;</code>
      */
+    @java.lang.Override
     public java.util.List<? extends org.nd4j.ir.MapperNamespace.MappingRuleOrBuilder> 
         getRuleOrBuilderList() {
       return rule_;
@@ -6852,6 +7168,7 @@ public final class MapperNamespace {
      *
      * <code>repeated .org.nd4j.ir.MappingRule rule = 4;</code>
      */
+    @java.lang.Override
     public int getRuleCount() {
       return rule_.size();
     }
@@ -6862,6 +7179,7 @@ public final class MapperNamespace {
      *
      * <code>repeated .org.nd4j.ir.MappingRule rule = 4;</code>
      */
+    @java.lang.Override
     public org.nd4j.ir.MapperNamespace.MappingRule getRule(int index) {
       return rule_.get(index);
     }
@@ -6872,6 +7190,7 @@ public final class MapperNamespace {
      *
      * <code>repeated .org.nd4j.ir.MappingRule rule = 4;</code>
      */
+    @java.lang.Override
     public org.nd4j.ir.MapperNamespace.MappingRuleOrBuilder getRuleOrBuilder(
         int index) {
       return rule_.get(index);
@@ -6907,6 +7226,7 @@ public final class MapperNamespace {
      * <code>map&lt;int64, int64&gt; indexOverrides = 5;</code>
      */
 
+    @java.lang.Override
     public boolean containsIndexOverrides(
         long key) {
       
@@ -6915,6 +7235,7 @@ public final class MapperNamespace {
     /**
      * Use {@link #getIndexOverridesMap()} instead.
      */
+    @java.lang.Override
     @java.lang.Deprecated
     public java.util.Map<java.lang.Long, java.lang.Long> getIndexOverrides() {
       return getIndexOverridesMap();
@@ -6922,6 +7243,7 @@ public final class MapperNamespace {
     /**
      * <code>map&lt;int64, int64&gt; indexOverrides = 5;</code>
      */
+    @java.lang.Override
 
     public java.util.Map<java.lang.Long, java.lang.Long> getIndexOverridesMap() {
       return internalGetIndexOverrides().getMap();
@@ -6929,6 +7251,7 @@ public final class MapperNamespace {
     /**
      * <code>map&lt;int64, int64&gt; indexOverrides = 5;</code>
      */
+    @java.lang.Override
 
     public long getIndexOverridesOrDefault(
         long key,
@@ -6941,6 +7264,7 @@ public final class MapperNamespace {
     /**
      * <code>map&lt;int64, int64&gt; indexOverrides = 5;</code>
      */
+    @java.lang.Override
 
     public long getIndexOverridesOrThrow(
         long key) {
@@ -6957,14 +7281,16 @@ public final class MapperNamespace {
     private int variableResolutionType_;
     /**
      * <code>.org.nd4j.ir.VariableResolutionType variableResolutionType = 6;</code>
+     * @return The enum numeric value on the wire for variableResolutionType.
      */
-    public int getVariableResolutionTypeValue() {
+    @java.lang.Override public int getVariableResolutionTypeValue() {
       return variableResolutionType_;
     }
     /**
      * <code>.org.nd4j.ir.VariableResolutionType variableResolutionType = 6;</code>
+     * @return The variableResolutionType.
      */
-    public org.nd4j.ir.MapperNamespace.VariableResolutionType getVariableResolutionType() {
+    @java.lang.Override public org.nd4j.ir.MapperNamespace.VariableResolutionType getVariableResolutionType() {
       @SuppressWarnings("deprecation")
       org.nd4j.ir.MapperNamespace.VariableResolutionType result = org.nd4j.ir.MapperNamespace.VariableResolutionType.valueOf(variableResolutionType_);
       return result == null ? org.nd4j.ir.MapperNamespace.VariableResolutionType.UNRECOGNIZED : result;
@@ -6984,13 +7310,13 @@ public final class MapperNamespace {
     @java.lang.Override
     public void writeTo(org.nd4j.shade.protobuf.CodedOutputStream output)
                         throws java.io.IOException {
-      if (!getFrameworkNameBytes().isEmpty()) {
+      if (!org.nd4j.shade.protobuf.GeneratedMessageV3.isStringEmpty(frameworkName_)) {
         org.nd4j.shade.protobuf.GeneratedMessageV3.writeString(output, 1, frameworkName_);
       }
-      if (!getOpNameBytes().isEmpty()) {
+      if (!org.nd4j.shade.protobuf.GeneratedMessageV3.isStringEmpty(opName_)) {
         org.nd4j.shade.protobuf.GeneratedMessageV3.writeString(output, 2, opName_);
       }
-      if (!getInputFrameworkOpNameBytes().isEmpty()) {
+      if (!org.nd4j.shade.protobuf.GeneratedMessageV3.isStringEmpty(inputFrameworkOpName_)) {
         org.nd4j.shade.protobuf.GeneratedMessageV3.writeString(output, 3, inputFrameworkOpName_);
       }
       for (int i = 0; i < rule_.size(); i++) {
@@ -7005,7 +7331,7 @@ public final class MapperNamespace {
       if (variableResolutionType_ != org.nd4j.ir.MapperNamespace.VariableResolutionType.DIRECT.getNumber()) {
         output.writeEnum(6, variableResolutionType_);
       }
-      unknownFields.writeTo(output);
+      getUnknownFields().writeTo(output);
     }
 
     @java.lang.Override
@@ -7014,13 +7340,13 @@ public final class MapperNamespace {
       if (size != -1) return size;
 
       size = 0;
-      if (!getFrameworkNameBytes().isEmpty()) {
+      if (!org.nd4j.shade.protobuf.GeneratedMessageV3.isStringEmpty(frameworkName_)) {
         size += org.nd4j.shade.protobuf.GeneratedMessageV3.computeStringSize(1, frameworkName_);
       }
-      if (!getOpNameBytes().isEmpty()) {
+      if (!org.nd4j.shade.protobuf.GeneratedMessageV3.isStringEmpty(opName_)) {
         size += org.nd4j.shade.protobuf.GeneratedMessageV3.computeStringSize(2, opName_);
       }
-      if (!getInputFrameworkOpNameBytes().isEmpty()) {
+      if (!org.nd4j.shade.protobuf.GeneratedMessageV3.isStringEmpty(inputFrameworkOpName_)) {
         size += org.nd4j.shade.protobuf.GeneratedMessageV3.computeStringSize(3, inputFrameworkOpName_);
       }
       for (int i = 0; i < rule_.size(); i++) {
@@ -7041,7 +7367,7 @@ public final class MapperNamespace {
         size += org.nd4j.shade.protobuf.CodedOutputStream
           .computeEnumSize(6, variableResolutionType_);
       }
-      size += unknownFields.getSerializedSize();
+      size += getUnknownFields().getSerializedSize();
       memoizedSize = size;
       return size;
     }
@@ -7067,7 +7393,7 @@ public final class MapperNamespace {
       if (!internalGetIndexOverrides().equals(
           other.internalGetIndexOverrides())) return false;
       if (variableResolutionType_ != other.variableResolutionType_) return false;
-      if (!unknownFields.equals(other.unknownFields)) return false;
+      if (!getUnknownFields().equals(other.getUnknownFields())) return false;
       return true;
     }
 
@@ -7094,7 +7420,7 @@ public final class MapperNamespace {
       }
       hash = (37 * hash) + VARIABLERESOLUTIONTYPE_FIELD_NUMBER;
       hash = (53 * hash) + variableResolutionType_;
-      hash = (29 * hash) + unknownFields.hashCode();
+      hash = (29 * hash) + getUnknownFields().hashCode();
       memoizedHashCode = hash;
       return hash;
     }
@@ -7233,19 +7559,13 @@ public final class MapperNamespace {
 
       // Construct using org.nd4j.ir.MapperNamespace.MapperDeclaration.newBuilder()
       private Builder() {
-        maybeForceBuilderInitialization();
+
       }
 
       private Builder(
           org.nd4j.shade.protobuf.GeneratedMessageV3.BuilderParent parent) {
         super(parent);
-        maybeForceBuilderInitialization();
-      }
-      private void maybeForceBuilderInitialization() {
-        if (org.nd4j.shade.protobuf.GeneratedMessageV3
-                .alwaysUseFieldBuilders) {
-          getRuleFieldBuilder();
-        }
+
       }
       @java.lang.Override
       public Builder clear() {
@@ -7258,10 +7578,11 @@ public final class MapperNamespace {
 
         if (ruleBuilder_ == null) {
           rule_ = java.util.Collections.emptyList();
-          bitField0_ = (bitField0_ & ~0x00000001);
         } else {
+          rule_ = null;
           ruleBuilder_.clear();
         }
+        bitField0_ = (bitField0_ & ~0x00000001);
         internalGetMutableIndexOverrides().clear();
         variableResolutionType_ = 0;
 
@@ -7398,7 +7719,7 @@ public final class MapperNamespace {
         if (other.variableResolutionType_ != 0) {
           setVariableResolutionTypeValue(other.getVariableResolutionTypeValue());
         }
-        this.mergeUnknownFields(other.unknownFields);
+        this.mergeUnknownFields(other.getUnknownFields());
         onChanged();
         return this;
       }
@@ -7413,17 +7734,71 @@ public final class MapperNamespace {
           org.nd4j.shade.protobuf.CodedInputStream input,
           org.nd4j.shade.protobuf.ExtensionRegistryLite extensionRegistry)
           throws java.io.IOException {
-        org.nd4j.ir.MapperNamespace.MapperDeclaration parsedMessage = null;
+        if (extensionRegistry == null) {
+          throw new java.lang.NullPointerException();
+        }
         try {
-          parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
+          boolean done = false;
+          while (!done) {
+            int tag = input.readTag();
+            switch (tag) {
+              case 0:
+                done = true;
+                break;
+              case 10: {
+                frameworkName_ = input.readStringRequireUtf8();
+
+                break;
+              } // case 10
+              case 18: {
+                opName_ = input.readStringRequireUtf8();
+
+                break;
+              } // case 18
+              case 26: {
+                inputFrameworkOpName_ = input.readStringRequireUtf8();
+
+                break;
+              } // case 26
+              case 34: {
+                org.nd4j.ir.MapperNamespace.MappingRule m =
+                    input.readMessage(
+                        org.nd4j.ir.MapperNamespace.MappingRule.parser(),
+                        extensionRegistry);
+                if (ruleBuilder_ == null) {
+                  ensureRuleIsMutable();
+                  rule_.add(m);
+                } else {
+                  ruleBuilder_.addMessage(m);
+                }
+                break;
+              } // case 34
+              case 42: {
+                org.nd4j.shade.protobuf.MapEntry<java.lang.Long, java.lang.Long>
+                indexOverrides__ = input.readMessage(
+                    IndexOverridesDefaultEntryHolder.defaultEntry.getParserForType(), extensionRegistry);
+                internalGetMutableIndexOverrides().getMutableMap().put(
+                    indexOverrides__.getKey(), indexOverrides__.getValue());
+                break;
+              } // case 42
+              case 48: {
+                variableResolutionType_ = input.readEnum();
+
+                break;
+              } // case 48
+              default: {
+                if (!super.parseUnknownField(input, extensionRegistry, tag)) {
+                  done = true; // was an endgroup tag
+                }
+                break;
+              } // default:
+            } // switch (tag)
+          } // while (!done)
         } catch (org.nd4j.shade.protobuf.InvalidProtocolBufferException e) {
-          parsedMessage = (org.nd4j.ir.MapperNamespace.MapperDeclaration) e.getUnfinishedMessage();
           throw e.unwrapIOException();
         } finally {
-          if (parsedMessage != null) {
-            mergeFrom(parsedMessage);
-          }
-        }
+          onChanged();
+        } // finally
         return this;
       }
       private int bitField0_;
@@ -7431,6 +7806,7 @@ public final class MapperNamespace {
       private java.lang.Object frameworkName_ = "";
       /**
        * <code>string frameworkName = 1;</code>
+       * @return The frameworkName.
        */
       public java.lang.String getFrameworkName() {
         java.lang.Object ref = frameworkName_;
@@ -7446,6 +7822,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>string frameworkName = 1;</code>
+       * @return The bytes for frameworkName.
        */
       public org.nd4j.shade.protobuf.ByteString
           getFrameworkNameBytes() {
@@ -7462,6 +7839,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>string frameworkName = 1;</code>
+       * @param value The frameworkName to set.
+       * @return This builder for chaining.
        */
       public Builder setFrameworkName(
           java.lang.String value) {
@@ -7475,6 +7854,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>string frameworkName = 1;</code>
+       * @return This builder for chaining.
        */
       public Builder clearFrameworkName() {
         
@@ -7484,6 +7864,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>string frameworkName = 1;</code>
+       * @param value The bytes for frameworkName to set.
+       * @return This builder for chaining.
        */
       public Builder setFrameworkNameBytes(
           org.nd4j.shade.protobuf.ByteString value) {
@@ -7500,6 +7882,7 @@ public final class MapperNamespace {
       private java.lang.Object opName_ = "";
       /**
        * <code>string opName = 2;</code>
+       * @return The opName.
        */
       public java.lang.String getOpName() {
         java.lang.Object ref = opName_;
@@ -7515,6 +7898,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>string opName = 2;</code>
+       * @return The bytes for opName.
        */
       public org.nd4j.shade.protobuf.ByteString
           getOpNameBytes() {
@@ -7531,6 +7915,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>string opName = 2;</code>
+       * @param value The opName to set.
+       * @return This builder for chaining.
        */
       public Builder setOpName(
           java.lang.String value) {
@@ -7544,6 +7930,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>string opName = 2;</code>
+       * @return This builder for chaining.
        */
       public Builder clearOpName() {
         
@@ -7553,6 +7940,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>string opName = 2;</code>
+       * @param value The bytes for opName to set.
+       * @return This builder for chaining.
        */
       public Builder setOpNameBytes(
           org.nd4j.shade.protobuf.ByteString value) {
@@ -7569,6 +7958,7 @@ public final class MapperNamespace {
       private java.lang.Object inputFrameworkOpName_ = "";
       /**
        * <code>string inputFrameworkOpName = 3;</code>
+       * @return The inputFrameworkOpName.
        */
       public java.lang.String getInputFrameworkOpName() {
         java.lang.Object ref = inputFrameworkOpName_;
@@ -7584,6 +7974,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>string inputFrameworkOpName = 3;</code>
+       * @return The bytes for inputFrameworkOpName.
        */
       public org.nd4j.shade.protobuf.ByteString
           getInputFrameworkOpNameBytes() {
@@ -7600,6 +7991,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>string inputFrameworkOpName = 3;</code>
+       * @param value The inputFrameworkOpName to set.
+       * @return This builder for chaining.
        */
       public Builder setInputFrameworkOpName(
           java.lang.String value) {
@@ -7613,6 +8006,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>string inputFrameworkOpName = 3;</code>
+       * @return This builder for chaining.
        */
       public Builder clearInputFrameworkOpName() {
         
@@ -7622,6 +8016,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>string inputFrameworkOpName = 3;</code>
+       * @param value The bytes for inputFrameworkOpName to set.
+       * @return This builder for chaining.
        */
       public Builder setInputFrameworkOpNameBytes(
           org.nd4j.shade.protobuf.ByteString value) {
@@ -7977,6 +8373,7 @@ public final class MapperNamespace {
        * <code>map&lt;int64, int64&gt; indexOverrides = 5;</code>
        */
 
+      @java.lang.Override
       public boolean containsIndexOverrides(
           long key) {
         
@@ -7985,6 +8382,7 @@ public final class MapperNamespace {
       /**
        * Use {@link #getIndexOverridesMap()} instead.
        */
+      @java.lang.Override
       @java.lang.Deprecated
       public java.util.Map<java.lang.Long, java.lang.Long> getIndexOverrides() {
         return getIndexOverridesMap();
@@ -7992,6 +8390,7 @@ public final class MapperNamespace {
       /**
        * <code>map&lt;int64, int64&gt; indexOverrides = 5;</code>
        */
+      @java.lang.Override
 
       public java.util.Map<java.lang.Long, java.lang.Long> getIndexOverridesMap() {
         return internalGetIndexOverrides().getMap();
@@ -7999,6 +8398,7 @@ public final class MapperNamespace {
       /**
        * <code>map&lt;int64, int64&gt; indexOverrides = 5;</code>
        */
+      @java.lang.Override
 
       public long getIndexOverridesOrDefault(
           long key,
@@ -8011,6 +8411,7 @@ public final class MapperNamespace {
       /**
        * <code>map&lt;int64, int64&gt; indexOverrides = 5;</code>
        */
+      @java.lang.Override
 
       public long getIndexOverridesOrThrow(
           long key) {
@@ -8073,21 +8474,27 @@ public final class MapperNamespace {
       private int variableResolutionType_ = 0;
       /**
        * <code>.org.nd4j.ir.VariableResolutionType variableResolutionType = 6;</code>
+       * @return The enum numeric value on the wire for variableResolutionType.
        */
-      public int getVariableResolutionTypeValue() {
+      @java.lang.Override public int getVariableResolutionTypeValue() {
         return variableResolutionType_;
       }
       /**
        * <code>.org.nd4j.ir.VariableResolutionType variableResolutionType = 6;</code>
+       * @param value The enum numeric value on the wire for variableResolutionType to set.
+       * @return This builder for chaining.
        */
       public Builder setVariableResolutionTypeValue(int value) {
+        
         variableResolutionType_ = value;
         onChanged();
         return this;
       }
       /**
        * <code>.org.nd4j.ir.VariableResolutionType variableResolutionType = 6;</code>
+       * @return The variableResolutionType.
        */
+      @java.lang.Override
       public org.nd4j.ir.MapperNamespace.VariableResolutionType getVariableResolutionType() {
         @SuppressWarnings("deprecation")
         org.nd4j.ir.MapperNamespace.VariableResolutionType result = org.nd4j.ir.MapperNamespace.VariableResolutionType.valueOf(variableResolutionType_);
@@ -8095,6 +8502,8 @@ public final class MapperNamespace {
       }
       /**
        * <code>.org.nd4j.ir.VariableResolutionType variableResolutionType = 6;</code>
+       * @param value The variableResolutionType to set.
+       * @return This builder for chaining.
        */
       public Builder setVariableResolutionType(org.nd4j.ir.MapperNamespace.VariableResolutionType value) {
         if (value == null) {
@@ -8107,6 +8516,7 @@ public final class MapperNamespace {
       }
       /**
        * <code>.org.nd4j.ir.VariableResolutionType variableResolutionType = 6;</code>
+       * @return This builder for chaining.
        */
       public Builder clearVariableResolutionType() {
         
@@ -8147,7 +8557,18 @@ public final class MapperNamespace {
           org.nd4j.shade.protobuf.CodedInputStream input,
           org.nd4j.shade.protobuf.ExtensionRegistryLite extensionRegistry)
           throws org.nd4j.shade.protobuf.InvalidProtocolBufferException {
-        return new MapperDeclaration(input, extensionRegistry);
+        Builder builder = newBuilder();
+        try {
+          builder.mergeFrom(input, extensionRegistry);
+        } catch (org.nd4j.shade.protobuf.InvalidProtocolBufferException e) {
+          throw e.setUnfinishedMessage(builder.buildPartial());
+        } catch (org.nd4j.shade.protobuf.UninitializedMessageException e) {
+          throw e.asInvalidProtocolBufferException().setUnfinishedMessage(builder.buildPartial());
+        } catch (java.io.IOException e) {
+          throw new org.nd4j.shade.protobuf.InvalidProtocolBufferException(e)
+              .setUnfinishedMessage(builder.buildPartial());
+        }
+        return builder.buildPartial();
       }
     };
 

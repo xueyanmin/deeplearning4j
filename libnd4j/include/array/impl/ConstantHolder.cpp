@@ -1,7 +1,7 @@
 /**
 * Copyright (c) 2019 Konduit K.K.
  *
-/* ******************************************************************************
+ ******************************************************************************
  *
  *
  * This program and the accompanying materials are made available under the
@@ -32,7 +32,7 @@ ConstantHolder::ConstantHolder(const ConstantHolder& other) {
   _deviceId = other._deviceId;
 }
 
-bool ConstantHolder::hasBuffer(sd::DataType dataType) { return _buffers.count(dataType) > 0; }
+bool ConstantHolder::hasBuffer(DataType dataType) { return _buffers.count(dataType) > 0; }
 
 std::mutex* ConstantHolder::mutex() { return &_mutex; }
 
@@ -40,19 +40,19 @@ template <typename T>
 bool ConstantHolder::hasBuffer() {
   return hasBuffer(DataTypeUtils::fromT<T>());
 }
-BUILD_SINGLE_TEMPLATE(template SD_LIB_EXPORT bool ConstantHolder::hasBuffer, (void), SD_COMMON_TYPES);
+BUILD_SINGLE_TEMPLATE( SD_LIB_EXPORT bool ConstantHolder::hasBuffer, (void), SD_COMMON_TYPES);
 
-void ConstantHolder::addBuffer(ConstantDataBuffer& pointer, sd::DataType dataType) { _buffers[dataType] = pointer; }
+void ConstantHolder::addBuffer(ConstantDataBuffer& pointer, DataType dataType) { _buffers[dataType] = pointer; }
 
 template <typename T>
 void ConstantHolder::addBuffer(ConstantDataBuffer& pointer) {
   addBuffer(pointer, DataTypeUtils::fromT<T>());
 }
-BUILD_SINGLE_TEMPLATE(template SD_LIB_EXPORT void ConstantHolder::addBuffer, (ConstantDataBuffer & cb),
+BUILD_SINGLE_TEMPLATE( SD_LIB_EXPORT void ConstantHolder::addBuffer, (ConstantDataBuffer & cb),
                       SD_COMMON_TYPES);
 
-ConstantDataBuffer* ConstantHolder::getConstantDataBuffer(sd::DataType dataType) {
-  if (!hasBuffer(dataType)) throw std::runtime_error("Requested dataType is absent in storage");
+ConstantDataBuffer* ConstantHolder::getConstantDataBuffer(DataType dataType) {
+  if (!hasBuffer(dataType)) THROW_EXCEPTION("Requested dataType is absent in storage");
 
   return &_buffers[dataType];
 }
@@ -61,6 +61,6 @@ template <typename T>
 ConstantDataBuffer* ConstantHolder::getConstantDataBuffer() {
   return getConstantDataBuffer(DataTypeUtils::fromT<T>());
 }
-BUILD_SINGLE_TEMPLATE(template SD_LIB_EXPORT ConstantDataBuffer* ConstantHolder::getConstantDataBuffer, (),
+BUILD_SINGLE_TEMPLATE( SD_LIB_EXPORT ConstantDataBuffer* ConstantHolder::getConstantDataBuffer, (),
                       SD_COMMON_TYPES);
 }  // namespace sd

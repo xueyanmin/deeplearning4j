@@ -25,7 +25,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>org.deeplearning4j</groupId>
+        <groupId>org.eclipse.deeplearning4j</groupId>
         <artifactId>deeplearning4j-ui-parent</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
@@ -33,9 +33,19 @@
     <artifactId>deeplearning4j-vertx</artifactId>
 
     <properties>
-        <maven.compiler.source>1.8</maven.compiler.source>
-        <maven.compiler.target>1.8</maven.compiler.target>
+
+
+        <module.name>deeplearning4j.vertx</module.name>
     </properties>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.moditect</groupId>
+                <artifactId>moditect-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
 
     <dependencies>
         <dependency>
@@ -49,12 +59,12 @@
             <version>${vertx.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.deeplearning4j</groupId>
+            <groupId>org.eclipse.deeplearning4j</groupId>
             <artifactId>deeplearning4j-core</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.deeplearning4j</groupId>
+            <groupId>org.eclipse.deeplearning4j</groupId>
             <artifactId>deeplearning4j-ui-model</artifactId>
             <version>${project.version}</version>
         </dependency>
@@ -79,7 +89,7 @@
             <version>2.3.2</version>
         </dependency>
         <dependency>
-            <groupId>org.deeplearning4j</groupId>
+            <groupId>org.eclipse.deeplearning4j</groupId>
             <artifactId>deeplearning4j-common-tests</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
@@ -299,9 +309,9 @@
         </dependency>
         <!-- For SameDiff UI -->
         <dependency>
-            <groupId>org.webjars.npm</groupId>
-            <artifactId>flatbuffers</artifactId>
-            <version>1.9.0</version>
+            <groupId>org.eclipse.deeplearning4j</groupId>
+            <artifactId>nd4j-webjar</artifactId>
+            <version>${project.version}</version>
         </dependency>
     </dependencies>
 
@@ -424,15 +434,4 @@
         </dependencies>
     </dependencyManagement>
 
-    <profiles>
-        <profile>
-            <id>nd4j-tests-cpu</id>
-        </profile>
-        <profile>
-            <id>nd4j-tests-cuda</id>
-        </profile>
-  <profile>
-            <id>nd4j-tests-aurora</id>
-        </profile>
-    </profiles>
 </project>

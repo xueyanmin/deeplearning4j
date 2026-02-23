@@ -26,7 +26,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>org.deeplearning4j</groupId>
+        <groupId>org.eclipse.deeplearning4j</groupId>
         <artifactId>deeplearning4j-data</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
@@ -36,33 +36,36 @@
 
     <name>deeplearning4j-datasets</name>
 
+    <properties>
+        <module.name>deeplearning4j.datasets</module.name>
+    </properties>
+
+    <build>
+        <plugins>
+           <plugin>
+                <groupId>org.moditect</groupId>
+                <artifactId>moditect-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
     <dependencies>
         <dependency>
-            <groupId>org.datavec</groupId>
+            <groupId>org.eclipse.deeplearning4j</groupId>
             <artifactId>datavec-data-image</artifactId>
             <version>${datavec.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.deeplearning4j</groupId>
+            <groupId>org.eclipse.deeplearning4j</groupId>
             <artifactId>deeplearning4j-datavec-iterators</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.deeplearning4j</groupId>
-            <artifactId>deeplearning4j-common</artifactId>
+            <groupId>org.eclipse.deeplearning4j</groupId>
+            <artifactId>resources</artifactId>
             <version>${project.version}</version>
         </dependency>
     </dependencies>
 
-    <profiles>
-        <profile>
-            <id>nd4j-tests-cpu</id>
-        </profile>
-        <profile>
-            <id>nd4j-tests-cuda</id>
-        </profile>
-  <profile>
-            <id>nd4j-tests-aurora</id>
-        </profile>
-    </profiles>
+
 </project>

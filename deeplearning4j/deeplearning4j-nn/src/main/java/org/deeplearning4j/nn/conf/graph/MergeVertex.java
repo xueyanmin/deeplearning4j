@@ -22,7 +22,6 @@ package org.deeplearning4j.nn.conf.graph;
 
 
 import lombok.Data;
-import lombok.Setter;
 import lombok.val;
 import org.deeplearning4j.nn.conf.CNN2DFormat;
 import org.deeplearning4j.nn.conf.RNNFormat;
@@ -122,12 +121,6 @@ public class MergeVertex extends GraphVertex {
                 val ow = otherConv.getWidth();
                 val oh = otherConv.getHeight();
                 val oc = otherConv.getChannels();
-
-                if (fd != od || fw != ow || fh != oh) {
-                    throw new InvalidInputTypeException("Invalid input: MergeVertex cannot merge CNN3D activations of different width/heights:" + "first [channels,width,height] = [" + fd + "," + fw + "," + fh
-                            + "], input " + i + " = [" + od + "," + ow + "," + oh + "]");
-                }
-
                 depthSum += oc;
             }
 
@@ -233,14 +226,6 @@ public class MergeVertex extends GraphVertex {
                 val od = otherConv.getChannels();
                 val ow = otherConv.getWidth();
                 val oh = otherConv.getHeight();
-
-                if (fw != ow || fh != oh) {
-                    throw new InvalidInputTypeException(
-                            "Invalid input: MergeVertex cannot merge CNN activations of different width/heights:"
-                                    + "first [channels,width,height] = [" + fd + "," + fw + "," + fh
-                                    + "], input " + i + " = [" + od + "," + ow + "," + oh + "]");
-                }
-
                 depthSum += od;
             }
 

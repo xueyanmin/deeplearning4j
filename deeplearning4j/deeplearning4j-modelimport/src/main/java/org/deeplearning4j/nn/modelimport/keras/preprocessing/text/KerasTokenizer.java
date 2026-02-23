@@ -22,6 +22,7 @@ package org.deeplearning4j.nn.modelimport.keras.preprocessing.text;
 
 import lombok.Data;
 import org.deeplearning4j.nn.modelimport.keras.exceptions.InvalidKerasConfigurationException;
+import org.deeplearning4j.nn.modelimport.keras.utils.KerasModelUtils;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.factory.Nd4j;
 
@@ -29,8 +30,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
-
-import static org.deeplearning4j.nn.modelimport.keras.utils.KerasModelUtils.parseJsonString;
 
 @Data
 public class KerasTokenizer {
@@ -105,7 +104,7 @@ public class KerasTokenizer {
      */
     public static KerasTokenizer fromJson(String jsonFileName) throws IOException, InvalidKerasConfigurationException {
         String json = new String(Files.readAllBytes(Paths.get(jsonFileName)));
-        Map<String, Object> tokenizerBaseConfig = parseJsonString(json);
+        Map<String, Object> tokenizerBaseConfig = KerasModelUtils.parseJsonString(json);
         Map<String, Object> tokenizerConfig;
         if (tokenizerBaseConfig.containsKey("config"))
             tokenizerConfig = (Map<String, Object>) tokenizerBaseConfig.get("config");
@@ -122,15 +121,15 @@ public class KerasTokenizer {
         Integer documentCount = (Integer) tokenizerConfig.get("document_count");
 
         @SuppressWarnings("unchecked")
-        Map<String, Integer> wordCounts = (Map) parseJsonString((String) tokenizerConfig.get("word_counts"));
+        Map<String, Integer> wordCounts = (Map) KerasModelUtils.parseJsonString((String) tokenizerConfig.get("word_counts"));
         @SuppressWarnings("unchecked")
-        Map<String, Integer> wordDocs = (Map) parseJsonString((String) tokenizerConfig.get("word_docs"));
+        Map<String, Integer> wordDocs = (Map) KerasModelUtils.parseJsonString((String) tokenizerConfig.get("word_docs"));
         @SuppressWarnings("unchecked")
-        Map<String, Integer> wordIndex = (Map) parseJsonString((String) tokenizerConfig.get("word_index"));
+        Map<String, Integer> wordIndex = (Map) KerasModelUtils.parseJsonString((String) tokenizerConfig.get("word_index"));
         @SuppressWarnings("unchecked")
-        Map<Integer, String> indexWord = (Map) parseJsonString((String) tokenizerConfig.get("index_word"));
+        Map<Integer, String> indexWord = (Map) KerasModelUtils.parseJsonString((String) tokenizerConfig.get("index_word"));
         @SuppressWarnings("unchecked")
-        Map<Integer, Integer> indexDocs = (Map) parseJsonString((String) tokenizerConfig.get("index_docs"));
+        Map<Integer, Integer> indexDocs = (Map) KerasModelUtils.parseJsonString((String) tokenizerConfig.get("index_docs"));
 
         KerasTokenizer tokenizer = new KerasTokenizer(numWords, filters, lower, split, charLevel, oovToken);
         tokenizer.setDocumentCount(documentCount);

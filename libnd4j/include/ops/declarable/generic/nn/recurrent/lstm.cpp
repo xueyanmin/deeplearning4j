@@ -48,14 +48,14 @@ CUSTOM_OP_IMPL(lstm, 8, 2, false, 3, 2) {
   auto c = OUTPUT_VARIABLE(1);  // cell states  [time x bS x numUnits] that is per each time step
 
   const int peephole = INT_ARG(0);  // if 1, provide peephole connections
-  const int projection =
-      INT_ARG(1);  // if 1, then projection is performed, if false then numProj==numUnits is mandatory!!!!
+  const int projection = INT_ARG(1);
+   // if 1, then projection is performed, if false then numProj==numUnits is mandatory!!!!
 
   // FIXME: double
-  const double clippingCellValue =
-      T_ARG(0);  // clipping value for ct, if it is not equal to zero, then cell state is clipped
-  const double clippingProjValue =
-      T_ARG(1);  // clipping value for projected ht, if it is not equal to zero, then projected cell output is clipped
+  const double clippingCellValue = T_ARG(0);
+   // clipping value for ct, if it is not equal to zero, then cell state is clipped
+  const double clippingProjValue =  T_ARG(1);
+   // clipping value for projected ht, if it is not equal to zero, then projected cell output is clipped
   const double forgetBias = T_ARG(2);
 
   const int rank = x->rankOf();
@@ -66,13 +66,13 @@ CUSTOM_OP_IMPL(lstm, 8, 2, false, 3, 2) {
   const int numUnits = c0->sizeAt(1);
 
   // input shapes validation
-  const std::vector<sd::LongType> correctH0Shape = {bS, numProj};
-  const std::vector<sd::LongType> correctC0Shape = {bS, numUnits};
-  const std::vector<sd::LongType> correctWxShape = {inSize, 4 * numUnits};
-  const std::vector<sd::LongType> correctWhShape = {numProj, 4 * numUnits};
-  const std::vector<sd::LongType> correctWcShape = {3 * numUnits};
-  const std::vector<sd::LongType> correctWpShape = {numUnits, numProj};
-  const std::vector<sd::LongType> correctBShape = {4 * numUnits};
+  const std::vector<LongType> correctH0Shape = {bS, numProj};
+  const std::vector<LongType> correctC0Shape = {bS, numUnits};
+  const std::vector<LongType> correctWxShape = {inSize, 4 * numUnits};
+  const std::vector<LongType> correctWhShape = {numProj, 4 * numUnits};
+  const std::vector<LongType> correctWcShape = {3 * numUnits};
+  const std::vector<LongType> correctWpShape = {numUnits, numProj};
+  const std::vector<LongType> correctBShape = {4 * numUnits};
 
   REQUIRE_TRUE(h0->isSameShape(correctH0Shape), 0,
                "LSTM operation: wrong shape of initial cell output, expected is %s, but got %s instead !",
@@ -103,10 +103,10 @@ CUSTOM_OP_IMPL(lstm, 8, 2, false, 3, 2) {
   helpers::lstmTimeLoop(block.launchContext(), x, h0, c0, Wx, Wh, Wc, Wp, b, h, c,
                         {(double)peephole, (double)projection, clippingCellValue, clippingProjValue, forgetBias});
 
-  return sd::Status::OK;
+  return Status::OK;
 }
 
-DECLARE_TYPES(lstm) { getOpDescriptor()->setAllowedInputTypes(sd::DataType::ANY)->setAllowedOutputTypes({ALL_FLOATS}); }
+DECLARE_TYPES(lstm) { getOpDescriptor()->setAllowedInputTypes(ANY)->setAllowedOutputTypes({ALL_FLOATS}); }
 
 DECLARE_SHAPE_FN(lstm) {
   auto xShapeInfo = inputShape->at(0);   // input [time x bS x inSize]
@@ -128,13 +128,13 @@ DECLARE_SHAPE_FN(lstm) {
   const int numUnits = c0ShapeInfo[2];
 
   // input shapes validation
-  const std::vector<sd::LongType> correctH0Shape = {bS, numProj};
-  const std::vector<sd::LongType> correctC0Shape = {bS, numUnits};
-  const std::vector<sd::LongType> correctWxShape = {inSize, 4 * numUnits};
-  const std::vector<sd::LongType> correctWhShape = {numProj, 4 * numUnits};
-  const std::vector<sd::LongType> correctWcShape = {3 * numUnits};
-  const std::vector<sd::LongType> correctWpShape = {numUnits, numProj};
-  const std::vector<sd::LongType> correctBShape = {4 * numUnits};
+  const std::vector<LongType> correctH0Shape = {bS, numProj};
+  const std::vector<LongType> correctC0Shape = {bS, numUnits};
+  const std::vector<LongType> correctWxShape = {inSize, 4 * numUnits};
+  const std::vector<LongType> correctWhShape = {numProj, 4 * numUnits};
+  const std::vector<LongType> correctWcShape = {3 * numUnits};
+  const std::vector<LongType> correctWpShape = {numUnits, numProj};
+  const std::vector<LongType> correctBShape = {4 * numUnits};
 
   REQUIRE_TRUE(ShapeUtils::areShapesEqual(h0ShapeInfo, correctH0Shape), 0,
                "LSTM operation: wrong shape of initial cell output, expected is %s, but got %s instead !",
@@ -160,7 +160,7 @@ DECLARE_SHAPE_FN(lstm) {
                ShapeUtils::shapeAsString(correctBShape).c_str(), ShapeUtils::shapeAsString(bShapeInfo).c_str());
 
   // evaluate output shapeInfos
-  sd::LongType *hShapeInfo(nullptr), *cShapeInfo(nullptr);
+  LongType *hShapeInfo(nullptr), *cShapeInfo(nullptr);
   ALLOCATE(hShapeInfo, block.getWorkspace(), shape::shapeInfoLength(rank), sd::LongType);  // [time x bS x numProj]
   ALLOCATE(cShapeInfo, block.getWorkspace(), shape::shapeInfoLength(rank), sd::LongType);  // [time x bS x numUnits]
 

@@ -21,7 +21,7 @@
 //
 #include <execution/Threads.h>
 #include <ops/declarable/helpers/hashcode.h>
-
+#if NOT_EXCLUDED(OP_hashcode)
 namespace sd {
 namespace ops {
 namespace helpers {
@@ -34,8 +34,8 @@ static void hashCode_(LaunchContext *context, NDArray &array, NDArray &result) {
   auto tempB = NDArrayFactory::create<sd::LongType>('c', {numBlocks / blockSize + 1}, context);
 
   auto buffer = array.bufferAsT<T>();
-  auto tempBufferA = tempA.bufferAsT<sd::LongType>();
-  auto tempBufferB = tempB.bufferAsT<sd::LongType>();
+  auto tempBufferA = tempA->bufferAsT<sd::LongType>();
+  auto tempBufferB = tempB->bufferAsT<sd::LongType>();
 
   // default buffer is the first one, because it might be the last one in case of small arrays (< blockSize)
   auto tempBuffer = tempBufferA;
@@ -69,7 +69,7 @@ static void hashCode_(LaunchContext *context, NDArray &array, NDArray &result) {
 
         sd::LongType r = 1;
         for (sd::LongType e = 0; e < blockSize && e + (b * numBlocks) < lastLength; e++) {
-          auto v = longBytes<T>(blockBuffer[e]);
+          auto v = longBytes<T>(static_cast<T>(blockBuffer[e]));
           r = 31 * r + v;
         }
 
@@ -93,6 +93,9 @@ static void hashCode_(LaunchContext *context, NDArray &array, NDArray &result) {
     result.p(0, tempBufferA[0]);
   else
     result.p(0, tempResult[0]);
+
+  delete tempA;
+  delete tempB;
 }
 
 void hashCode(LaunchContext *context, NDArray &array, NDArray &result) {
@@ -101,3 +104,4 @@ void hashCode(LaunchContext *context, NDArray &array, NDArray &result) {
 }  // namespace helpers
 }  // namespace ops
 }  // namespace sd
+#endif

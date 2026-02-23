@@ -18,7 +18,8 @@
 //
 // @author AbdelRauf
 //
-
+#include <system/op_boilerplate.h>
+#if NOT_EXCLUDED(OP_standard_deviation)
 //inform Cmake that each of LIBND4J_TYPE will be generated and used in separate cpp files.
 #cmakedefine SD_COMMON_TYPES_GEN 
 #include <ops/declarable/helpers/cpu/summaryReductions.hpp>
@@ -26,8 +27,9 @@
 namespace sd {
     namespace ops {
         namespace helpers {
-            BUILD_DOUBLE_TEMPLATE(template SD_LIB_HIDDEN void standardDeviation_, (const NDArray& input, NDArray& output, const std::vector<int>& dimensions, bool biasCorrected), SD_COMMON_TYPES_@FL_TYPE_INDEX@, SD_FLOAT_TYPES);
+            BUILD_DOUBLE_TEMPLATE( SD_LIB_HIDDEN void standardDeviation_, (NDArray& input, NDArray& output, const std::vector<sd::LongType>& dimensions, bool biasCorrected), SD_COMMON_TYPES_@FL_TYPE_INDEX@, SD_FLOAT_TYPES);
         }
     }
 }
+#endif
 #endif

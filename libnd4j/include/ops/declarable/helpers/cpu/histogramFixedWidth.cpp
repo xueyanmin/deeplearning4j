@@ -20,20 +20,20 @@
 // @author Yurii Shyrma (iuriish@yahoo.com), created on 31.08.2018
 //
 #include <ops/declarable/helpers/histogramFixedWidth.h>
-
+#if NOT_EXCLUDED(OP_histogram_fixed_width)
 namespace sd {
 namespace ops {
 namespace helpers {
 
 template <typename T>
-void histogramFixedWidth_(const NDArray& input, const NDArray& range, NDArray& output) {
+void histogramFixedWidth_(NDArray& input, NDArray& range, NDArray& output) {
   const int nbins = output.lengthOf();
 
   // firstly initialize output with zeros
   output.nullify();
 
-  const T leftEdge = range.e<double>(0);
-  const T rightEdge = range.e<double>(1);
+  const T leftEdge = static_cast<T>(range.e<double>(0));
+  const T rightEdge = static_cast<T>(range.e<double>(1));
 
   const T binWidth = (rightEdge - leftEdge) / nbins;
   const T secondEdge = leftEdge + binWidth;
@@ -56,12 +56,13 @@ void histogramFixedWidth_(const NDArray& input, const NDArray& range, NDArray& o
   }
 }
 
-void histogramFixedWidth(sd::LaunchContext* context, const NDArray& input, const NDArray& range, NDArray& output) {
+void histogramFixedWidth(sd::LaunchContext* context, NDArray& input, NDArray& range, NDArray& output) {
   BUILD_SINGLE_SELECTOR(input.dataType(), histogramFixedWidth_, (input, range, output), SD_COMMON_TYPES);
 }
-BUILD_SINGLE_TEMPLATE(template void histogramFixedWidth_, (const NDArray& input, const NDArray& range, NDArray& output),
+BUILD_SINGLE_TEMPLATE( void histogramFixedWidth_, (NDArray& input, NDArray& range, NDArray& output),
                       SD_COMMON_TYPES);
 
 }  // namespace helpers
 }  // namespace ops
 }  // namespace sd
+#endif

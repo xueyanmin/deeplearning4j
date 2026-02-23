@@ -116,15 +116,15 @@ public class TensorMmul extends DynamicCustomOp {
         this.sameDiff = sameDiff;
         this.axes = new int[][]{dimensionsX, dimensionsY};
         addIArgument(dimensionsX.length);
-        addIArgument(dimensionsX[0]);
+        addIArgument(dimensionsX);
         addIArgument(dimensionsY.length);
-        addIArgument(dimensionsY[0]);
+        addIArgument(dimensionsY);
         addBArgument(transposeX, transposeY, transposeZ);
     }
 
     @Override
     public List<SDVariable> doDiff(List<SDVariable> gradients) {
-        return Arrays.asList(new TensorMmulBp(sameDiff, larg(), rarg(), gradients.get(0), axes ).outputVariables());
+        return Arrays.asList(new TensorMmulBp(sameDiff, larg(), rarg(), outputVariable(),gradients.get(0), axes).outputVariables());
     }
 
     @Override
@@ -136,32 +136,6 @@ public class TensorMmul extends DynamicCustomOp {
     @Override
     public void initFromTensorFlow(NodeDef nodeDef, SameDiff initWith, Map<String, AttrValue> attributesForNode, GraphDef graph) {
         super.initFromTensorFlow(nodeDef, initWith, attributesForNode, graph);
-        /**
-         * name: "MatMul"
-         op: "MatMul"
-         input: "input"
-         input: "Variable/read"
-         attr {
-         key: "transpose_b"
-         value {
-         b: false
-         }
-         }
-         attr {
-         key: "transpose_a"
-         value {
-         b: false
-         }
-         }
-         attr {
-         key: "T"
-         value {
-         type: DT_FLOAT
-         }
-         }
-
-         */
-
         val isTransposeA = attributesForNode.get("transpose_a").getB();
         val isTransposeB = attributesForNode.get("transpose_b").getB();
         MMulTranspose mMulTranspose = MMulTranspose.builder()
@@ -202,6 +176,63 @@ public class TensorMmul extends DynamicCustomOp {
         return result;
     }
 
+    @Override
+    public void configureFromArguments() {
+        MMulTranspose.MMulTransposeBuilder mMulTransposeBuilder = MMulTranspose.builder();
+        if(!iArguments.isEmpty()) {
+            long numDimensionsX = iArguments.get(0);
+            List<Long> xDims = new ArrayList<>();
+            List<Long> yDims = new ArrayList<>();
+            int currCount = 1;
+            for(int i = currCount; i < numDimensionsX + 1; i++) {
+                xDims.add(iArguments.get(i));
+                currCount++;
+            }
+
+            long numDimensionsY = iArguments.get(currCount);
+            currCount++;
+            for(int i = 0; i < numDimensionsY; i++) {
+                yDims.add(iArguments.get(currCount));
+                currCount++;
+            }
+
+
+            this.axes = new int[][]{Ints.toArray(xDims),Ints.toArray(yDims)};
+        }
+
+
+        if(!bArguments.isEmpty()) {
+            mMulTransposeBuilder.transposeA(bArguments.get(0))
+                    .transposeB(bArguments.get(1))
+                    .transposeResult(bArguments.get(2));
+        }
+
+        this.mMulTranspose = mMulTransposeBuilder.build();
+        this.addedEdges = true;
+    }
+
+    @Override
+    public void setPropertiesForFunction(Map<String, Object> properties) {
+        //ignore dimensionsX,Y these will be initialized in configureFromArguments
+        MMulTranspose.MMulTransposeBuilder mMulTransposeBuilder = MMulTranspose.builder();
+        if(properties.containsKey("transposeX")) {
+            Boolean transposeX = getBooleanFromProperty("transposeX",properties);
+            mMulTransposeBuilder.transposeA(transposeX);
+        }
+
+        if(properties.containsKey("transposeZ")) {
+            Boolean transposeZ = getBooleanFromProperty("transposeZ",properties);
+            mMulTransposeBuilder.transposeResult(transposeZ);
+        }
+
+        if(properties.containsKey("transposeY")) {
+            Boolean transposeY = getBooleanFromProperty("transposeY",properties);
+            mMulTransposeBuilder.transposeB(transposeY);
+        }
+
+        this.mMulTranspose = mMulTransposeBuilder.build();
+
+    }
 
     @Override
     public Op.Type opType() {

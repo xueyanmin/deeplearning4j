@@ -26,7 +26,6 @@ import org.nd4j.autodiff.samediff.SDVariable;
 import org.nd4j.autodiff.samediff.SameDiff;
 import org.nd4j.common.base.Preconditions;
 import org.nd4j.imports.descriptors.properties.PropertyMapping;
-import org.nd4j.imports.graphmapper.tf.TFGraphMapper;
 import org.nd4j.linalg.api.buffer.DataType;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.api.ops.DynamicCustomOp;
@@ -55,11 +54,11 @@ public class Split extends DynamicCustomOp {
     }
 
     public Split(@NonNull INDArray in, INDArray out) {
-        super(null, new INDArray[]{in}, wrapOrNull(out), null, (List<Integer>)null);
+        super(null, new INDArray[]{in}, wrapOrNull(out), null, (List<Long>)null);
     }
 
     public Split(INDArray input, int numSplit, int splitDim) {
-        super(null,input,null,Collections.emptyList(),new int[0]);
+        super(null,input,null,Collections.emptyList(),new long[0]);
         addIArgument(numSplit,splitDim);
         this.numSplit = numSplit;
         this.splitDim = splitDim;
@@ -92,21 +91,29 @@ public class Split extends DynamicCustomOp {
     }
 
     @Override
-    public void setPropertiesForFunction(Map<String, Object> properties) {
-        super.setPropertiesForFunction(properties);
+    public Map<String, Object> propertiesForFunction() {
+        Map<String,Object> ret = new HashMap<>();
+        ret.put("numSplit",numSplit);
+        ret.put("splitDim",splitDim);
+        return ret;
     }
 
     @Override
-    public void initFromTensorFlow(NodeDef nodeDef, SameDiff initWith, Map<String, AttrValue> attributesForNode, GraphDef graph) {
-        val numSplits = (int) attributesForNode.get("num_split").getI();
-        this.numSplit = numSplits;
-        addIArgument(numSplits);
-
-        val splitDim = TFGraphMapper.getArrayFrom(TFGraphMapper.getNodeWithNameFromGraph(graph,nodeDef.getInput(0)),graph);
-        if(splitDim != null) {
-            this.splitDim = splitDim.getInt(0);
-            addIArgument(splitDim.getInt(0));
+    public void setPropertiesForFunction(Map<String, Object> properties) {
+        if(properties.containsKey("splitDim")) {
+            Integer splitDim = getIntValueFromProperty("splitDim",properties);
+            this.splitDim = splitDim;
         }
+
+        if(properties.containsKey("numSplit")) {
+            Integer numSplit = getIntValueFromProperty("numSplit",properties);
+            this.numSplit = numSplit;
+        }
+    }
+    @Override
+    public void initFromTensorFlow(NodeDef nodeDef, SameDiff initWith, Map<String, AttrValue> attributesForNode, GraphDef graph) {
+        throw new UnsupportedOperationException("Use the new Tensorflow Importer instead. This method is now removed.");
+
     }
 
     @Override
@@ -157,5 +164,10 @@ public class Split extends DynamicCustomOp {
             out.add(dt);
         }
         return out;
+    }
+
+    @Override
+    public List<SDVariable> doDiff(List<SDVariable> f1) {
+        return Arrays.asList(new Concat(sameDiff,splitDim,f1.toArray(new SDVariable[f1.size()])).outputVariables());
     }
 }

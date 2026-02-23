@@ -20,22 +20,29 @@
 
 package org.nd4j.autodiff.functions;
 
-import lombok.*;
+import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import lombok.val;
+
 import onnx.Onnx;
 import org.nd4j.autodiff.samediff.SDVariable;
 import org.nd4j.autodiff.samediff.SameDiff;
 import org.nd4j.autodiff.samediff.serde.FlatBuffersMapper;
 import org.nd4j.common.base.Preconditions;
+import org.nd4j.common.util.StackTraceUtils;
 import org.nd4j.imports.converters.DifferentialFunctionClassHolder;
 import org.nd4j.imports.descriptors.properties.AttributeAdapter;
 import org.nd4j.imports.descriptors.properties.PropertyMapping;
+import org.nd4j.linalg.api.buffer.DataBuffer;
 import org.nd4j.linalg.api.buffer.DataType;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.api.ops.Op;
 import org.nd4j.linalg.api.ops.OpContext;
-import org.nd4j.linalg.api.shape.LongShapeDescriptor;
 import org.nd4j.linalg.exception.ND4JIllegalStateException;
+import org.nd4j.linalg.factory.Nd4j;
 import org.nd4j.shade.jackson.annotation.JsonIgnore;
 import org.tensorflow.framework.AttrValue;
 import org.tensorflow.framework.GraphDef;
@@ -71,7 +78,7 @@ public abstract class DifferentialFunction {
     @Getter
     @Setter
     @JsonIgnore
-    protected int[] dimensions;
+    protected long[] dimensions;
 
     @JsonIgnore
     protected Object[] extraArgs;
@@ -87,14 +94,24 @@ public abstract class DifferentialFunction {
     @Setter
     protected boolean ownNameSetWithDefault = false;
 
+    @Getter
+    protected StackTraceElement creationLocation,creationPointofOrigin;
+    @Getter
+    protected StackTraceElement[] sameDiffCalls;
+    @Getter
+    protected  StackTraceElement[] creationCallStack;
     public DifferentialFunction() {
-        this(true);
+        this(false);
     }
 
     public DifferentialFunction(boolean sameDiff) {
         //Only need instance ID if using function in context of SameDiff, not standard ND4J with INDArray args
-        if(sameDiff)
+        if(sameDiff) {
             setInstanceId();
+        }
+
+        recordCreation();
+
     }
 
     /**
@@ -106,19 +123,82 @@ public abstract class DifferentialFunction {
         this.sameDiff = sameDiff;
         setInstanceId();
         initFromTensorFlow(nodeDef, sameDiff,attributesForNode ,graph);
+        recordCreation();
     }
 
     /**
      * Initialize the function from the given
-     * {@link onnx.Onnx.NodeProto}
+     * {@link Onnx.NodeProto}
      * @param node
      */
-    public DifferentialFunction(SameDiff sameDiff,onnx.Onnx.NodeProto node,Map<String, Onnx.AttributeProto> attributesForNode, Onnx.GraphProto graph) {
+    public DifferentialFunction(SameDiff sameDiff, Onnx.NodeProto node, Map<String, Onnx.AttributeProto> attributesForNode, Onnx.GraphProto graph) {
         this.sameDiff = sameDiff;
         setInstanceId();
         initFromOnnx(node, sameDiff, attributesForNode, graph);
+        recordCreation();
     }
 
+
+    public String debugInfo() {
+        StringBuilder stringBuilder = new StringBuilder();
+        stringBuilder.append("Op type: " + opName());
+        if(getOwnName() != null) {
+            stringBuilder.append("Own name: " + getOwnName());
+        }
+
+        if(sameDiff != null) {
+            String[] inputsForOp = sameDiff.getInputsForOp(this);
+            if(inputsForOp != null) {
+                stringBuilder.append("Input names: " + Arrays.toString(inputsForOp) + "\n");
+                for(String variable : inputsForOp) {
+                    SDVariable var = sameDiff.getVariable(variable);
+                    stringBuilder.append(var.toString() + "\n");
+                }
+            }
+
+            String[] outputsForOp = sameDiff.getOutputsForOp(this);
+            if(outputsForOp != null) {
+                stringBuilder.append("Output names: " + Arrays.toString(outputsForOp) + "\n");
+                for(String output : outputsForOp) {
+                    SDVariable outVar = sameDiff.getVariable(output);
+                    stringBuilder.append(outVar.toString() + "\n");
+                }
+            }
+        }
+
+
+        return stringBuilder.toString();
+
+
+    }
+
+
+
+    protected void recordCreation() {
+        // Guard against circular initialization: DifferentialFunctionClassHolder.initInstance()
+        // is called during Nd4j initialization before the backend is fully set up.
+        //
+        // while Nd4j class is being initialized causes circular dependency issues and crashes.
+        //
+        // Instead, we use try-catch to safely handle the case where Nd4j is not yet initialized.
+        // If Nd4j.getEnvironment() throws any exception (NoClassDefFoundError, NullPointerException,
+        // ExceptionInInitializerError, etc.), it means Nd4j is not ready, so we skip recording.
+        try {
+            if(Nd4j.getEnvironment().isDebug() || Nd4j.getEnvironment().isVerbose() ||
+            Nd4j.getEnvironment().isFuncTracePrintJavaOnly()) {
+                StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
+                this.creationLocation = StackTraceUtils.pointOfInvocation(stackTrace);
+                this.creationPointofOrigin = StackTraceUtils.pointOfOrigin(stackTrace);
+                this.sameDiffCalls = StackTraceUtils.callsFromClass(stackTrace, SameDiff.class.getName());
+                creationCallStack = stackTrace;
+            }
+        } catch (Throwable t) {
+            // Nd4j is not fully initialized yet - skip recording.
+            // This is expected during DifferentialFunctionClassHolder.initInstance() which
+            // happens during Nd4j static initialization.
+            return;
+        }
+    }
 
     /**
      * Returns the {@link AttributeAdapter} s for each of the
@@ -199,10 +279,32 @@ public abstract class DifferentialFunction {
         return null;
     }
 
-    protected String getStringFromProperty(String propertyName,Map<String,Object> properties) {
+    protected String getStringFromProperty(String propertyName, Map<String,Object> properties) {
         if(properties.containsKey(propertyName)) {
-            String value = (String) properties.get(propertyName);
-            return value;
+            Object value = properties.get(propertyName);
+
+            if (value instanceof String) {
+                return (String) value;
+            } else if (value instanceof String[]) {
+                String[] stringArray = (String[]) value;
+                // Return first element if array has elements, null otherwise
+                return stringArray.length > 0 ? stringArray[0] : null;
+            }
+        }
+
+        return null;
+    }
+
+    protected String[] getStringArrayFromProperty(String propertyName, Map<String,Object> properties) {
+        if(properties.containsKey(propertyName)) {
+            Object value = properties.get(propertyName);
+
+            if (value instanceof String[]) {
+                return (String[]) value;
+            } else if (value instanceof String) {
+                // Wrap single string in array
+                return new String[]{(String) value};
+            }
         }
 
         return null;
@@ -211,8 +313,8 @@ public abstract class DifferentialFunction {
 
     protected Integer getIntValueFromProperty(String propertyName, Map<String,Object> properties) {
         if(properties.containsKey(propertyName)) {
-            Integer value = (Integer) properties.get(propertyName);
-            return value;
+            Number value = (Number) properties.get(propertyName);
+            return value.intValue();
         }
 
         return null;
@@ -221,8 +323,8 @@ public abstract class DifferentialFunction {
 
     protected Long getLongValueFromProperty(String propertyName, Map<String,Object> properties) {
         if(properties.containsKey(propertyName)) {
-            Long value = (Long) properties.get(propertyName);
-            return value;
+            Number value = (Number) properties.get(propertyName);
+            return value.longValue();
         }
 
         return null;
@@ -230,8 +332,8 @@ public abstract class DifferentialFunction {
 
     protected Double getDoubleValueFromProperty(String propertyName, Map<String,Object> properties) {
         if(properties.containsKey(propertyName)) {
-            Double value = (Double) properties.get(propertyName);
-            return value;
+            Number value = (Number) properties.get(propertyName);
+            return value.doubleValue();
         }
 
         return null;
@@ -283,11 +385,11 @@ public abstract class DifferentialFunction {
             } catch (NoSuchFieldException e){
                 //OK, try superclass
             }
-            while(f == null && currClass.getSuperclass() != null){
+            while(f == null && currClass.getSuperclass() != null) {
                 currClass = currClass.getSuperclass();
                 try{
                     f = currClass.getDeclaredField(propertyName);
-                } catch (NoSuchFieldException e){
+                } catch (NoSuchFieldException e) {
                     //OK, try superclass
                 }
             }
@@ -345,7 +447,6 @@ public abstract class DifferentialFunction {
                     value = value2.longValue();
                 }
 
-
                 if(target.getType().equals(Double.class) && value instanceof Long) {
                     Long value2 = (Long) value;
                     value = value2.doubleValue();
@@ -357,12 +458,26 @@ public abstract class DifferentialFunction {
                 }
 
                 if(target.getType().equals(DataType.class) && value instanceof Double) {
-                       Double value2 = (Double) value;
-                       int idxConverted = value2.intValue();
-                       value = DataType.values()[idxConverted];
+                    Double value2 = (Double) value;
+                    int idxConverted = value2.intValue();
+                    value = DataType.values()[idxConverted];
                 }
 
-                if(target.getType().isEnum() && value instanceof Long || value instanceof Integer && !target.getType().equals(int.class) && !target.getType().equals(long.class)) {
+                // NEW: Handle String array to String conversion
+                if(target.getType().equals(String.class) && value instanceof String[]) {
+                    String[] stringArray = (String[]) value;
+                    // Take the first element if array has elements, null otherwise
+                    value = stringArray.length > 0 ? stringArray[0] : null;
+                }
+
+                // NEW: Handle String to String array conversion
+                if(target.getType().equals(String[].class) && value instanceof String) {
+                    String stringValue = (String) value;
+                    // Wrap single string in array
+                    value = new String[]{stringValue};
+                }
+
+                if(target.getType().isEnum() && (value instanceof Long || value instanceof Integer && !target.getType().equals(int.class) && !target.getType().equals(long.class))) {
                     Class<? extends Enum> enumType = (Class<? extends Enum>) target.getType();
                     Method method = enumType.getMethod("values");
                     method.setAccessible(true);
@@ -373,11 +488,11 @@ public abstract class DifferentialFunction {
                     value = get;
                 }
 
-
-
                 target.set(this,value);
-            } catch (IllegalAccessException e) {
-                throw new RuntimeException("Error setting property for function " + getClass().getName(), e);
+            } catch (Exception e) {
+                throw new RuntimeException("Error setting property for function " + getClass().getName() +
+                        ". Field: " + target.getName() + ", Field Type: " + target.getType() +
+                        ", Value Type: " + (value != null ? value.getClass() : "null"), e);
             }
         }
     }
@@ -563,10 +678,12 @@ public abstract class DifferentialFunction {
         if(sameDiff != null && args != null) {
             sameDiff.addArgsFor(args, this);
         }
+
+        recordCreation();
     }
 
     /**
-     * Replace argument at the specfied index
+     * Replace argument at the specified index
      * @param i the index
      * @param newArg the new argument
      */
@@ -601,9 +718,11 @@ public abstract class DifferentialFunction {
 
     public String[] outputVariablesNames() {
         SDVariable[] outputVars = outputVariables();
+        if(outputVars == null)
+            return new String[0];
         String[] out = new String[outputVars.length];
         for( int i = 0; i < out.length; i++) {
-            out[i] = outputVars[i].name();
+            out[i] = outputVars[i] == null ? "" : outputVars[i].name();
         }
         return out;
     }
@@ -635,21 +754,33 @@ public abstract class DifferentialFunction {
     }
 
     /**
+     * Return the variables expecting
+     * gradients. This is usually {@link #args()}
+     * but may vary depending on the function.
+     * @return the variables expecting a gradient.
+     */
+    public  SDVariable[] variablesExpectingGrads() {
+        return args();
+    }
+
+    /**
      * Return the specified argument for this function
      * @param num Number of the argument. Must be in range 0 to numArgs - 1 inclusive
      * @return Specified argument
      */
-    public SDVariable arg(int num){
+    public SDVariable arg(int num) {
         SDVariable[] args = args();
         Preconditions.checkNotNull(args, "Arguments are null for function %s", this.getOwnName());
         Preconditions.checkArgument(num >= 0 && num < args.length, "Invalid index: must be 0 to numArgs (0 <= idx < %s), got %s", args.length, num);
         return args[num];
     }
 
-    public String[] argNames(){
+    public String[] argNames() {
         SDVariable[] args = args();
+        if(args == null)
+            return new String[0];
         String[] out = new String[args.length];
-        for( int i = 0; i < args.length; i++ ){
+        for( int i = 0; i < args.length; i++) {
             out[i] = args[i].name();
         }
         return out;
@@ -675,17 +806,17 @@ public abstract class DifferentialFunction {
      */
     public List<SDVariable> diff(List<SDVariable> i_v1) {
         List<SDVariable> vals = doDiff(i_v1);
-        if(vals == null){
+        if(vals == null) {
             throw new IllegalStateException("Error executing diff operation: doDiff returned null for op: " + this.opName());
         }
 
-        val outputVars = args();
+        val outputVars = variablesExpectingGrads();
         boolean copied = false;
         for(int i = 0; i < vals.size(); i++) {
             SDVariable var = outputVars[i];
             SDVariable grad = var.hasGradient() ? var.getGradient() : null;
             if(grad != null) {
-                if(!copied){
+                if(!copied) {
                     //Don't mutate the original - this could mess with the original op's state!
                     vals = new ArrayList<>(vals);
                     copied = true;
@@ -697,7 +828,8 @@ public abstract class DifferentialFunction {
             } else {
                 SDVariable gradVar = vals.get(i);
                 if(sameDiff.hasVariable(var.name() + "-grad")) {
-                    sameDiff.getVariable(var.name() + "-grad").add(gradVar);
+                    if(sameDiff.getVariable(var.name() + "-grad").dataType().isFPType())
+                        sameDiff.getVariable(var.name() + "-grad").add(gradVar);
                 } else {
                     sameDiff.updateVariableNameAndReference(gradVar,var.name() + "-grad");
                     sameDiff.setGradientForVariableName(var.name(), gradVar);
@@ -711,7 +843,12 @@ public abstract class DifferentialFunction {
     }
 
 
-    protected void setInstanceId() {
+    /**
+     * Note: DO NOT USE THIS METHOD UNLESS YOU KNOW WHAT YOU ARE DOING.
+     * This is only for usage in {@link SameDiff#dynamic(String, List, List, List, List, List, List)}
+     *
+     */
+    public void setInstanceId() {
         if(ownName == null) {
             ownNameSetWithDefault = true;
             if(sameDiff == null)
@@ -774,7 +911,7 @@ public abstract class DifferentialFunction {
 
     /**
      * Iniitialize the function from the given
-     * {@link onnx.Onnx.NodeProto}
+     * {@link Onnx.NodeProto}
      * @param node
      * @param initWith
      * @param attributesForNode
@@ -820,13 +957,14 @@ public abstract class DifferentialFunction {
 
     /**
      * Calculate the output shape for this op
+     *
      * @return List of output shape descriptors
      */
-    public List<LongShapeDescriptor> calculateOutputShape() {
+    public List<DataBuffer> calculateOutputShape() {
         throw new ND4JIllegalStateException("Op type of " + getClass().getName() + "did not override calculateOutputShape() method leaked out for [" + this.opName() + "]");
     }
 
-    public List<LongShapeDescriptor> calculateOutputShape(OpContext oc){
+    public List<DataBuffer> calculateOutputShape(OpContext oc){
         throw new ND4JIllegalStateException("Op type of " + getClass().getName() + " did not override calculateOutputShape(OpContext) method leaked out for [" + this.opName() + "]");
     }
 
@@ -840,7 +978,7 @@ public abstract class DifferentialFunction {
      * @param dataTypes The data types of the inputs
      * @return The data types of the outputs
      */
-    public List<org.nd4j.linalg.api.buffer.DataType> calculateOutputDataTypes(List<org.nd4j.linalg.api.buffer.DataType> dataTypes){
+    public List<DataType> calculateOutputDataTypes(List<DataType> dataTypes){
         throw new UnsupportedOperationException("Op type of " + getClass().getName() + " and name " +  this.toString() + " did not override  calculateOutputDataTypes()! This function has not been implemented for " + getClass().getName());
     }
 
@@ -861,9 +999,6 @@ public abstract class DifferentialFunction {
     @Override
     public int hashCode() {
         int result = 31;
-        result = 31 * result + (inPlace ? 1 : 0);
-        result = 31 * result + (scalarValue != null ? scalarValue.hashCode() : 0);
-        result = 31 * result + Arrays.hashCode(dimensions);
         result = 31 * result + (ownName != null ? ownName.hashCode() : 0);
         return result;
     }
@@ -904,4 +1039,9 @@ public abstract class DifferentialFunction {
      * Clear the input and output INDArrays, if any are set
      */
     public abstract void clearArrays();
+
+    public boolean needsConfigure() {
+        return false;
+    }
+
 }

@@ -22,22 +22,26 @@
 
 #include <ops/declarable/helpers/transforms.h>
 #include <ops/specials.h>
-
+#include <system/selective_rendering.h>
+#if NOT_EXCLUDED(OP_concat)
 namespace sd {
 namespace ops {
 namespace helpers {
 //////////////////////////////////////////////////////////////////////////
 template <typename T>
-static void concat_(const std::vector<const NDArray*>& inArrs, NDArray& output, const int axis) {
+static void concat_(const std::vector<NDArray*>& inArrs, NDArray& output, const int axis) {
   sd::SpecialMethods<T>::concatCpuGeneric(inArrs, output, axis);
 }
 
-void concat(sd::LaunchContext* context, const std::vector<const NDArray*>& inArrs, NDArray& output, const int axis) {
+void concat(sd::LaunchContext* context, const std::vector<NDArray*>& inArrs, NDArray& output, const int axis) {
+auto outputTYpe = output.dataType();
   BUILD_SINGLE_SELECTOR(output.dataType(), concat_, (inArrs, output, axis), SD_COMMON_TYPES);
 }
 
-BUILD_SINGLE_TEMPLATE(template void concat_,
-                      (const std::vector<const NDArray*>& inArrs, NDArray& output, const int axis), SD_COMMON_TYPES);
+BUILD_SINGLE_TEMPLATE( void concat_,
+                      (const std::vector<NDArray*>& inArrs, NDArray& output, const int axis), SD_COMMON_TYPES);
 }  // namespace helpers
 }  // namespace ops
 }  // namespace sd
+
+#endif

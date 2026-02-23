@@ -23,6 +23,7 @@ import org.nd4j.autodiff.functions.DifferentialFunction
 import org.nd4j.autodiff.samediff.SameDiff
 import org.nd4j.autodiff.samediff.VariableType
 import org.nd4j.common.io.ReflectionUtils
+import org.nd4j.graph.OpType
 import org.nd4j.ir.OpNamespace
 import org.nd4j.linalg.api.ndarray.INDArray
 import org.nd4j.linalg.api.ops.CustomOp
@@ -82,6 +83,8 @@ class DefaultImportRunner<GRAPH_TYPE: GeneratedMessageV3,
                         OpNamespace.ArgDescriptor.ArgType.INPUT_TENSOR -> {
                             if(df.opType() != Op.Type.LOGIC) {
                                 val opInputs = sd.ops[dynamicCustomOp.ownName]
+                                if(opInputs == null)
+                                    throw IllegalArgumentException("No op with name ${dynamicCustomOp.ownName} found!")
                                 for(input in opInputs!!.inputsToOp) {
                                     val name = if(mappingContext.graph().hasConstantInitializer(input)) {
                                         input
@@ -216,6 +219,20 @@ class DefaultImportRunner<GRAPH_TYPE: GeneratedMessageV3,
                                         ReflectionUtils.setField(scalarField, df, nd4jScalarValue)
 
                                     }
+                                    OpNamespace.ArgDescriptor.ArgType.BOOL -> {
+                                        val nd4jScalarValue = Nd4j.scalar(argDescriptor.boolValue).castTo(dtype)
+                                        ReflectionUtils.setField(scalarField, df, nd4jScalarValue)
+
+                                    }
+
+                                    OpNamespace.ArgDescriptor.ArgType.STRING -> {
+                                        val nd4jScalarValue = Nd4j.scalar(argDescriptor.stringValue).castTo(dtype)
+                                        ReflectionUtils.setField(scalarField, df, nd4jScalarValue)
+
+                                    }
+                                    else -> {
+                                        throw IllegalArgumentException("Trying to convert invalid argument type " + argDescriptor.argType)
+                                    }
                                 }
                             }
                         }
@@ -255,6 +272,19 @@ class DefaultImportRunner<GRAPH_TYPE: GeneratedMessageV3,
                                     ReflectionUtils.setField(scalarField, df, nd4jScalarValue)
 
                                 }
+
+                                OpNamespace.ArgDescriptor.ArgType.BOOL -> {
+                                    val nd4jScalarValue = Nd4j.scalar(argDescriptor.boolValue).castTo(dtype)
+                                    ReflectionUtils.setField(scalarField, df, nd4jScalarValue)
+                                }
+
+                                OpNamespace.ArgDescriptor.ArgType.STRING -> {
+                                    val nd4jScalarValue = Nd4j.scalar(argDescriptor.stringValue).castTo(dtype)
+                                    ReflectionUtils.setField(scalarField, df, nd4jScalarValue)
+                                }
+                                else -> {
+                                    throw IllegalArgumentException("Trying to convert invalid argument type " + argDescriptor.argType)
+                                }
                             }
                         }
                     }
@@ -267,6 +297,14 @@ class DefaultImportRunner<GRAPH_TYPE: GeneratedMessageV3,
             }
             else -> {
                 var hasDimensions = false
+                if(df.opType() == Op.Type.REDUCE_LONG ||
+                    df.opType() == Op.Type.REDUCE_BOOL ||
+                    df.opType() == Op.Type.REDUCE_FLOAT ||
+                    df.opType() == Op.Type.REDUCE_SAME ||
+                    df.opType() == Op.Type.INDEXREDUCE && df.args().size > 1) {
+                    hasDimensions = true
+
+                }
                 applied.second.argDescriptorList.forEach { argDescriptor ->
                     if (argDescriptor.name == "dimensions")
                         hasDimensions = true
@@ -287,15 +325,25 @@ class DefaultImportRunner<GRAPH_TYPE: GeneratedMessageV3,
 
                 if (hasDimensions) {
                     //dimensions sorted by index
-                    val dimArgs =
-                        applied.second.argDescriptorList.filter { argDescriptor -> argDescriptor.name.contains("dimensions") }
-                            .sortedBy { argDescriptor -> argDescriptor.argIndex }
-                            .map { argDescriptor -> argDescriptor.int64Value.toInt() }.toIntArray()
+                    val dimArgs: LongArray = when {
+                        df.args().size > 1 && df.arg(1).arr != null -> {
+                            df.arg(1).arr.toLongVector()
+                        }
+                        else -> {
+                            applied.second.argDescriptorList.filter { argDescriptor -> argDescriptor.name.contains("dimensions") }
+                                .sortedBy { argDescriptor -> argDescriptor.argIndex }
+                                .map { argDescriptor -> argDescriptor.int64Value.toLong() }.toLongArray()
+                        }
+                    }
                     val dimensionsField = ReflectionUtils.findField(df.javaClass, "dimensions")
                     val dimensionzField = ReflectionUtils.findField(df.javaClass, "dimensionz")
+                    val isEmptyReduce = ReflectionUtils.findField(df.javaClass,"isEmptyReduce")
+                    val dimensionVar = ReflectionUtils.findField(df.javaClass,"dimensionVariable")
+                    val dimensionVarName = ReflectionUtils.findField(df.javaClass,"dimensionVariableName")
+
                     if (dimensionsField != null) {
                         dimensionsField.isAccessible = true
-                        if (intArrayOf(0).javaClass.isAssignableFrom(dimensionsField.type)) {
+                        if (longArrayOf(0).javaClass.isAssignableFrom(dimensionsField.type)) {
                             ReflectionUtils.setField(dimensionsField, df, dimArgs)
                         }
                     }
@@ -306,8 +354,31 @@ class DefaultImportRunner<GRAPH_TYPE: GeneratedMessageV3,
                             val buffer = Nd4j.createBuffer(dimArgs)
                             val createdArr = Nd4j.create(buffer)
                             ReflectionUtils.setField(dimensionzField, df, createdArr)
+                            if(dimensionVar != null) {
+                                dimensionVar.isAccessible = true
+                                val varConst = sd.constant(createdArr)
+                                ReflectionUtils.setField(dimensionVar,df,varConst)
+                                if(dimensionVarName != null) {
+                                    dimensionVarName.isAccessible = true
+                                    ReflectionUtils.setField(dimensionVarName,df,varConst.name())
+                                }
+                            }
+
+                            if (dimensionsField != null) {
+                                dimensionsField.isAccessible = true
+                                ReflectionUtils.setField(dimensionsField, df, createdArr.toLongVector())
+                            }
                         }
                     }
+
+
+                    if(isEmptyReduce != null) {
+                        isEmptyReduce.isAccessible = true
+                        if(dimArgs.isEmpty()) {
+                            ReflectionUtils.setField(isEmptyReduce,df,true)
+                        }
+                    }
+
 
                 }
 

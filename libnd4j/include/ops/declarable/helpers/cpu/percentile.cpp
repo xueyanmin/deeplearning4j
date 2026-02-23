@@ -22,29 +22,29 @@
 #include <array/NDArrayFactory.h>
 #include <array/ResultSet.h>
 #include <ops/declarable/helpers/percentile.h>
-
+#if NOT_EXCLUDED(OP_percentile)
 namespace sd {
 namespace ops {
 namespace helpers {
 
 //////////////////////////////////////////////////////////////////////////
 template <typename T>
-static void _percentile(const NDArray& input, NDArray& output, std::vector<int>& axises, const float q,
+static void _percentile(NDArray& input, NDArray& output, std::vector<LongType>& axises, const float q,
                         const int interpolation) {
   const int inputRank = input.rankOf();
 
   if (axises.empty())
     for (int i = 0; i < inputRank; ++i) axises.push_back(i);
   else
-    shape::checkDimensions(inputRank, axises);  // check, sort dimensions and remove duplicates if they are present
+    shape::checkDimensions(inputRank, &axises);  // check, sort dimensions and remove duplicates if they are present
 
   auto listOfSubArrs = input.allTensorsAlongDimension(axises);
 
   std::vector<sd::LongType> shapeOfSubArr(listOfSubArrs.at(0)->rankOf());
-  for (int i = 0; i < shapeOfSubArr.size(); ++i) shapeOfSubArr[i] = listOfSubArrs.at(0)->shapeOf()[i];
+  for (size_t i = 0; i < shapeOfSubArr.size(); ++i) shapeOfSubArr[i] = listOfSubArrs.at(0)->shapeOf()[i];
 
   auto flattenedArr = NDArrayFactory::create('c', shapeOfSubArr, input.dataType(), input.getContext());
-  const int len = flattenedArr.lengthOf();
+  const int len = flattenedArr->lengthOf();
 
   const float fraction = 1.f - q / 100.;
   sd::LongType position = 0;
@@ -65,23 +65,26 @@ static void _percentile(const NDArray& input, NDArray& output, std::vector<int>&
   // FIXME: our sort impl should be used instead, so this operation might be implemented as generic
   // FIXME: parallelism !
   for (int i = 0; i < listOfSubArrs.size(); ++i) {
-    auto buff = reinterpret_cast<T*>(flattenedArr.buffer());
-    flattenedArr.assign(listOfSubArrs.at(i));
+    auto buff = reinterpret_cast<T*>(flattenedArr->buffer());
+    flattenedArr->assign(listOfSubArrs.at(i));
     std::sort(buff, buff + len);
-    output.p(i, flattenedArr.e<T>(position));
+    output.p(i, flattenedArr->e<T>(position));
   }
+
+  delete flattenedArr;
 }
 
-void percentile(sd::LaunchContext* context, const NDArray& input, NDArray& output, std::vector<int>& axises,
+void percentile(sd::LaunchContext* context, NDArray& input, NDArray& output, std::vector<LongType>& axises,
                 const float q, const int interpolation) {
   BUILD_SINGLE_SELECTOR(input.dataType(), _percentile, (input, output, axises, q, interpolation), SD_COMMON_TYPES);
 }
 
-BUILD_SINGLE_TEMPLATE(template void _percentile,
-                      (const NDArray& input, NDArray& output, std::vector<int>& axises, const float q,
+BUILD_SINGLE_TEMPLATE( void _percentile,
+                      (NDArray& input, NDArray& output, std::vector<LongType>& axises, const float q,
                        const int interpolation),
                       SD_COMMON_TYPES);
 
 }  // namespace helpers
 }  // namespace ops
 }  // namespace sd
+#endif

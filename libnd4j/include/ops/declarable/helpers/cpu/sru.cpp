@@ -1,20 +1,20 @@
 /* ******************************************************************************
- *
- *
- * This program and the accompanying materials are made available under the
- * terms of the Apache License, Version 2.0 which is available at
- * https://www.apache.org/licenses/LICENSE-2.0.
- *
- *  See the NOTICE file distributed with this work for additional
- *  information regarding copyright ownership.
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations
- * under the License.
- *
- * SPDX-License-Identifier: Apache-2.0
- ******************************************************************************/
+*
+*
+* This program and the accompanying materials are made available under the
+* terms of the Apache License, Version 2.0 which is available at
+* https://www.apache.org/licenses/LICENSE-2.0.
+*
+*  See the NOTICE file distributed with this work for additional
+*  information regarding copyright ownership.
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+* WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+* License for the specific language governing permissions and limitations
+* under the License.
+*
+* SPDX-License-Identifier: Apache-2.0
+******************************************************************************/
 
 //
 // implementation of operations for Simple Recurrent Unit: arXiv:1709.02755v2 [cs.CL] 12 Sep 2017
@@ -25,26 +25,25 @@
 #include <execution/Threads.h>
 #include <helpers/MmulHelper.h>
 #include <ops/declarable/helpers/sru.h>
-
+#if NOT_EXCLUDED(OP_sru)
 namespace sd {
 namespace ops {
 namespace helpers {
 
 //////////////////////////////////////////////////////////////////////////
-static SD_INLINE NDArray activation(const NDArray& arr) {
-  // return (const_cast<NDArray<T>&>(arr)).template transform<simdOps::Tanh<T>>();
+static SD_INLINE NDArray activation(NDArray& arr) {
   auto result = NDArray(&arr, false, arr.getContext());
-  (const_cast<NDArray&>(arr)).applyTransform(transform::Tanh, result);
+  (const_cast<NDArray&>(arr)).applyTransform(transform::Tanh, &result);
   return result;
 }
 
 //////////////////////////////////////////////////////////////////////////
-static SD_INLINE NDArray sigmoid(const NDArray& arr) {
+static SD_INLINE NDArray* sigmoid(NDArray& arr) {
   return (const_cast<NDArray&>(arr)).transform(transform::Sigmoid);
 }
 
 //////////////////////////////////////////////////////////////////////////
-void sruCell(sd::LaunchContext* context, const NDArray* x, const NDArray* c0, const NDArray* w, const NDArray* b,
+void sruCell(sd::LaunchContext* context, NDArray* x, NDArray* c0, NDArray* w, NDArray* b,
              NDArray* h, NDArray* c) {
   // x   input [bS x inSize], bS - batch size, inSize - number of features
   // c0  previous cell state c  [bS x inSize], that is at previous time step t-1
@@ -56,26 +55,61 @@ void sruCell(sd::LaunchContext* context, const NDArray* x, const NDArray* c0, co
 
   const int inSize = x->sizeAt(1);  // inSize - number of features
 
-  auto z = mmul(*x, *w);  //  [bS x 3*inSize]
+  NDArray *z = mmul(*x, *w);  //  [bS x 3*inSize]
 
   // forget gate = sigmoid(x*Wf + bf)
-  auto f = sigmoid(z({0, 0, inSize, 2 * inSize}) + (*b)({0, inSize}));
+  NDArray *zView1 = (*z)({0, 0, inSize, 2 * inSize});
+  NDArray *bView1 = (*b)({0, inSize});
+  NDArray *addResult1 = (*zView1) + (*bView1);
+  NDArray *f = sigmoid(*addResult1);
+  delete addResult1;
 
   // reset gate = sigmoid(x*Wr + br)
-  auto r = sigmoid(z({0, 0, 2 * inSize, 3 * inSize}) + (*b)({inSize, 2 * inSize}));
+  NDArray *zView2 = (*z)({0, 0, 2 * inSize, 3 * inSize});
+  NDArray *bView2 = (*b)({inSize, 2 * inSize});
+  NDArray *addResult2 = (*zView2) + (*bView2);
+  NDArray *r = sigmoid(*addResult2);
+  delete addResult2;
 
   // ◦ means element-wise product or so called Hadamard product
   // current sell state = f◦c0 + (1 - f)◦(x*Wc)
-  c->assign(f * (*c0) + (1.f - f) * z({0, 0, 0, inSize}));
+  NDArray *zView3 = (*z)({0, 0, 0, inSize});
+  NDArray *fMulC0 = (*f) * (*c0);
+  NDArray *oneMinusF = 1.f - (*f);
+  NDArray *oneMinusFMulZ = (*oneMinusF) * (*zView3);
+  NDArray *assignOne = (*fMulC0) + (*oneMinusFMulZ);
+  c->assign(assignOne);
+  delete fMulC0;
+  delete oneMinusFMulZ;
+  delete assignOne;
+  delete oneMinusF;
   // *c = f*(*c0 - z({},{0, inSize})) + z({{},{0, inSize}});
 
   // current cell output = r◦activation(c) + (1 - r)◦x
-  h->assign(r * activation(*c) + (1.f - r) * (*x));
+  NDArray activationC = activation(*c);
+  NDArray *rMulActivation = (*r) * activationC;
+  NDArray *oneMinusR = 1.f - (*r);
+  NDArray *oneMinusRMulX = *oneMinusR * (*x);
+  NDArray *assign2 = (*rMulActivation) + (*oneMinusRMulX);
+  h->assign(assign2);
+  delete rMulActivation;
+  delete oneMinusRMulX;
+  delete assign2;
+  delete oneMinusR;
   // *h = r * (activation<T>(c) - *x) + *x;
+
+  delete z;
+  delete zView1;
+  delete bView1;
+  delete f;
+  delete zView2;
+  delete bView2;
+  delete r;
+  delete zView3;
 }
 
 //////////////////////////////////////////////////////////////////////////
-void sruTimeLoop(sd::LaunchContext* context, const NDArray* x, const NDArray* c0, const NDArray* w, const NDArray* b,
+void sruTimeLoop(sd::LaunchContext* context, NDArray* x, NDArray* c0, NDArray* w, NDArray* b,
                  NDArray* h, NDArray* c) {
   // x   input [bS x inSize x time]
   // c0  initial cell state  (at time step = 0) [bS x inSize],
@@ -85,7 +119,7 @@ void sruTimeLoop(sd::LaunchContext* context, const NDArray* x, const NDArray* c0
   // h   cell outputs [bS x inSize x time]
   // c   cell states  [bS x inSize x time]
 
-  auto wT = w->transpose();  // [3*inSize x inSize] -> [inSize x 3*inSize]
+  NDArray *wT = w->transpose();  // [3*inSize x inSize] -> [inSize x 3*inSize]
 
   const int time = x->sizeAt(2);
 
@@ -93,18 +127,24 @@ void sruTimeLoop(sd::LaunchContext* context, const NDArray* x, const NDArray* c0
 
   // loop through time steps
   for (int t = 0; t < time; ++t) {
-    auto xt = (*x)({0, 0, 0, 0, t, t + 1});
-    auto ht = (*h)({0, 0, 0, 0, t, t + 1});
-    auto ct = (*c)({0, 0, 0, 0, t, t + 1});
+    NDArray *xt = (*x)({0, 0, 0, 0, t, t + 1});
+    NDArray *ht = (*h)({0, 0, 0, 0, t, t + 1});
+    NDArray *ct = (*c)({0, 0, 0, 0, t, t + 1});
 
-    helpers::sruCell(context, &xt, &ct_1, &wT, b, &ht, &ct);
+    helpers::sruCell(context, xt, &ct_1, wT, b, ht, ct);
     ct_1.assign(ct);
+
+    delete xt;
+    delete ht;
+    delete ct;
   }
+
+  delete wT;
 }
 
 //////////////////////////////////////////////////////////////////////////
 template <typename T>
-static void sruBI_(NDArray* x, const NDArray* w, const NDArray* b, const NDArray* c0, const NDArray* mask, NDArray* ht,
+static void sruBI_(NDArray* x, NDArray* w, NDArray* b, NDArray* c0, NDArray* mask, NDArray* ht,
                    NDArray* ct) {
   // x     input 3d tensor [time x bS x 2*K], time - number of time steps, bS - batch size, K - number of features
   // w     2d tensor of weights [2*K x 6*K]
@@ -118,19 +158,19 @@ static void sruBI_(NDArray* x, const NDArray* w, const NDArray* b, const NDArray
   const sd::LongType time = x->sizeAt(0);   // time - number of time steps
   const sd::LongType bS = x->sizeAt(1);     // bS - batch size
   const sd::LongType K = x->sizeAt(2) / 2;  // K - number of features
-
+  std::vector<sd::LongType> dims2 = {1, 2};
   //  x = x * mask
-  if (mask) x->applyBroadcast(broadcast::Multiply, {1, 2}, *mask, *x);  // apply mask
+  if (mask) x->applyBroadcast(broadcast::Multiply, &dims2, mask, x);  // apply mask
 
   // U = x * w
-  NDArray wi = mmul(*x, *w);  //  U [time x bS x 6*K]
+  NDArray *wi = mmul(*x, *w);  //  U [time x bS x 6*K]
 
   const sd::LongType d2 = 2 * K;
   const sd::LongType ncols = bS * d2;
   const sd::LongType ncolsWi = 3 * ncols;
 
   T* pI = x->bufferAsT<T>();
-  T* pWi = wi.bufferAsT<T>();
+  T* pWi = wi->bufferAsT<T>();
   T* pBias = const_cast<NDArray*>(b)->bufferAsT<T>();
   T* pInit = const_cast<NDArray*>(c0)->bufferAsT<T>();
   T* pMask = mask ? const_cast<NDArray*>(mask)->bufferAsT<T>() : nullptr;
@@ -180,12 +220,14 @@ static void sruBI_(NDArray* x, const NDArray* w, const NDArray* b, const NDArray
   };
 
   samediff::Threads::parallel_tad(func, 0, ncols);
+
+  delete wi;
 }
 
 //////////////////////////////////////////////////////////////////////////
 template <typename T>
-static void sruBIBP_(NDArray* x, const NDArray* w, const NDArray* b, const NDArray* c0, const NDArray* ct,
-                     const NDArray* inGradC0, const NDArray* inGradHt, const NDArray* mask, NDArray* gradI,
+static void sruBIBP_(NDArray* x, NDArray* w, NDArray* b, NDArray* c0, NDArray* ct,
+                     NDArray* inGradC0, NDArray* inGradHt, NDArray* mask, NDArray* gradI,
                      NDArray* gradW, NDArray* gradB, NDArray* gradC0) {
   // x  input 3d tensor [time x bS x 2*K], time - number of time steps, bS - batch size, K - number of features
   // w  2d tensor of weights [2*K x 6*K]
@@ -204,20 +246,23 @@ static void sruBIBP_(NDArray* x, const NDArray* w, const NDArray* b, const NDArr
   const sd::LongType time = x->sizeAt(0);  // time - number of time steps
   const sd::LongType bS = x->sizeAt(1);
   const sd::LongType K = x->sizeAt(2) / 2;
+  std::vector<sd::LongType> dims2 = {1, 2};
 
   //  x = x * mask
-  if (mask) x->applyBroadcast(broadcast::Multiply, {1, 2}, *mask, *x);  // apply mask
+  if (mask) x->applyBroadcast(broadcast::Multiply, &dims2, mask, x);  // apply mask
 
   // U = x * w
-  NDArray wi = mmul(*x, *w);  //  [time x bS x 2*K] * [2*K x 6*K] = [time x bS x 6*K]
-  NDArray gradBias(x->ordering(), {bS, 4 * K}, x->dataType(), x->getContext());
-  NDArray gradWi(x->ordering(), {time, bS, 6 * K}, x->dataType(), x->getContext());
+  NDArray *wi = mmul(*x, *w);  //  [time x bS x 2*K] * [2*K x 6*K] = [time x bS x 6*K]
+  std::vector<sd::LongType> biasShape = {bS, 4 * K};
+  std::vector<sd::LongType> wShape = {time, bS, 6 * K};
+  NDArray gradBias(x->ordering(), biasShape, x->dataType(), x->getContext());
+  NDArray gradWi(x->ordering(), wShape, x->dataType(), x->getContext());
 
   const sd::LongType d2 = 2 * K;
   const sd::LongType ncols = bS * d2;
   const sd::LongType ncolsWi = 3 * ncols;
   T* pInput = x->bufferAsT<T>();
-  T* pWi = wi.bufferAsT<T>();
+  T* pWi = wi->bufferAsT<T>();
   T* pBias = const_cast<NDArray*>(b)->bufferAsT<T>();
   T* pInit = const_cast<NDArray*>(c0)->bufferAsT<T>();
   T* pMask = mask ? const_cast<NDArray*>(mask)->bufferAsT<T>() : nullptr;
@@ -231,8 +276,8 @@ static void sruBIBP_(NDArray* x, const NDArray* w, const NDArray* b, const NDArr
 
   auto func = PRAGMA_THREADS_FOR {
     for (auto col = start; col < stop; col++) {
-      T gbF = 0.f;
-      T gbR = 0.f;
+      T gbF = static_cast<T>(0.f);
+      T gbR = static_cast<T>(0.f);
       const auto colNum = col % d2;
       const bool flip = colNum >= K;
       T maskVal = mask ? *(pMask + col) : T(1.);
@@ -300,107 +345,41 @@ static void sruBIBP_(NDArray* x, const NDArray* w, const NDArray* b, const NDArr
   samediff::Threads::parallel_tad(func, 0, ncols);
 
   // gradB
-  gradBias.reduceAlongDimension(reduce::Sum, *gradB, {0});  // [4*K]
+
+  std::vector<sd::LongType> dims = {0};
+  gradBias.reduceAlongDimension(reduce::Sum, gradB, &dims);  // [4*K]
 
   // gradW
-  x->permutei({0, 2, 1});                       // [time x bS x 2*K] -> [time x 2*K x bS]
+  x->permutei({0, 2, 1}, 0, false);                       // [time x bS x 2*K] -> [time x 2*K x bS]
   MmulHelper::mmul(x, &gradWi, gradW, 1., 0.);  // [time x 2*K x bS ] * [time x bS x 6*K] = [time x 2*K x 6*K]
+
+  delete wi;
 }
 
-void sruBI(sd::LaunchContext* context, NDArray* x, const NDArray* w, const NDArray* b, const NDArray* c0,
-           const NDArray* mask, NDArray* ht, NDArray* ct) {
+void sruBI(sd::LaunchContext* context, NDArray* x, NDArray* w, NDArray* b, NDArray* c0,
+           NDArray* mask, NDArray* ht, NDArray* ct) {
   BUILD_SINGLE_SELECTOR(x->dataType(), sruBI_, (x, w, b, c0, mask, ht, ct), SD_FLOAT_TYPES);
 }
-void sruBIBP(sd::LaunchContext* context, NDArray* x, const NDArray* w, const NDArray* b, const NDArray* c0,
-             const NDArray* ct, const NDArray* inGradC0, const NDArray* inGradH, const NDArray* mask, NDArray* gradI,
+void sruBIBP(sd::LaunchContext* context, NDArray* x, NDArray* w, NDArray* b, NDArray* c0,
+             NDArray* ct, NDArray* inGradC0, NDArray* inGradH, NDArray* mask, NDArray* gradI,
              NDArray* gradW, NDArray* gradB, NDArray* gradC0) {
   BUILD_SINGLE_SELECTOR(x->dataType(), sruBIBP_,
                         (x, w, b, c0, ct, inGradC0, inGradH, mask, gradI, gradW, gradB, gradC0), SD_FLOAT_TYPES);
 }
-
-BUILD_SINGLE_TEMPLATE(template void sruBI_,
-                      (NDArray * x, const NDArray* w, const NDArray* b, const NDArray* c0, const NDArray* mask,
-                       NDArray* ht, NDArray* ct),
-                      SD_FLOAT_TYPES);
-BUILD_SINGLE_TEMPLATE(template void sruBIBP_,
-                      (NDArray * x, const NDArray* w, const NDArray* b, const NDArray* c0, const NDArray* ct,
-                       const NDArray* inGradC0, const NDArray* inGradH, const NDArray* mask, NDArray* gradI,
-                       NDArray* gradW, NDArray* gradB, NDArray* gradC0),
-                      SD_FLOAT_TYPES);
+BUILD_SINGLE_TEMPLATE( void sruBI_,
+                       (NDArray * x, NDArray* w, NDArray* b, NDArray* c0, NDArray* mask,
+                           NDArray* ht, NDArray* ct),
+                       SD_FLOAT_TYPES);
+BUILD_SINGLE_TEMPLATE( void sruBIBP_,
+                       (NDArray * x, NDArray* w, NDArray* b, NDArray* c0, NDArray* ct,
+                           NDArray* inGradC0, NDArray* inGradH, NDArray* mask, NDArray* gradI,
+                           NDArray* gradW, NDArray* gradB, NDArray* gradC0),
+                       SD_FLOAT_TYPES);
 
 }  // namespace helpers
 }  // namespace ops
 }  // namespace sd
 
 //////////////////////////////////////////////////////////////////////////
-// template <typename T>
-// void sruCellBP(const std::vector<NDArray<T>*>& inArrs, const std::vector<NDArray<T>*>& outArrs) {
 
-//     NDArray<T>* x    = inArrs[0];               // input [bS x inSize], bS - batch size, inSize - number of features
-//     NDArray<T>* c0   = inArrs[1];               // previous cell state c  [bS x inSize], that is at previous time
-//     step t-1 NDArray<T>* w    = inArrs[2];               // weights [inSize x 3*inSize] NDArray<T>* b    = inArrs[3];
-//     // biases [2*inSize] NDArray<T>* dLdC = inArrs[4];               // gradient of the loss func with respect to
-//     cell output [bS x inSize] NDArray<T>* dLdH = inArrs[5];               // gradient of the loss func with respect
-//     to cell state  [bS x inSize]
-
-//     NDArray<T>* dLdX  = outArrs[0];             // gradient of the loss func with respect to input [bS x inSize], so
-//     called epsilon NDArray<T>* dLdW  = outArrs[1];             // gradient of the loss func with respect to weights
-//     [inSize x 3*inSize] NDArray<T>* dLdB  = outArrs[2];             // gradient of the loss func with respect to
-//     biases [2*inSize] NDArray<T>* dLdC0 = outArrs[3];             // gradient of the loss func with respect to
-//     previous cell state [bS, inSize]
-
-//     const int inSize = x->sizeAt(1);           // inSize - number of features
-
-//     //*********** feed forward ***********//
-//     NDArray<T> z = mmul(*x, *w);               //  [bS x 3*inSize]
-
-//     // forget gate = sigmoid(x*Wf + bf)
-//     NDArray<T> f = sigmoid<T>(z({{},{inSize,   2*inSize}}) + (*b)({{0, inSize}}));             // [bS, inSize]
-//     NDArray<T> oneMinusF = 1. - f;
-
-//     // reset gate = sigmoid(x*Wr + br)
-//     NDArray<T> r = sigmoid<T>(z({{},{2*inSize, 3*inSize}}) + (*b)({{inSize, 2*inSize}}));      // [bS, inSize]
-//     NDArray<T> oneMinusR = 1. - r;
-
-//     // current sell state = f◦c0 + (1 - f)◦(x*Wc)             --->  c->assign( f*(*c0) + ((T)1. - f) * z({{},{0,
-//     inSize}}) );
-//     // current cell output = r◦activation(c) + (1 - r)◦x      --->  h->assign( r*activation<T>(*c) + ((T)1. - r) *
-//     (*x) );
-
-//     //*********** back propagation ***********//
-//     // dCdC0 = f;
-//     // dFdX = Wf
-//     // dRdX = Wr
-
-//     NDArray<T> tanh = activation<T>(*c);
-//     NDArray<T> dFdBf = f * oneMinusF;
-//     NDArray<T> dRdBr = r * oneMinusR;
-//     NDArray<T> dHdR = tanh - *x;
-//     // dCdF = c0 - x*Wc;
-//     NDArray<T> dCdF = *c0 - z({{},{0, inSize}});
-//     // dHdC = r * (1 - tanh*tanh)
-//     NDArray<T> dHdC = r * (1. - tanh * tanh);
-//     // dCdX = dCdX + dCdF*dFdX = (1-f)*Wc +  dCdF*Wf
-//     NDArray<T> dCdX = oneMinusF * (*w)({{},{0, inSize}}) + dCdF * (*w)({{},{inSize, 2*inSize}});
-
-//     // dLdC0 =  dLdC * dCdC0 = dLdC * f
-//     dLdC0->assign((*dLdC) * f);
-
-//     // dLdBf = dLdH*dHdBf + dLdC*dCdBf = dLdH*dHdC*dCdBf + dLdC*dCdF*dFdBf =  dLdH*dHdC*dCdF*dFdBf + dLdC*dCdF*dFdBf
-//     = (dLdH*dHdC + dLdC)*dCdF*dFdBf
-//     (*dLdB)({{0, inSize}}).assign(((*dLdH) * dHdC + *dLdC) * dCdF * dFdBf);
-//     // dLdBr = dLdH * dHdR * dRdBr
-//     (*dLdB)({{inSize, 2*inSize}}).assign((*dLdH) * dHdR * dRdBr)
-
-//     // dLdWc = dLdH*dHdWc + dLdC*dCdWc = dLdH*dHdC*dCdWc + dLdC*dCdWc = (dLdH*dHdC + dLdC) * dCdWc = (dLdH*dHdC +
-//     dLdC) * (1-f)*x
-//     (*dLdW)({{}, {0, inSize}}).assign(((*dLdH) * dHdC + *dLdC) * oneMinusF * (*x));
-//     // dLdWf = dLdBf * x
-//     (*dLdW)({{}, {inSize, 2*inSize}}).assign((*dLdB)({{0, inSize}}) * (*x));
-//     // dLdWr = dLdBr * x
-//     (*dLdW)({{}, {2*inSize, 3*inSize}}).assign((*dLdB)({{inSize, 2*inSize}}) * (*x));
-
-//     // dLdX = dLdH*dHdX + dLdC*dCdX = dLdH*(dHdX + dHdR*dRdX + dHdC*dCdX) + dLdC*dCdF*dFdX = dLdH*(1 - r + dHdR*dRdX
-//     + dHdC*dCdX) + dLdC*dCdX dLdX->assign((*dLdH) * (oneMinusR + dHdR * (*w)({{},{2*inSize, 3*inSize}}) + dHdC *
-//     dCdX) + (*dLdC) * dCdX);
-// }
+#endif

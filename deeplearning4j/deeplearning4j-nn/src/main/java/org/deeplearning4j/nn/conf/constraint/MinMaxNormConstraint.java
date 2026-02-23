@@ -27,8 +27,6 @@ import org.nd4j.linalg.api.ops.CustomOp;
 import org.nd4j.linalg.api.ops.DynamicCustomOp;
 import org.nd4j.linalg.factory.Broadcast;
 import org.nd4j.linalg.factory.Nd4j;
-import org.nd4j.linalg.indexing.BooleanIndexing;
-import org.nd4j.linalg.indexing.conditions.Conditions;
 
 import java.util.Collections;
 import java.util.Set;
@@ -55,7 +53,7 @@ public class MinMaxNormConstraint extends BaseConstraint {
      *                       be dimension 1. For CNNs, this should be dimensions [1,2,3] corresponding to last 3 of
      *                       parameters which have order [depthOut, depthIn, kH, kW]
      */
-    public MinMaxNormConstraint(double min, double max, int... dimensions){
+    public MinMaxNormConstraint(double min, double max, long... dimensions){
         this(min, max, DEFAULT_RATE, null, dimensions);
     }
 
@@ -69,7 +67,7 @@ public class MinMaxNormConstraint extends BaseConstraint {
      *                       be dimension 1. For CNNs, this should be dimensions [1,2,3] corresponding to last 3 of
      *                       parameters which have order [depthOut, depthIn, kH, kW]
      */
-    public MinMaxNormConstraint(double min, double max, double rate, int... dimensions){
+    public MinMaxNormConstraint(double min, double max, double rate, long... dimensions){
         this(min, max, rate, Collections.<String>emptySet(), dimensions);
     }
 
@@ -83,7 +81,7 @@ public class MinMaxNormConstraint extends BaseConstraint {
      *                       be dimension 1. For CNNs, this should be dimensions [1,2,3] corresponding to last 3 of
      *                       parameters which have order [depthOut, depthIn, kH, kW]
      */
-    public MinMaxNormConstraint(double min, double max, double rate, Set<String> paramNames, int... dimensions){
+    public MinMaxNormConstraint(double min, double max, double rate, Set<String> paramNames, long... dimensions){
         super(paramNames, dimensions);
         if(rate <= 0 || rate > 1.0){
             throw new IllegalStateException("Invalid rate: must be in interval (0,1]: got " + rate);

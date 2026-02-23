@@ -93,17 +93,17 @@ public class ParagraphVectors extends Word2Vec {
 
     protected synchronized void initInference() {
         if (countSubmitted == null || countFinished == null || inferenceExecutor == null) {
-            inferenceExecutor = new PriorityScheduler( 
-                            Math.max(Runtime.getRuntime().availableProcessors() - 2, 2), 
-                            TaskPriority.High, 1000, 
-                            new ThreadFactory() {
-                                public Thread newThread(Runnable r) {
-                                    Thread t = Executors.defaultThreadFactory().newThread(r);
-                                    t.setName("ParagraphVectors inference thread");
-                                    t.setDaemon(true);
-                                    return t;
-                                }
-                            });
+            inferenceExecutor = new PriorityScheduler(
+                    Math.max(Runtime.getRuntime().availableProcessors() - 2, 2),
+                    TaskPriority.High, 1000,
+                    new ThreadFactory() {
+                        public Thread newThread(Runnable r) {
+                            Thread t = Executors.defaultThreadFactory().newThread(r);
+                            t.setName("ParagraphVectors inference thread");
+                            t.setDaemon(true);
+                            return t;
+                        }
+                    });
             countSubmitted = new AtomicLong(0);
             countFinished = new AtomicLong(0);
         }
@@ -192,24 +192,7 @@ public class ParagraphVectors extends Word2Vec {
      * @return
      */
     public INDArray inferVector(String text, double learningRate, double minLearningRate, int iterations) {
-        if (tokenizerFactory == null)
-            throw new IllegalStateException("TokenizerFactory should be defined, prior to predict() call");
-
-        if (this.vocab == null || this.vocab.numWords() == 0)
-            reassignExistingModel();
-
-        List<String> tokens = tokenizerFactory.create(text).getTokens();
-        List<VocabWord> document = new ArrayList<>();
-        for (String token : tokens) {
-            if (vocab.containsWord(token)) {
-                document.add(vocab.wordFor(token));
-            }
-        }
-
-        if (document.isEmpty())
-            throw new ND4JIllegalStateException("Text passed for inference has no matches in model vocabulary.");
-
-        return inferVector(document, learningRate, minLearningRate, iterations);
+        return inferVector(null,text,learningRate,minLearningRate,iterations);
     }
 
     @SuppressWarnings("unchecked")
@@ -228,7 +211,7 @@ public class ParagraphVectors extends Word2Vec {
      * @return
      */
     public INDArray inferVector(LabelledDocument document, double learningRate, double minLearningRate,
-                    int iterations) {
+                                int iterations) {
         if (document.getReferencedContent() != null && !document.getReferencedContent().isEmpty()) {
             return inferVector(document.getReferencedContent(), learningRate, minLearningRate, iterations);
         } else
@@ -242,7 +225,92 @@ public class ParagraphVectors extends Word2Vec {
      * @return
      */
     public INDArray inferVector(@NonNull List<VocabWord> document, double learningRate, double minLearningRate,
-                    int iterations) {
+                                int iterations) {
+        return inferVector(null,document,learningRate,minLearningRate,iterations);
+    }
+
+    /**
+     * This method calculates inferred vector for given text, with default parameters for learning rate and iterations
+     *
+     * @param text
+     * @return
+     */
+    public INDArray inferVector(String text) {
+        return inferVector(null,text, this.learningRate.get(), this.minLearningRate, this.numEpochs * this.numIterations);
+    }
+
+    /**
+     * This method calculates inferred vector for given document, with default parameters for learning rate and iterations
+     *
+     * @param document
+     * @return
+     */
+    public INDArray inferVector(LabelledDocument document) {
+        return inferVector(null,document);
+    }
+
+    /**
+     * This method calculates inferred vector for given list of words, with default parameters for learning rate and iterations
+     *
+     * @param document
+     * @return
+     */
+    public INDArray inferVector(@NonNull List<VocabWord> document) {
+        return inferVector(null,document);
+    }
+
+
+
+    /**
+     * This method calculates inferred vector for given text
+     *
+     * @param text
+     * @return
+     */
+    public INDArray inferVector(INDArray inferenceVector,String text, double learningRate, double minLearningRate, int iterations) {
+        if (tokenizerFactory == null)
+            throw new IllegalStateException("TokenizerFactory should be defined, prior to predict() call");
+
+        if (this.vocab == null || this.vocab.numWords() == 0)
+            reassignExistingModel();
+
+        List<String> tokens = tokenizerFactory.create(text).getTokens();
+        List<VocabWord> document = new ArrayList<>();
+        for (String token : tokens) {
+            if (vocab.containsWord(token)) {
+                document.add(vocab.wordFor(token));
+            }
+        }
+
+        if (document.isEmpty())
+            throw new ND4JIllegalStateException("Text passed for inference has no matches in model vocabulary.");
+
+        return inferVector(inferenceVector,document, learningRate, minLearningRate, iterations);
+    }
+
+
+    /**
+     * This method calculates inferred vector for given document
+     *
+     * @param document
+     * @return
+     */
+    public INDArray inferVector(INDArray inferenceVector,LabelledDocument document, double learningRate, double minLearningRate,
+                                int iterations) {
+        if (document.getReferencedContent() != null && !document.getReferencedContent().isEmpty()) {
+            return inferVector(inferenceVector,document.getReferencedContent(), learningRate, minLearningRate, iterations);
+        } else
+            return inferVector(inferenceVector,document.getContent(), learningRate, minLearningRate, iterations);
+    }
+
+    /**
+     * This method calculates inferred vector for given document
+     *
+     * @param document
+     * @return
+     */
+    public INDArray inferVector(INDArray inferenceVector,@NonNull List<VocabWord> document, double learningRate, double minLearningRate,
+                                int iterations) {
 
         if (this.vocab == null || this.vocab.numWords() == 0)
             reassignExistingModel();
@@ -276,7 +344,8 @@ public class ParagraphVectors extends Word2Vec {
 
         initLearners();
 
-        INDArray inf = learner.inferSequence(sequence, seed, learningRate, minLearningRate, iterations);
+        INDArray inf = inferenceVector == null ? learner.inferSequence(sequence, seed, learningRate, minLearningRate, iterations)
+                : learner.inferSequence(inferenceVector,sequence, seed, learningRate, minLearningRate, iterations);
 
         return inf;
     }
@@ -287,8 +356,8 @@ public class ParagraphVectors extends Word2Vec {
      * @param text
      * @return
      */
-    public INDArray inferVector(String text) {
-        return inferVector(text, this.learningRate.get(), this.minLearningRate, this.numEpochs * this.numIterations);
+    public INDArray inferVector(INDArray inferenceVector,String text) {
+        return inferVector(inferenceVector,text, this.learningRate.get(), this.minLearningRate, this.numEpochs * this.numIterations);
     }
 
     /**
@@ -297,9 +366,9 @@ public class ParagraphVectors extends Word2Vec {
      * @param document
      * @return
      */
-    public INDArray inferVector(LabelledDocument document) {
-        return inferVector(document, this.learningRate.get(), this.minLearningRate,
-                        this.numEpochs * this.numIterations);
+    public INDArray inferVector(INDArray inferenceVector,LabelledDocument document) {
+        return inferVector(inferenceVector,document, this.learningRate.get(), this.minLearningRate,
+                this.numEpochs * this.numIterations);
     }
 
     /**
@@ -308,10 +377,11 @@ public class ParagraphVectors extends Word2Vec {
      * @param document
      * @return
      */
-    public INDArray inferVector(@NonNull List<VocabWord> document) {
-        return inferVector(document, this.learningRate.get(), this.minLearningRate,
-                        this.numEpochs * this.numIterations);
+    public INDArray inferVector(INDArray inferenceVector,@NonNull List<VocabWord> document) {
+        return inferVector(inferenceVector,document, this.learningRate.get(), this.minLearningRate,
+                this.numEpochs * this.numIterations);
     }
+
 
     /**
      * This method implements batched inference, based on Java Future parallelism model.
@@ -386,7 +456,7 @@ public class ParagraphVectors extends Word2Vec {
 
         for (int i = 0; i < documents.size(); i++) {
             BlindInferenceCallable callable =
-                            new BlindInferenceCallable(vocab, tokenizerFactory, documents.get(i), flag);
+                    new BlindInferenceCallable(vocab, tokenizerFactory, documents.get(i), flag);
 
             futuresList.add(inferenceExecutor.submit(callable));
         }
@@ -589,6 +659,9 @@ public class ParagraphVectors extends Word2Vec {
             }
         }
 
+        if(labelVector.rank() < 2)
+            labelVector = labelVector.reshape(1,labelVector.length());
+
         INDArray similarity = Transforms.unitVec(labelVector).mmul(labelsMatrix.transpose());
         List<Double> highToLowSimList = getTopN(similarity, topN + 20);
 
@@ -754,6 +827,60 @@ public class ParagraphVectors extends Word2Vec {
         return ret;
     }
 
+    @Override
+    public String toString() {
+        return "ParagraphVectors{" +
+                "labelsSource=" + labelsSource +
+                ", labelAwareIterator=" + labelAwareIterator +
+                ", labelsMatrix=" + labelsMatrix +
+                ", labelsList=" + labelsList +
+                ", normalizedLabels=" + normalizedLabels +
+                ", inferenceLocker=" + inferenceLocker +
+                ", inferenceExecutor=" + inferenceExecutor +
+                ", countSubmitted=" + countSubmitted +
+                ", countFinished=" + countFinished +
+                ", sentenceIter=" + sentenceIter +
+                ", tokenizerFactory=" + tokenizerFactory +
+                ", iterator=" + iterator +
+                ", elementsLearningAlgorithm=" + elementsLearningAlgorithm +
+                ", sequenceLearningAlgorithm=" + sequenceLearningAlgorithm +
+                ", configuration=" + configuration +
+                ", existingModel=" + existingModel +
+                ", intersectModel=" + intersectModel +
+                ", unknownElement=" + unknownElement +
+                ", scoreElements=" + scoreElements +
+                ", scoreSequences=" + scoreSequences +
+                ", configured=" + configured +
+                ", lockFactor=" + lockFactor +
+                ", enableScavenger=" + enableScavenger +
+                ", vocabLimit=" + vocabLimit +
+                ", eventListeners=" + eventListeners +
+                ", minWordFrequency=" + minWordFrequency +
+                ", lookupTable=" + lookupTable +
+                ", vocab=" + vocab +
+                ", layerSize=" + layerSize +
+                ", modelUtils=" + modelUtils +
+                ", numIterations=" + numIterations +
+                ", numEpochs=" + numEpochs +
+                ", negative=" + negative +
+                ", sampling=" + sampling +
+                ", learningRate=" + learningRate +
+                ", minLearningRate=" + minLearningRate +
+                ", window=" + window +
+                ", batchSize=" + batchSize +
+                ", learningRateDecayWords=" + learningRateDecayWords +
+                ", resetModel=" + resetModel +
+                ", useAdeGrad=" + useAdeGrad +
+                ", workers=" + workers +
+                ", trainSequenceVectors=" + trainSequenceVectors +
+                ", trainElementsVectors=" + trainElementsVectors +
+                ", seed=" + seed +
+                ", useUnknown=" + useUnknown +
+                ", variableWindows=" + Arrays.toString(variableWindows) +
+                ", stopWords=" + stopWords +
+                '}';
+    }
+
     public static class Builder extends Word2Vec.Builder {
         protected LabelAwareIterator labelAwareIterator;
         protected LabelsSource labelsSource;
@@ -774,7 +901,7 @@ public class ParagraphVectors extends Word2Vec {
         @SuppressWarnings("unchecked")
         public Builder useExistingWordVectors(@NonNull WordVectors vec) {
             if (((InMemoryLookupTable<VocabWord>) vec.lookupTable()).getSyn1() == null
-                            && ((InMemoryLookupTable<VocabWord>) vec.lookupTable()).getSyn1Neg() == null)
+                    && ((InMemoryLookupTable<VocabWord>) vec.lookupTable()).getSyn1Neg() == null)
                 throw new ND4JIllegalStateException("Model being passed as existing has no syn1/syn1Neg available");
 
             this.existingVectors = vec;
@@ -958,16 +1085,16 @@ public class ParagraphVectors extends Word2Vec {
         @Override
         public ParagraphVectors build() {
             presetTables();
-
+            if(configuration == null) {
+                configurationSpecified = false;
+                configuration = new VectorsConfiguration();
+            }
             ParagraphVectors ret = new ParagraphVectors();
 
             if (this.existingVectors != null) {
                 trainWordVectors(false);
                 trainElementsRepresentation(false);
                 this.elementsLearningAlgorithm = null;
-
-                //    this.lookupTable = this.existingVectors.lookupTable();
-                //    this.vocabCache = this.existingVectors.vocab();
             }
 
             if (this.labelsSource == null)
@@ -981,14 +1108,14 @@ public class ParagraphVectors extends Word2Vec {
 
                 if (docIter instanceof LabelAwareDocumentIterator)
                     this.labelAwareIterator =
-                                    new DocumentIteratorConverter((LabelAwareDocumentIterator) docIter, labelsSource);
+                            new DocumentIteratorConverter(docIter, labelsSource);
                 else
                     this.labelAwareIterator = new DocumentIteratorConverter(docIter, labelsSource);
             } else if (sentenceIterator != null) {
                 // we have SentenceIterator. Mechanics will be the same, as above
                 if (sentenceIterator instanceof LabelAwareSentenceIterator)
                     this.labelAwareIterator = new SentenceIteratorConverter(
-                                    (LabelAwareSentenceIterator) sentenceIterator, labelsSource);
+                            sentenceIterator, labelsSource);
                 else
                     this.labelAwareIterator = new SentenceIteratorConverter(sentenceIterator, labelsSource);
             } else if (labelAwareIterator != null) {
@@ -1001,11 +1128,13 @@ public class ParagraphVectors extends Word2Vec {
 
             if (labelAwareIterator != null) {
                 SentenceTransformer transformer = new SentenceTransformer.Builder().iterator(labelAwareIterator)
-                                .tokenizerFactory(tokenizerFactory).allowMultithreading(allowParallelTokenization)
-                                .build();
+                        .vocabCache(vocabCache)
+                        .tokenizerFactory(tokenizerFactory).allowMultithreading(allowParallelTokenization)
+                        .build();
                 this.iterator = new AbstractSequenceIterator.Builder<>(transformer).build();
             }
 
+            ret.vectorCalcThreads = this.vectorCalcThreads;
             ret.numEpochs = this.numEpochs;
             ret.numIterations = this.iterations;
             ret.vocab = this.vocabCache;
@@ -1041,35 +1170,41 @@ public class ParagraphVectors extends Word2Vec {
             ret.lookupTable = this.lookupTable;
             ret.modelUtils = this.modelUtils;
             ret.eventListeners = this.vectorsListeners;
-
-            this.configuration.setLearningRate(this.learningRate);
-            this.configuration.setLayersSize(layerSize);
-            this.configuration.setHugeModelExpected(hugeModelExpected);
-            this.configuration.setWindow(window);
-            this.configuration.setMinWordFrequency(minWordFrequency);
-            this.configuration.setIterations(iterations);
-            this.configuration.setSeed(seed);
-            this.configuration.setBatchSize(batchSize);
-            this.configuration.setLearningRateDecayWords(learningRateDecayWords);
-            this.configuration.setMinLearningRate(minLearningRate);
-            this.configuration.setSampling(this.sampling);
-            this.configuration.setUseAdaGrad(useAdaGrad);
-            this.configuration.setNegative(negative);
-            this.configuration.setEpochs(this.numEpochs);
-            this.configuration.setStopList(this.stopWords);
-            this.configuration.setUseHierarchicSoftmax(this.useHierarchicSoftmax);
-            this.configuration.setTrainElementsVectors(this.trainElementsVectors);
-            this.configuration.setPreciseWeightInit(this.preciseWeightInit);
-            this.configuration
+            ret.workers = this.workers;
+            ret.vectorCalcThreads = this.vectorCalcThreads;
+            if(!configurationSpecified) {
+                this.configuration.setWorkers(this.workers);
+                this.configuration.setLearningRate(this.learningRate);
+                this.configuration.setLayersSize(layerSize);
+                this.configuration.setHugeModelExpected(hugeModelExpected);
+                this.configuration.setWindow(window);
+                this.configuration.setMinWordFrequency(minWordFrequency);
+                this.configuration.setIterations(iterations);
+                this.configuration.setSeed(seed);
+                this.configuration.setBatchSize(batchSize);
+                this.configuration.setLearningRateDecayWords(learningRateDecayWords);
+                this.configuration.setMinLearningRate(minLearningRate);
+                this.configuration.setSampling(this.sampling);
+                this.configuration.setUseAdaGrad(useAdaGrad);
+                this.configuration.setNegative(negative);
+                this.configuration.setEpochs(this.numEpochs);
+                this.configuration.setStopList(this.stopWords);
+                this.configuration.setUseHierarchicSoftmax(this.useHierarchicSoftmax);
+                this.configuration.setTrainElementsVectors(this.trainElementsVectors);
+                this.configuration.setPreciseWeightInit(this.preciseWeightInit);
+                this.configuration.setVectorCalcThreads(this.vectorCalcThreads);
+                if(this.sequenceLearningAlgorithm != null)
+                    this.configuration
                             .setSequenceLearningAlgorithm(this.sequenceLearningAlgorithm.getClass().getCanonicalName());
-            this.configuration.setModelUtils(this.modelUtils.getClass().getCanonicalName());
-            this.configuration.setAllowParallelTokenization(this.allowParallelTokenization);
+                this.configuration.setModelUtils(this.modelUtils.getClass().getCanonicalName());
+                this.configuration.setAllowParallelTokenization(this.allowParallelTokenization);
+                if (tokenizerFactory != null) {
+                    this.configuration.setTokenizerFactory(tokenizerFactory.getClass().getCanonicalName());
+                    if (tokenizerFactory.getTokenPreProcessor() != null)
+                        this.configuration.setTokenPreProcessor(
+                                tokenizerFactory.getTokenPreProcessor().getClass().getCanonicalName());
+                }
 
-            if (tokenizerFactory != null) {
-                this.configuration.setTokenizerFactory(tokenizerFactory.getClass().getCanonicalName());
-                if (tokenizerFactory.getTokenPreProcessor() != null)
-                    this.configuration.setTokenPreProcessor(
-                                    tokenizerFactory.getTokenPreProcessor().getClass().getCanonicalName());
             }
 
             ret.configuration = this.configuration;
@@ -1081,6 +1216,16 @@ public class ParagraphVectors extends Word2Vec {
             ret.labelsSource = this.labelsSource;
             ret.labelAwareIterator = this.labelAwareIterator;
             ret.iterator = this.iterator;
+            if(this.elementsLearningAlgorithm != null)
+                elementsLearningAlgorithm.configure(vocabCache,lookupTable,configuration);
+            if(this.sequenceLearningAlgorithm != null)
+                sequenceLearningAlgorithm.configure(vocabCache,lookupTable,configuration);
+
+           if(existingVectors!= null) {
+               ret.lookupTable = existingVectors.lookupTable();
+               ret.vocab = existingVectors.vocab();
+           }
+
 
             return ret;
         }
@@ -1347,6 +1492,21 @@ public class ParagraphVectors extends Word2Vec {
         }
 
         /**
+         * Sets number of threads running calculations.
+         * Note this is different from workers which affect
+         * the number of threads used to compute updates.
+         * This should be balanced with the number of workers.
+         * High number of threads will actually hinder performance.
+         *
+         * @param vectorCalcThreads the number of threads to compute updates
+         * @return
+         */
+        public Builder vectorCalcThreads(int vectorCalcThreads) {
+            super.vectorCalcThreads(vectorCalcThreads);
+            return this;
+        }
+
+        /**
          * This method defines maximum number of concurrent threads available for training
          *
          * @param numWorkers
@@ -1434,14 +1594,14 @@ public class ParagraphVectors extends Word2Vec {
         private AtomicLong flag;
 
         public InferenceCallable(@NonNull VocabCache<VocabWord> vocabCache, @NonNull TokenizerFactory tokenizerFactory,
-                        @NonNull LabelledDocument document) {
+                                 @NonNull LabelledDocument document) {
             this.tokenizerFactory = tokenizerFactory;
             this.vocab = vocabCache;
             this.document = document;
         }
 
         public InferenceCallable(@NonNull VocabCache<VocabWord> vocabCache, @NonNull TokenizerFactory tokenizerFactory,
-                        @NonNull LabelledDocument document, @NonNull AtomicLong flag) {
+                                 @NonNull LabelledDocument document, @NonNull AtomicLong flag) {
             this(vocabCache, tokenizerFactory, document);
             this.flag = flag;
         }
@@ -1481,15 +1641,15 @@ public class ParagraphVectors extends Word2Vec {
         private AtomicLong flag;
 
         public BlindInferenceCallable(@NonNull VocabCache<VocabWord> vocabCache,
-                        @NonNull TokenizerFactory tokenizerFactory, @NonNull String document) {
+                                      @NonNull TokenizerFactory tokenizerFactory, @NonNull String document) {
             this.tokenizerFactory = tokenizerFactory;
             this.vocab = vocabCache;
             this.document = document;
         }
 
         public BlindInferenceCallable(@NonNull VocabCache<VocabWord> vocabCache,
-                        @NonNull TokenizerFactory tokenizerFactory, @NonNull String document,
-                        @NonNull AtomicLong flag) {
+                                      @NonNull TokenizerFactory tokenizerFactory, @NonNull String document,
+                                      @NonNull AtomicLong flag) {
             this(vocabCache, tokenizerFactory, document);
             this.flag = flag;
         }

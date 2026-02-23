@@ -21,7 +21,6 @@
 package org.nd4j.linalg.api.ops.impl.controlflow.compat;
 
 import lombok.Data;
-import lombok.NoArgsConstructor;
 import org.nd4j.autodiff.samediff.SDVariable;
 import org.nd4j.autodiff.samediff.SameDiff;
 import org.nd4j.common.base.Preconditions;
@@ -109,6 +108,11 @@ public class Enter extends BaseCompatOp {
             this.isConstant = isConstant;
         }
 
+    }
+
+    @Override
+    public List<SDVariable> doDiff(List<SDVariable> f1) {
+        return super.doDiff(f1);
     }
 
     @Override

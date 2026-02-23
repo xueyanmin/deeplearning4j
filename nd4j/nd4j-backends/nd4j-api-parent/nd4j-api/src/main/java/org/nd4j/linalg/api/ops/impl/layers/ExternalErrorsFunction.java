@@ -26,6 +26,7 @@ import org.nd4j.autodiff.samediff.SameDiff;
 import org.nd4j.autodiff.samediff.VariableType;
 import org.nd4j.common.base.Preconditions;
 import org.nd4j.imports.NoOpNameFoundException;
+import org.nd4j.linalg.api.buffer.DataBuffer;
 import org.nd4j.linalg.api.buffer.DataType;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.api.ops.DynamicCustomOp;
@@ -42,7 +43,15 @@ import java.util.*;
 public class ExternalErrorsFunction extends DynamicCustomOp {
     public static final String OP_NAME = "ExternalErrorsFn";
 
-    private static final List<LongShapeDescriptor> OUT_SHAPE = Collections.singletonList(LongShapeDescriptor.fromShape(new long[0], Nd4j.dataType()));
+    // Note: We return null here instead of a pre-computed buffer to avoid circular
+    // initialization issues. This class gets loaded during Nd4j initialization via
+    // DifferentialFunctionClassHolder.initInstance(), and calling Nd4j.createBuffer()
+    // at that time causes Nd4j to be accessed before it's fully initialized, leading
+    // to corrupted NDArrays with null shapeInfo pointers.
+    // Returning null is safe - callers handle null shape descriptors appropriately.
+    private static List<DataBuffer> getOutShape() {
+        return null;
+    }
 
     private Map<String,INDArray> gradients;
     private Map<String,SDVariable> gradVariables;
@@ -203,13 +212,13 @@ public class ExternalErrorsFunction extends DynamicCustomOp {
     }
 
     @Override
-    public List<LongShapeDescriptor> calculateOutputShape(){
-        return OUT_SHAPE;
+    public List<DataBuffer> calculateOutputShape(){
+        return getOutShape();
     }
 
     @Override
-    public List<LongShapeDescriptor> calculateOutputShape(OpContext oc){
-        return OUT_SHAPE;
+    public List<DataBuffer> calculateOutputShape(OpContext oc){
+        return getOutShape();
     }
 
     public Op.Type opType() {

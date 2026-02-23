@@ -228,15 +228,103 @@ public class SDNN extends SDOps {
   }
 
   /**
+   * This operation performs dot product attention on the given timeseries input with the given queries<br>
+   * out = sum(similarity(k_i, q) * v_i)<br>
+   * <br>
+   * similarity(k, q) = softmax(k * q) where x * q is the dot product of x and q<br>
+   * <br>
+   * Optionally with normalization step:<br>
+   * similarity(k, q) = softmax(k * q / sqrt(size(q))<br>
+   * <br>
+   * See also "Attention is all you need" (https://arxiv.org/abs/1706.03762, p. 4, eq. 1)<br>
+   * <br>
+   * Note: This supports multiple queries at once, if only one query is available the queries vector still has to<br>
+   * be 3D but can have queryCount = 1<br>
+   * <br>
+   * Note: keys and values usually is the same array. If you want to use it as the same array, simply pass it for<br>
+   * both.<br>
+   * <br>
+   * Note: Queries, keys and values must either be all rank 3 or all rank 4 arrays. Mixing them doesn't work. The<br>
+   * output rank will depend on the input rank.<br>
+   *
+   * @param queries A {@link SDVariable} representing the query tensor. Shape: [batchSize, numQueries, queryDim] (NUMERIC type)
+   * @param values A {@link SDVariable} representing the value tensor. Shape: [batchSize, numValues, valueDim] (NUMERIC type)
+   * @param keys A {@link SDVariable} representing the key tensor. Shape: [batchSize, numValues, keyDim] (NUMERIC type)
+   * @param queryMask A {@link SDVariable} representing the query mask tensor. Shape: [batchSize, numQueries] (NUMERIC type)
+   * @param valueMask @param valueMask          A {@link SDVariable} representing the value mask tensor. Shape: [batchSize, numValues] (NUMERIC type)
+   * @param scaleFactor @param scaleFactor        A {@code double} scaling factor applied to the dot product between queries and keys.
+   * @param dropoutProbability A {@code double} specifying the dropout probability to be applied to attention weights.
+   * @param useCausalMask  A {@code boolean} flag to indicate whether to apply a causal mask to the attention scores, for autoregressive tasks.
+   * @param training  A {@code boolean} flag to indicate whether the layer is in training mode or inference mode, affecting dropout.
+   * @return output  A {@link SDVariable} representing the output tensor of the dot product attention operation. Shape: [batchSize, numQueries, valueDim] (NUMERIC type)
+   */
+  public SDVariable dotProductAttentionV2(SDVariable queries, SDVariable values, SDVariable keys,
+      SDVariable queryMask, SDVariable valueMask, double scaleFactor, double dropoutProbability,
+      boolean useCausalMask, boolean training) {
+    SDValidation.validateNumerical("dotProductAttentionV2", "queries", queries);
+    SDValidation.validateNumerical("dotProductAttentionV2", "values", values);
+    SDValidation.validateNumerical("dotProductAttentionV2", "keys", keys);
+    SDValidation.validateNumerical("dotProductAttentionV2", "queryMask", queryMask);
+    SDValidation.validateNumerical("dotProductAttentionV2", "valueMask", valueMask);
+    return new org.nd4j.linalg.api.ops.impl.transforms.custom.DotProductAttentionV2(sd,queries, values, keys, queryMask, valueMask, scaleFactor, dropoutProbability, useCausalMask, training).outputVariable();
+  }
+
+  /**
+   * This operation performs dot product attention on the given timeseries input with the given queries<br>
+   * out = sum(similarity(k_i, q) * v_i)<br>
+   * <br>
+   * similarity(k, q) = softmax(k * q) where x * q is the dot product of x and q<br>
+   * <br>
+   * Optionally with normalization step:<br>
+   * similarity(k, q) = softmax(k * q / sqrt(size(q))<br>
+   * <br>
+   * See also "Attention is all you need" (https://arxiv.org/abs/1706.03762, p. 4, eq. 1)<br>
+   * <br>
+   * Note: This supports multiple queries at once, if only one query is available the queries vector still has to<br>
+   * be 3D but can have queryCount = 1<br>
+   * <br>
+   * Note: keys and values usually is the same array. If you want to use it as the same array, simply pass it for<br>
+   * both.<br>
+   * <br>
+   * Note: Queries, keys and values must either be all rank 3 or all rank 4 arrays. Mixing them doesn't work. The<br>
+   * output rank will depend on the input rank.<br>
+   *
+   * @param name name May be null. Name for the output variable
+   * @param queries A {@link SDVariable} representing the query tensor. Shape: [batchSize, numQueries, queryDim] (NUMERIC type)
+   * @param values A {@link SDVariable} representing the value tensor. Shape: [batchSize, numValues, valueDim] (NUMERIC type)
+   * @param keys A {@link SDVariable} representing the key tensor. Shape: [batchSize, numValues, keyDim] (NUMERIC type)
+   * @param queryMask A {@link SDVariable} representing the query mask tensor. Shape: [batchSize, numQueries] (NUMERIC type)
+   * @param valueMask @param valueMask          A {@link SDVariable} representing the value mask tensor. Shape: [batchSize, numValues] (NUMERIC type)
+   * @param scaleFactor @param scaleFactor        A {@code double} scaling factor applied to the dot product between queries and keys.
+   * @param dropoutProbability A {@code double} specifying the dropout probability to be applied to attention weights.
+   * @param useCausalMask  A {@code boolean} flag to indicate whether to apply a causal mask to the attention scores, for autoregressive tasks.
+   * @param training  A {@code boolean} flag to indicate whether the layer is in training mode or inference mode, affecting dropout.
+   * @return output  A {@link SDVariable} representing the output tensor of the dot product attention operation. Shape: [batchSize, numQueries, valueDim] (NUMERIC type)
+   */
+  public SDVariable dotProductAttentionV2(String name, SDVariable queries, SDVariable values,
+      SDVariable keys, SDVariable queryMask, SDVariable valueMask, double scaleFactor,
+      double dropoutProbability, boolean useCausalMask, boolean training) {
+    SDValidation.validateNumerical("dotProductAttentionV2", "queries", queries);
+    SDValidation.validateNumerical("dotProductAttentionV2", "values", values);
+    SDValidation.validateNumerical("dotProductAttentionV2", "keys", keys);
+    SDValidation.validateNumerical("dotProductAttentionV2", "queryMask", queryMask);
+    SDValidation.validateNumerical("dotProductAttentionV2", "valueMask", valueMask);
+    SDVariable out =  new org.nd4j.linalg.api.ops.impl.transforms.custom.DotProductAttentionV2(sd,queries, values, keys, queryMask, valueMask, scaleFactor, dropoutProbability, useCausalMask, training).outputVariable();
+    return sd.updateVariableNameAndReference(out, name);
+  }
+
+  /**
    * Dropout operation<br>
    *
    * @param input Input array (NUMERIC type)
-   * @param inputRetainProbability Probability of retaining an input (set to 0 with probability 1-p)
+   * @param inverted Whether dropout should be inverted or not.
+   * @param seed the seed for dropout
+   * @param probabilityValue the chance of dropping a value to 0. Maybe interpreted as 1 - p if inverted is true.
    * @return output Output (NUMERIC type)
    */
-  public SDVariable dropout(SDVariable input, double inputRetainProbability) {
+  public SDVariable dropout(SDVariable input, boolean inverted, int seed, double probabilityValue) {
     SDValidation.validateNumerical("dropout", "input", input);
-    return new org.nd4j.linalg.api.ops.random.impl.DropOut(sd,input, inputRetainProbability).outputVariable();
+    return new org.nd4j.linalg.api.ops.random.impl.CustomDropOut(sd,input, inverted, seed, probabilityValue).outputVariable();
   }
 
   /**
@@ -244,12 +332,44 @@ public class SDNN extends SDOps {
    *
    * @param name name May be null. Name for the output variable
    * @param input Input array (NUMERIC type)
-   * @param inputRetainProbability Probability of retaining an input (set to 0 with probability 1-p)
+   * @param inverted Whether dropout should be inverted or not.
+   * @param seed the seed for dropout
+   * @param probabilityValue the chance of dropping a value to 0. Maybe interpreted as 1 - p if inverted is true.
    * @return output Output (NUMERIC type)
    */
-  public SDVariable dropout(String name, SDVariable input, double inputRetainProbability) {
+  public SDVariable dropout(String name, SDVariable input, boolean inverted, int seed,
+      double probabilityValue) {
     SDValidation.validateNumerical("dropout", "input", input);
-    SDVariable out =  new org.nd4j.linalg.api.ops.random.impl.DropOut(sd,input, inputRetainProbability).outputVariable();
+    SDVariable out =  new org.nd4j.linalg.api.ops.random.impl.CustomDropOut(sd,input, inverted, seed, probabilityValue).outputVariable();
+    return sd.updateVariableNameAndReference(out, name);
+  }
+
+  /**
+   * Dropout operation<br>
+   *
+   * @param input Input array (NUMERIC type)
+   * @param inverted Whether dropout should be inverted or not.
+   * @param probabilityValue the chance of dropping a value to 0. Maybe interpreted as 1 - p if inverted is true.
+   * @return output Output (NUMERIC type)
+   */
+  public SDVariable dropout(SDVariable input, boolean inverted, double probabilityValue) {
+    SDValidation.validateNumerical("dropout", "input", input);
+    return new org.nd4j.linalg.api.ops.random.impl.CustomDropOut(sd,input, inverted, 0, probabilityValue).outputVariable();
+  }
+
+  /**
+   * Dropout operation<br>
+   *
+   * @param name name May be null. Name for the output variable
+   * @param input Input array (NUMERIC type)
+   * @param inverted Whether dropout should be inverted or not.
+   * @param probabilityValue the chance of dropping a value to 0. Maybe interpreted as 1 - p if inverted is true.
+   * @return output Output (NUMERIC type)
+   */
+  public SDVariable dropout(String name, SDVariable input, boolean inverted,
+      double probabilityValue) {
+    SDValidation.validateNumerical("dropout", "input", input);
+    SDVariable out =  new org.nd4j.linalg.api.ops.random.impl.CustomDropOut(sd,input, inverted, 0, probabilityValue).outputVariable();
     return sd.updateVariableNameAndReference(out, name);
   }
 
@@ -412,7 +532,7 @@ public class SDNN extends SDOps {
    * @return output Output variable (NUMERIC type)
    */
   public SDVariable layerNorm(SDVariable input, SDVariable gain, SDVariable bias,
-      boolean channelsFirst, int... dimensions) {
+      boolean channelsFirst, long... dimensions) {
     SDValidation.validateNumerical("layerNorm", "input", input);
     SDValidation.validateNumerical("layerNorm", "gain", gain);
     SDValidation.validateNumerical("layerNorm", "bias", bias);
@@ -434,7 +554,7 @@ public class SDNN extends SDOps {
    * @return output Output variable (NUMERIC type)
    */
   public SDVariable layerNorm(String name, SDVariable input, SDVariable gain, SDVariable bias,
-      boolean channelsFirst, int... dimensions) {
+      boolean channelsFirst, long... dimensions) {
     SDValidation.validateNumerical("layerNorm", "input", input);
     SDValidation.validateNumerical("layerNorm", "gain", gain);
     SDValidation.validateNumerical("layerNorm", "bias", bias);
@@ -455,7 +575,7 @@ public class SDNN extends SDOps {
    * @return output Output variable (NUMERIC type)
    */
   public SDVariable layerNorm(SDVariable input, SDVariable gain, boolean channelsFirst,
-      int... dimensions) {
+      long... dimensions) {
     SDValidation.validateNumerical("layerNorm", "input", input);
     SDValidation.validateNumerical("layerNorm", "gain", gain);
     Preconditions.checkArgument(dimensions.length >= 1, "dimensions has incorrect size/length. Expected: dimensions.length >= 1, got %s", dimensions.length);
@@ -475,7 +595,7 @@ public class SDNN extends SDOps {
    * @return output Output variable (NUMERIC type)
    */
   public SDVariable layerNorm(String name, SDVariable input, SDVariable gain, boolean channelsFirst,
-      int... dimensions) {
+      long... dimensions) {
     SDValidation.validateNumerical("layerNorm", "input", input);
     SDValidation.validateNumerical("layerNorm", "gain", gain);
     Preconditions.checkArgument(dimensions.length >= 1, "dimensions has incorrect size/length. Expected: dimensions.length >= 1, got %s", dimensions.length);
@@ -548,13 +668,55 @@ public class SDNN extends SDOps {
    * @param input Input data (NUMERIC type)
    * @param weights Weights variable, shape [nIn, nOut] (NUMERIC type)
    * @param bias Optional bias variable (may be null) (NUMERIC type)
+   * @param transposeA Whether to transpose input or not
+   * @param transposeB Whether to transpose second input or not
+   * @param transposeC Whether to transpose result or not
+   * @return output Output variable (NUMERIC type)
+   */
+  public SDVariable linear(SDVariable input, SDVariable weights, SDVariable bias,
+      boolean transposeA, boolean transposeB, boolean transposeC) {
+    SDValidation.validateNumerical("linear", "input", input);
+    SDValidation.validateNumerical("linear", "weights", weights);
+    SDValidation.validateNumerical("linear", "bias", bias);
+    return new org.nd4j.linalg.api.ops.impl.transforms.custom.XwPlusB(sd,input, weights, bias, transposeA, transposeB, transposeC).outputVariable();
+  }
+
+  /**
+   * Linear layer operation: out = mmul(in,w) + bias<br>
+   * Note that bias array is optional<br>
+   *
+   * @param name name May be null. Name for the output variable
+   * @param input Input data (NUMERIC type)
+   * @param weights Weights variable, shape [nIn, nOut] (NUMERIC type)
+   * @param bias Optional bias variable (may be null) (NUMERIC type)
+   * @param transposeA Whether to transpose input or not
+   * @param transposeB Whether to transpose second input or not
+   * @param transposeC Whether to transpose result or not
+   * @return output Output variable (NUMERIC type)
+   */
+  public SDVariable linear(String name, SDVariable input, SDVariable weights, SDVariable bias,
+      boolean transposeA, boolean transposeB, boolean transposeC) {
+    SDValidation.validateNumerical("linear", "input", input);
+    SDValidation.validateNumerical("linear", "weights", weights);
+    SDValidation.validateNumerical("linear", "bias", bias);
+    SDVariable out =  new org.nd4j.linalg.api.ops.impl.transforms.custom.XwPlusB(sd,input, weights, bias, transposeA, transposeB, transposeC).outputVariable();
+    return sd.updateVariableNameAndReference(out, name);
+  }
+
+  /**
+   * Linear layer operation: out = mmul(in,w) + bias<br>
+   * Note that bias array is optional<br>
+   *
+   * @param input Input data (NUMERIC type)
+   * @param weights Weights variable, shape [nIn, nOut] (NUMERIC type)
+   * @param bias Optional bias variable (may be null) (NUMERIC type)
    * @return output Output variable (NUMERIC type)
    */
   public SDVariable linear(SDVariable input, SDVariable weights, SDVariable bias) {
     SDValidation.validateNumerical("linear", "input", input);
     SDValidation.validateNumerical("linear", "weights", weights);
     SDValidation.validateNumerical("linear", "bias", bias);
-    return new org.nd4j.linalg.api.ops.impl.transforms.custom.XwPlusB(sd,input, weights, bias).outputVariable();
+    return new org.nd4j.linalg.api.ops.impl.transforms.custom.XwPlusB(sd,input, weights, bias, false, false, false).outputVariable();
   }
 
   /**
@@ -571,7 +733,7 @@ public class SDNN extends SDOps {
     SDValidation.validateNumerical("linear", "input", input);
     SDValidation.validateNumerical("linear", "weights", weights);
     SDValidation.validateNumerical("linear", "bias", bias);
-    SDVariable out =  new org.nd4j.linalg.api.ops.impl.transforms.custom.XwPlusB(sd,input, weights, bias).outputVariable();
+    SDVariable out =  new org.nd4j.linalg.api.ops.impl.transforms.custom.XwPlusB(sd,input, weights, bias, false, false, false).outputVariable();
     return sd.updateVariableNameAndReference(out, name);
   }
 
@@ -924,11 +1086,10 @@ public class SDNN extends SDOps {
 
   /**
    * ReLU (Rectified Linear Unit) layer operation: out = relu(mmul(in,w) + bias)<br>
-   * Note that bias array is optional<br>
    *
    * @param input Input data (NUMERIC type)
    * @param weights Weights variable (NUMERIC type)
-   * @param bias Optional bias variable (may be null) (NUMERIC type)
+   * @param bias  Bias variable (NUMERIC type)
    * @return output Output variable (NUMERIC type)
    */
   public SDVariable reluLayer(SDVariable input, SDVariable weights, SDVariable bias) {
@@ -940,12 +1101,11 @@ public class SDNN extends SDOps {
 
   /**
    * ReLU (Rectified Linear Unit) layer operation: out = relu(mmul(in,w) + bias)<br>
-   * Note that bias array is optional<br>
    *
    * @param name name May be null. Name for the output variable
    * @param input Input data (NUMERIC type)
    * @param weights Weights variable (NUMERIC type)
-   * @param bias Optional bias variable (may be null) (NUMERIC type)
+   * @param bias  Bias variable (NUMERIC type)
    * @return output Output variable (NUMERIC type)
    */
   public SDVariable reluLayer(String name, SDVariable input, SDVariable weights, SDVariable bias) {
@@ -1089,36 +1249,6 @@ public class SDNN extends SDOps {
   }
 
   /**
-   * Softmax derivative function<br>
-   *
-   * @param x Softmax input (NUMERIC type)
-   * @param wrt Gradient at output, dL/dx (NUMERIC type)
-   * @param dimension Softmax dimension
-   * @return output  (NUMERIC type)
-   */
-  public SDVariable softmaxDerivative(SDVariable x, SDVariable wrt, int dimension) {
-    SDValidation.validateNumerical("softmaxDerivative", "x", x);
-    SDValidation.validateNumerical("softmaxDerivative", "wrt", wrt);
-    return new org.nd4j.linalg.api.ops.impl.transforms.gradient.SoftmaxBp(sd,x, wrt, dimension).outputVariable();
-  }
-
-  /**
-   * Softmax derivative function<br>
-   *
-   * @param name name May be null. Name for the output variable
-   * @param x Softmax input (NUMERIC type)
-   * @param wrt Gradient at output, dL/dx (NUMERIC type)
-   * @param dimension Softmax dimension
-   * @return output  (NUMERIC type)
-   */
-  public SDVariable softmaxDerivative(String name, SDVariable x, SDVariable wrt, int dimension) {
-    SDValidation.validateNumerical("softmaxDerivative", "x", x);
-    SDValidation.validateNumerical("softmaxDerivative", "wrt", wrt);
-    SDVariable out =  new org.nd4j.linalg.api.ops.impl.transforms.gradient.SoftmaxBp(sd,x, wrt, dimension).outputVariable();
-    return sd.updateVariableNameAndReference(out, name);
-  }
-
-  /**
    * Element-wise softplus function: out = log(exp(x) + 1)<br>
    *
    * @param x Input variable (NUMERIC type)
@@ -1238,5 +1368,31 @@ public class SDNN extends SDOps {
     SDValidation.validateNumerical("tanh", "x", x);
     SDVariable out =  new org.nd4j.linalg.api.ops.impl.transforms.strict.Tanh(sd,x).outputVariable();
     return sd.updateVariableNameAndReference(out, name);
+  }
+
+  /**
+   * Find values and indices for the largest k entries along the last dimension.<br>
+   *
+   * @param input Input data (NUMERIC type)
+   * @param k The number of values to return
+   * @param sorted Whether to return the values sorted or not
+   */
+  public SDVariable[] topK(SDVariable input, double k, boolean sorted) {
+    SDValidation.validateNumerical("topK", "input", input);
+    return new org.nd4j.linalg.api.ops.impl.transforms.custom.TopK(sd,input, k, sorted).outputVariables();
+  }
+
+  /**
+   * Find values and indices for the largest k entries along the last dimension.<br>
+   *
+   * @param names names May be null. Arrays of names for the output variables.
+   * @param input Input data (NUMERIC type)
+   * @param k The number of values to return
+   * @param sorted Whether to return the values sorted or not
+   */
+  public SDVariable[] topK(String[] names, SDVariable input, double k, boolean sorted) {
+    SDValidation.validateNumerical("topK", "input", input);
+    SDVariable[] out =  new org.nd4j.linalg.api.ops.impl.transforms.custom.TopK(sd,input, k, sorted).outputVariables();
+    return sd.updateVariableNamesAndReferences(out, names);
   }
 }

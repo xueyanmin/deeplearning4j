@@ -56,8 +56,8 @@ CUSTOM_OP_IMPL(lstmBlockCell, 8, 7, false, 2, 1) {
   const int peephole = INT_ARG(0);  // if 1, provide peephole connections
 
   const double forgetBias = T_ARG(0);
-  const double clippingCellValue =
-      T_ARG(1);  // clipping value for ct, if it is not equal to zero, then cell state is clipped
+  const double clippingCellValue = T_ARG(1);
+  // clipping value for ct, if it is not equal to zero, then cell state is clipped
 
   REQUIRE_TRUE(xt->rankOf() == 2 && cLast->rankOf() == 2 && yLast->rankOf() == 2, 0,
                "lstmBlockCell: Input ranks must be 2 for inputs 0/1/2 (x, cLast, outLast) - got %i, %i, %i",
@@ -88,11 +88,11 @@ CUSTOM_OP_IMPL(lstmBlockCell, 8, 7, false, 2, 1) {
   helpers::lstmBlockCell(xt, cLast, yLast, W, Wci, Wcf, Wco, b, i, c, f, o, z, h, y,
                          {(double)peephole, forgetBias, clippingCellValue});
 
-  return sd::Status::OK;
+  return Status::OK;
 }
 
 DECLARE_TYPES(lstmBlockCell) {
-  getOpDescriptor()->setAllowedInputTypes(sd::DataType::ANY)->setAllowedOutputTypes({ALL_FLOATS});
+  getOpDescriptor()->setAllowedInputTypes(ANY)->setAllowedOutputTypes({ALL_FLOATS});
 }
 
 DECLARE_SHAPE_FN(lstmBlockCell) {
@@ -123,7 +123,7 @@ DECLARE_SHAPE_FN(lstmBlockCell) {
 
   // evaluate output shapeInfos
   const int bS = xt[1];
-  sd::LongType *s(nullptr);
+  LongType *s(nullptr);
   ALLOCATE(s, block.getWorkspace(), shape::shapeInfoLength(2), sd::LongType);  // [bS, numUnits]
 
   s[0] = 2;

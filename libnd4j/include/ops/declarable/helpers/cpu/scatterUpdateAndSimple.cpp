@@ -22,68 +22,76 @@
 #include <helpers/Loops.h>
 #include <helpers/ShapeUtils.h>
 #include <ops/declarable/helpers/transforms.h>
-
+#if NOT_EXCLUDED(OP_scatter_update)
 namespace sd {
 namespace ops {
 namespace helpers {
 
 //////////////////////////////////////////////////////////////////////////
-void scatterUpdate(sd::LaunchContext* context, NDArray& input, NDArray& updates, const std::vector<int>* intArgs) {
-  int opCode = (*intArgs)[0];
-  int dimSize = (*intArgs)[1];
+void scatterUpdate(sd::LaunchContext* context, NDArray& input, NDArray& updates, const std::vector<LongType>* intArgs) {
+  sd::LongType opCode = (*intArgs)[0];
+  sd::LongType dimSize = (*intArgs)[1];
   sd::LongType e;
   sd::LongType limg = 2 + dimSize;
-  std::vector<int> tadDimensions(dimSize);
+  std::vector<sd::LongType> tadDimensions(dimSize);
   for (e = 2; e < limg; e++) tadDimensions[e - 2] = (*intArgs)[e];
 
-  std::vector<int> dimsToExclude = ShapeUtils::evalDimsToExclude(input.rankOf(), tadDimensions);
+  std::vector<sd::LongType> *dimsToExclude = ShapeUtils::evalDimsToExclude(input.rankOf(), tadDimensions.size(),tadDimensions.data());
 
   // increasing counter to skip numIndices
   e++;
-  std::vector<int> indices;
+  std::vector<sd::LongType> indices;
   for (; e < static_cast<sd::LongType>(intArgs->size()); e++) indices.push_back((*intArgs)[e]);
 
   auto func = PRAGMA_THREADS_FOR {
     for (auto i = start; i < stop; i++) {
-      auto inSubArr = input(indices[i], dimsToExclude, true);
-      auto updSubArr = updates(i, dimsToExclude, true);
-
-      if (inSubArr.lengthOf() != updSubArr.lengthOf()) continue;
+      auto inSubArr = input(indices[i], *dimsToExclude, true);
+      auto updSubArr = updates(i, *dimsToExclude, true);
+      if (inSubArr->lengthOf() != updSubArr->lengthOf())  {
+        delete inSubArr;
+        continue;
+      }
 
       switch (opCode) {
         case 0:
-          inSubArr.applyPairwiseTransform(pairwise::Add, updSubArr, inSubArr);
+          inSubArr->applyPairwiseTransform(pairwise::Add, updSubArr, inSubArr);
           break;
         case 1:
-          inSubArr.applyPairwiseTransform(pairwise::Subtract, updSubArr, inSubArr);
+          inSubArr->applyPairwiseTransform(pairwise::Subtract, updSubArr, inSubArr);
           break;
         case 2:
-          inSubArr.applyPairwiseTransform(pairwise::Multiply, updSubArr, inSubArr);
+          inSubArr->applyPairwiseTransform(pairwise::Multiply, updSubArr, inSubArr);
           break;
         case 3:
-          inSubArr.applyPairwiseTransform(pairwise::Divide, updSubArr, inSubArr);
+          inSubArr->applyPairwiseTransform(pairwise::Divide, updSubArr, inSubArr);
           break;
         case 4:
-          inSubArr.applyPairwiseTransform(pairwise::ReverseSubtract, updSubArr, inSubArr);
+          inSubArr->applyPairwiseTransform(pairwise::ReverseSubtract, updSubArr, inSubArr);
           break;
         case 5:
-          inSubArr.applyPairwiseTransform(pairwise::ReverseDivide, updSubArr, inSubArr);
+          inSubArr->applyPairwiseTransform(pairwise::ReverseDivide, updSubArr, inSubArr);
           break;
         case 6:
-          inSubArr.applyPairwiseTransform(pairwise::CopyPws, updSubArr, inSubArr);
+          inSubArr->applyPairwiseTransform(pairwise::CopyPws, updSubArr, inSubArr);
           break;
         default:
           continue;
       }
+
+      delete inSubArr;
+      delete updSubArr;
     }
   };
 
   samediff::Threads::parallel_tad(func, 0, indices.size());
+
+
+  delete dimsToExclude;
 }
 
 //////////////////////////////////////////////////////////////////////////
-void scatterSimple(sd::LaunchContext* context, const int opId, NDArray& input, const NDArray& updates,
-                   const NDArray& indices, const std::vector<int>& dimensions) {
+void scatterSimple(sd::LaunchContext* context, const int opId, NDArray& input, NDArray& updates,
+                   NDArray& indices, const std::vector<LongType>& dimensions) {
   // updates and indices have same length
   const sd::LongType len = indices.lengthOf();
 
@@ -92,7 +100,8 @@ void scatterSimple(sd::LaunchContext* context, const int opId, NDArray& input, c
       auto func = PRAGMA_THREADS_FOR {
         for (auto i = start; i < stop; i++) {
           auto inSubArr = input(i, dimensions);
-          inSubArr.p(indices.t<sd::LongType>(i), updates.e(i));
+          auto curr = indices.e(i);
+          inSubArr->p(indices.t<sd::LongType>(i), &curr);
         }
       };
 
@@ -100,10 +109,11 @@ void scatterSimple(sd::LaunchContext* context, const int opId, NDArray& input, c
     } break;
 
     default:
-      throw std::invalid_argument("helpers::scatterSimple: operation is not implemented for given id !");
+      THROW_EXCEPTION("helpers::scatterSimple: operation is not implemented for given id !");
   }
 }
 
 }  // namespace helpers
 }  // namespace ops
 }  // namespace sd
+#endif

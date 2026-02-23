@@ -26,7 +26,6 @@ import org.nd4j.autodiff.samediff.SDVariable;
 import org.nd4j.autodiff.samediff.SameDiff;
 import org.nd4j.common.base.Preconditions;
 import org.nd4j.imports.NoOpNameFoundException;
-import org.nd4j.imports.graphmapper.tf.TFGraphMapper;
 import org.nd4j.linalg.api.buffer.DataType;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.api.ops.DynamicCustomOp;
@@ -83,24 +82,33 @@ public class Create extends DynamicCustomOp {
         super(sd,new SDVariable[]{shape});
         addDArgument(dataType);
         addBArgument(false);
-        addIArgument((int) 'c', dataType.toInt());
+        addIArgument('c', dataType.toInt());
+        this.outputType = dataType;
     }
 
     public Create(SameDiff sd, SDVariable shape, DataType dataType, String order, boolean initialize) {
         this(sd,shape,dataType);
-        addIArgument((int) order.charAt(0),dataType.toInt());
+        addIArgument(order.charAt(0),dataType.toInt());
         addBArgument(initialize);
+        this.outputType = dataType;
     }
 
     public Create(INDArray shape, DataType dataType, String order, boolean initialize) {
         super(new INDArray[]{shape},null);
         addBArgument(initialize);
-        addIArgument((int) order.charAt(0),dataType.toInt());
+        addIArgument(order.charAt(0),dataType.toInt());
     }
 
     protected void addArgs() {
         addBArgument(initialize);
-        addIArgument((int) order,outputType.toInt());
+        addIArgument(order,outputType.toInt());
+    }
+
+    @Override
+    public void configureFromArguments() {
+        if(!iArguments.isEmpty()) {
+            this.outputType = DataType.fromInt(iArguments.size() > 1 ? iArguments.get(1).intValue(): iArguments.get(0).intValue());
+        }
     }
 
     @Override
@@ -122,19 +130,8 @@ public class Create extends DynamicCustomOp {
 
     @Override
     public void initFromTensorFlow(NodeDef nodeDef, SameDiff initWith, Map<String, AttrValue> attributesForNode, GraphDef graph) {
-        // convert output data type
-        if(attributesForNode.containsKey("dtype")) {
-            outputType = TFGraphMapper.convertType(attributesForNode.get("dtype").getType());
-        }
+        throw new UnsupportedOperationException("Use the new Tensorflow Importer instead. This method is now removed.");
 
-        // get init field
-        if(attributesForNode.containsKey("init")) {
-            initialize = attributesForNode.get("init").getB();
-        }
-
-        // there's no order in TF, just plain C
-        this.order = 'c';
-        addArgs();
     }
 
     @Override

@@ -4,7 +4,7 @@ on:
       buildThreads:
         description: 'Build threads for libnd4j. Used to control memory usage of builds.'
         required: true
-        default: 1
+        default: 3
 
 
       deployToReleaseStaging:
@@ -15,7 +15,7 @@ on:
       releaseVersion:
         description: 'Release version target'
         required: false
-        default: 1.0.0-M2
+        default: 1.0.0-M3
 
       snapshotVersion:
         description: 'Snapshot version target'
@@ -30,17 +30,17 @@ on:
       serverId:
         description: 'Server id to publish to'
         required: false
-        default: ossrh
+        default: central
 
       runsOn:
-        description: 'Runs on:'
+        description: 'System to run on'
         required: false
         default: macos-10.15
 
       mvnFlags:
         description: "Extra maven flags (must escape input yourself if used)"
         required: false
-        default: -pl \":nd4j-native-preset,:libnd4j,:nd4j-native\"
+        default:
 
       libnd4jUrl:
         description: 'Sets a libnd4j download url for this build. LIBND4J_HOME will automatically be set. Should be used when only needing to build other modules.'
@@ -71,7 +71,7 @@ jobs:
             experimental: true
             name: OS to run on
 
-          - libnd4j_file_download: ${{ github.event.inputs.libnd4jDownload }}
+          - libnd4j_file_download: ${{ github.event.inputs.libnd4jUrl }}
             experimental: true
             name: OS to run on
 
@@ -115,30 +115,31 @@ jobs:
       - name: Set mvn build command based on matrix
         shell: bash
         run: |
-              command="mvn ${{ matrix.mvn_ext }}  -Dlibnd4j.buildThreads=${{ matrix.build_threads }} -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.count=3   -Possrh   -DskipTestResourceEnforcement=true  -Dmaven.javadoc.failOnError=false -Djavacpp.platform=macosx-x86_64  -Pcpu  --also-make  --batch-mode deploy -DskipTests"
+              if  [  "${{ matrix.libnd4j_file_download }}" != '' ]; then
+                  modules=':nd4j-native,:nd4j-native-preset'
+              else 
+               echo "Building libnd4j from source"
+               modules=':nd4j-native,:nd4j-native-preset,:libnd4j'
+              fi
+              command="mvn ${{ matrix.mvn_ext }}  -pl $modules -Pcpu -Dlibnd4j.buildthreads=${{ matrix.build_threads }} -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.count=3   -Possrh   -DskipTestResourceEnforcement=true  -Dmaven.javadoc.failOnError=false -Djavacpp.platform=macosx-x86_64  -Pcpu  --also-make  --batch-mode deploy -DskipTests"
               if [ "${{ matrix.helper }}" != '' ] && [ "${{ matrix.extension }}" != '' ]; then
-                  mvn_ext=" -Dlibnd4j.classifier=macosx-x86_64-${{ matrix.helper }}-${{matrix.extension}} -Dlibnd4j.helper=${{ matrix.helper }} -Dlibnd4j.extension=${{ matrix.extension }} -Djavacpp.platform.extension=-${{ matrix.helper }}-${{ matrix.extension }}"
+                  mvn_ext=" -Posx-aarch64-protoc -Dlibnd4j.classifier=macosx-x86_64-${{ matrix.helper }}-${{matrix.extension}} -Dlibnd4j.helper=${{ matrix.helper }} -Dlibnd4j.extension=${{ matrix.extension }} -Djavacpp.platform.extension=-${{ matrix.helper }}-${{ matrix.extension }}"
               elif [ "${{ matrix.helper }}" != '' ]; then
-                  mvn_ext=" -Dlibnd4j.classifier=${{ matrix.helper }} -Dlibnd4j.helper=${{ matrix.helper }} -Dlibnd4j.extension=${{ matrix.helper }} -Djavacpp.platform.extension=-${{ matrix.helper }}"
+                  mvn_ext=" -Posx-aarch64-protoc -Dlibnd4j.classifier=${{ matrix.helper }} -Dlibnd4j.helper=${{ matrix.helper }} -Dlibnd4j.extension=${{ matrix.helper }} -Djavacpp.platform.extension=-${{ matrix.helper }}"
               elif [ "${{ matrix.extension }}" != '' ]; then
-                 mvn_ext=" -Dlibnd4j.classifier=macosx-x86_64-${{matrix.extension}} -Dlibnd4j.extension=${{ matrix.extension }} -Djavacpp.platform.extension=-${{ matrix.extension }}"
+                 mvn_ext=" -Posx-aarch64-protoc -Dlibnd4j.classifier=macosx-x86_64-${{matrix.extension}} -Dlibnd4j.extension=${{ matrix.extension }} -Djavacpp.platform.extension=-${{ matrix.extension }}"
               else
-                  mvn_ext=" -Dlibnd4j.classifier=macosx-x86_64"
+                  mvn_ext=" -Posx-aarch64-protoc -Dlibnd4j.classifier=macosx-x86_64"
               fi
               if  [  "${{ matrix.libnd4j_file_download }}" != '' ]; then
                 echo "Adding libnd4j download"
-                echo "LIBND4J_FILE_NAME=${libnd4j_download_file_url}" >> $GITHUB_ENV
+                echo "LIBND4J_FILE_NAME=${{ matrix.libnd4j_file_download }}/${libnd4j_download_file_url}" >> $GITHUB_ENV
               fi
               command="${command} ${mvn_ext}"
               echo "Setting command for helper ${{ matrix.helper }} and extension ${{ matrix.extension }} to ${command}"
               echo "COMMAND=${command}" >> $GITHUB_ENV
 
-      - name: Cache Maven packages
-        uses: actions/cache@v2
-        with:
-          path: ~/.m2
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-m2
+  
 
       - name: Import GPG Key
         uses: crazy-max/ghaction-import-gpg@v1
@@ -147,16 +148,18 @@ jobs:
             PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
 
       - name: Set up Java for publishing to OSSRH
-        uses: actions/setup-java@v2
+        uses: actions/setup-java@v4
         with:
-          java-version: 8
-          distribution: 'zulu'
+          java-version: 11
+          distribution: 'temurin'
           server-id: ${{ github.event.inputs.serverId }}
           server-username: MAVEN_USERNAME
           server-password: MAVEN_PASSWORD
           gpg-private-key: ${{ secrets.SONATYPE_GPG_KEY }}
           gpg-passphrase: MAVEN_GPG_PASSPHRASE
           cache: 'maven'
+        
+        
 
 
       - name: Update path for gnu sed
@@ -168,11 +171,10 @@ jobs:
       - name: Setup libnd4j home if a download url is specified
         shell: bash
         run: |
-            echo "LIBND4J_HOME=${GITHUB_WORKSPACE}/libnd4j_home/libnd4j/" >> "$GITHUB_ENV"
             mkdir "${GITHUB_WORKSPACE}/openblas_home"
             cd "${GITHUB_WORKSPACE}/openblas_home"
-            wget https://repo1.maven.org/maven2/org/bytedeco/openblas/0.3.13-1.5.5/openblas-0.3.13-1.5.5-macosx-x86_64.jar
-            unzip openblas-0.3.13-1.5.5-macosx-x86_64.jar
+            wget https://repo1.maven.org/maven2/org/bytedeco/openblas/0.3.19-1.5.7/openblas-0.3.19-1.5.7-macosx-x86_64.jar
+            unzip openblas-0.3.19-1.5.7-macosx-x86_64.jar
             cd ..
             cp ${GITHUB_WORKSPACE}/openblas_home/org/bytedeco/openblas/macosx-x86_64/libopenblas.0.dylib  ${GITHUB_WORKSPACE}/openblas_home/org/bytedeco/openblas/macosx-x86_64/libopenblas.dylib
             echo "OPENBLAS_PATH=${GITHUB_WORKSPACE}/openblas_home/org/bytedeco/openblas/macosx-x86_64/" >> "$GITHUB_ENV"
@@ -183,10 +185,10 @@ jobs:
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PUBLISH_TO: ossrh
+          PUBLISH_TO: central
           MAVEN_GPG_KEY: ${{ secrets.SONATYPE_GPG_KEY }}
-          MAVEN_USERNAME: ${{ secrets.SONATYPE_USER_1 }}
-          MAVEN_PASSWORD: ${{ secrets.SONATYPE_USER1_PASS }}
+          MAVEN_USERNAME: ${{ secrets.CENTRAL_SONATYPE_TOKEN_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.CENTRAL_SONATYPE_TOKEN_PASSWORD }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.PACKAGES_GPG_PASS }}
           PERFORM_RELEASE: ${{ matrix.deploy_to_release_staging }}
           RELEASE_VERSION: ${{ matrix.release_version }}
@@ -196,6 +198,7 @@ jobs:
           MAVEN_OPTS: "-Xmx2g"
           HELPER: ${{ matrix.helper }}
           EXTENSION: ${{ matrix.extension }}
+          LIBND4J_FILE_NAME: ${{ matrix.libnd4j_file_download }}
 
 
         run: |
@@ -214,8 +217,7 @@ jobs:
           gpg1 --version
           brew list
           brew list --cask
-          # download libnd4j from a url and set it up if LIBND4J_FILE_NAME is defined
-          bash ./bootstrap-libnd4j-from-url.sh
+      
           if [ "$PERFORM_RELEASE" == 1 ]; then
                     echo "Performing release with command ${COMMAND}"
                     bash ${GITHUB_WORKSPACE}/release-specified-component.sh  "${RELEASE_VERSION}" "${SNAPSHOT_VERSION}" "${RELEASE_REPO_ID}" "${COMMAND}"
@@ -225,7 +227,5 @@ jobs:
                   eval "${COMMAND}"
           fi
 
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
-        if: ${{ github.event_name == 'workflow_dispatch' && matrix.debug_enabled }}
+    
 

@@ -123,10 +123,10 @@ CUSTOM_OP_IMPL(lstmLayer, 3, 1, false, 1, 5) {
   // !!! dimension 3*nOut implies order it, ft, ot
 
   const auto dataFormat = INT_ARG(0);  // for unidirectional: 0 = [sL, bS, nIn], 1 = [bS, sL ,nIn], 2 = [bS, nIn, sL],
-                                       // for bidirectional: 3 = [sL, bS, nIn] && [sL, 2, bS, nOut] (for ONNX)
-  const auto directionMode =
-      INT_ARG(1);  // direction: 0 = fwd, 1 = bwd, 2 = bidirectional sum, 3 = bidirectional concat, 4 = bidirectional
-                   // extra output dim (in conjunction with format dataFormat = 3)
+  // for bidirectional: 3 = [sL, bS, nIn] && [sL, 2, bS, nOut] (for ONNX)
+  const auto directionMode = INT_ARG(1);
+  // direction: 0 = fwd, 1 = bwd, 2 = bidirectional sum, 3 = bidirectional concat, 4 = bidirectional
+  // extra output dim (in conjunction with format dataFormat = 3)
 
   // integer numbers corresponding to activations: 0=tanh, 1=relu, 2=sigmoid, 3=affine, 4=leaky relu, 5= thresholded
   // relu, 6=scaled tanh, 7=hard sigmoid, 8=ELU, 9=softsign, 10=softplus
@@ -150,7 +150,7 @@ CUSTOM_OP_IMPL(lstmLayer, 3, 1, false, 1, 5) {
   const auto cellActHasBeta = cellAct == 3 || cellAct == 6;
   const auto outActHasBeta = outAct == 3 || outAct == 6;
 
-  sd::Unsigned count = 1;
+  LongType count = 1;
   const auto cellClip = T_ARG(0);  // cell clipping value, if it = 0 then do not apply clipping
   const auto gateAlpha = gateActHasAlpha ? T_ARG(count++) : 0;
   const auto gateBeta = gateActHasBeta ? T_ARG(count++) : 0;
@@ -184,69 +184,69 @@ CUSTOM_OP_IMPL(lstmLayer, 3, 1, false, 1, 5) {
   auto cL = retLastC ? OUTPUT_VARIABLE(count++) : nullptr;   // cell state at last step
 
   // evaluate dimensions
-  const sd::LongType sL = dataFormat == 3 ? x->sizeAt(0) : x->sizeAt(dataFormat);
-  const sd::LongType bS = dataFormat == 1 || dataFormat == 2 ? x->sizeAt(0) : x->sizeAt(1);
-  const sd::LongType nIn = dataFormat == 2 ? x->sizeAt(1) : x->sizeAt(2);
-  const sd::LongType nOut = Wx->sizeAt(-1) / 4;
+  const LongType sL = dataFormat == 3 ? x->sizeAt(0) : x->sizeAt(dataFormat);
+  const LongType bS = dataFormat == 1 || dataFormat == 2 ? x->sizeAt(0) : x->sizeAt(1);
+  const LongType nIn = dataFormat == 2 ? x->sizeAt(1) : x->sizeAt(2);
+  const LongType nOut = Wx->sizeAt(-1) / 4;
 
   // inputs validations
   if (directionMode < 2) {  // no bidirectional
 
     // Wx validation
     if (Wx->rankOf() != 2 || Wx->sizeAt(0) != nIn)
-      REQUIRE_TRUE(false, 0, "LSTM_LAYER operation: wrong shape of input weights, expected is %s, but got %s instead !",
-                   ShapeUtils::shapeAsString({nIn, 4 * nOut}).c_str(), ShapeUtils::shapeAsString(Wx).c_str());
+    REQUIRE_TRUE(false, 0, "LSTM_LAYER operation: wrong shape of input weights, expected is %s, but got %s instead !",
+                 ShapeUtils::shapeAsString({nIn, 4 * nOut}).c_str(), ShapeUtils::shapeAsString(Wx).c_str());
     // Wr validation
     if (Wr->rankOf() != 2 || Wr->sizeAt(0) != nOut || Wr->sizeAt(1) != 4 * nOut)
-      REQUIRE_TRUE(false, 0,
-                   "LSTM_LAYER operation: wrong shape of recurrent weights, expected is %s, but got %s instead !",
-                   ShapeUtils::shapeAsString({nOut, 4 * nOut}).c_str(), ShapeUtils::shapeAsString(Wr).c_str());
+    REQUIRE_TRUE(false, 0,
+                 "LSTM_LAYER operation: wrong shape of recurrent weights, expected is %s, but got %s instead !",
+                 ShapeUtils::shapeAsString({nOut, 4 * nOut}).c_str(), ShapeUtils::shapeAsString(Wr).c_str());
     // biases validation
     if (b != nullptr && (b->rankOf() != 1 || b->sizeAt(0) != 4 * nOut))
-      REQUIRE_TRUE(false, 0, "LSTM_LAYER operation: wrong shape of biases, expected is %s, but got %s instead !",
-                   ShapeUtils::shapeAsString({4 * nOut}).c_str(), ShapeUtils::shapeAsString(b).c_str());
+    REQUIRE_TRUE(false, 0, "LSTM_LAYER operation: wrong shape of biases, expected is %s, but got %s instead !",
+                 ShapeUtils::shapeAsString({4 * nOut}).c_str(), ShapeUtils::shapeAsString(b).c_str());
     // initial output validation
     if (hI != nullptr && (hI->rankOf() != 2 || hI->sizeAt(0) != bS || hI->sizeAt(1) != nOut))
-      REQUIRE_TRUE(false, 0,
-                   "LSTM_LAYER operation: wrong shape of initial output, expected is %s, but got %s instead !",
-                   ShapeUtils::shapeAsString({bS, nOut}).c_str(), ShapeUtils::shapeAsString(hI).c_str());
+    REQUIRE_TRUE(false, 0,
+                 "LSTM_LAYER operation: wrong shape of initial output, expected is %s, but got %s instead !",
+                 ShapeUtils::shapeAsString({bS, nOut}).c_str(), ShapeUtils::shapeAsString(hI).c_str());
     // initial cell  validation
     if (cI != nullptr && (cI->rankOf() != 2 || cI->sizeAt(0) != bS || cI->sizeAt(1) != nOut))
-      REQUIRE_TRUE(false, 0,
-                   "LSTM_LAYER operation: wrong shape of initial cell state, expected is %s, but got %s instead !",
-                   ShapeUtils::shapeAsString({bS, nOut}).c_str(), ShapeUtils::shapeAsString(cI).c_str());
+    REQUIRE_TRUE(false, 0,
+                 "LSTM_LAYER operation: wrong shape of initial cell state, expected is %s, but got %s instead !",
+                 ShapeUtils::shapeAsString({bS, nOut}).c_str(), ShapeUtils::shapeAsString(cI).c_str());
     // peephole weights validation
     if (Wp != nullptr && (Wp->rankOf() != 1 || Wp->sizeAt(0) != 3 * nOut))
-      REQUIRE_TRUE(false, 0, "LSTM_LAYER operation: wrong peephole weights, expected is %s, but got %s instead !",
-                   ShapeUtils::shapeAsString({3 * nOut}).c_str(), ShapeUtils::shapeAsString(Wp).c_str());
+    REQUIRE_TRUE(false, 0, "LSTM_LAYER operation: wrong peephole weights, expected is %s, but got %s instead !",
+                 ShapeUtils::shapeAsString({3 * nOut}).c_str(), ShapeUtils::shapeAsString(Wp).c_str());
   } else {  // bidirectional
-            // Wx validation
+    // Wx validation
     if (Wx->rankOf() != 3 || Wx->sizeAt(0) != 2 || Wx->sizeAt(1) != nIn)
-      REQUIRE_TRUE(false, 0, "LSTM_LAYER operation: wrong shape of input weights, expected is %s, but got %s instead !",
-                   ShapeUtils::shapeAsString({2, nIn, 4 * nOut}).c_str(), ShapeUtils::shapeAsString(Wx).c_str());
+    REQUIRE_TRUE(false, 0, "LSTM_LAYER operation: wrong shape of input weights, expected is %s, but got %s instead !",
+                 ShapeUtils::shapeAsString({2, nIn, 4 * nOut}).c_str(), ShapeUtils::shapeAsString(Wx).c_str());
     // Wr validation
     if (Wr->rankOf() != 3 || Wr->sizeAt(0) != 2 || Wr->sizeAt(1) != nOut || Wr->sizeAt(2) != 4 * nOut)
-      REQUIRE_TRUE(false, 0,
-                   "LSTM_LAYER operation: wrong shape of recurrent weights, expected is %s, but got %s instead !",
-                   ShapeUtils::shapeAsString({2, nOut, 4 * nOut}).c_str(), ShapeUtils::shapeAsString(Wr).c_str());
+    REQUIRE_TRUE(false, 0,
+                 "LSTM_LAYER operation: wrong shape of recurrent weights, expected is %s, but got %s instead !",
+                 ShapeUtils::shapeAsString({2, nOut, 4 * nOut}).c_str(), ShapeUtils::shapeAsString(Wr).c_str());
     // biases validation
     if (b != nullptr && (b->rankOf() != 2 || b->sizeAt(0) != 2 || b->sizeAt(1) != 4 * nOut))
-      REQUIRE_TRUE(false, 0, "LSTM_LAYER operation: wrong shape of biases, expected is %s, but got %s instead !",
-                   ShapeUtils::shapeAsString({2, 4 * nOut}).c_str(), ShapeUtils::shapeAsString(b).c_str());
+    REQUIRE_TRUE(false, 0, "LSTM_LAYER operation: wrong shape of biases, expected is %s, but got %s instead !",
+                 ShapeUtils::shapeAsString({2, 4 * nOut}).c_str(), ShapeUtils::shapeAsString(b).c_str());
     // initial output validation
     if (hI != nullptr && (hI->rankOf() != 3 || hI->sizeAt(0) != 2 || hI->sizeAt(1) != bS || hI->sizeAt(2) != nOut))
-      REQUIRE_TRUE(false, 0,
-                   "LSTM_LAYER operation: wrong shape of initial output, expected is %s, but got %s instead !",
-                   ShapeUtils::shapeAsString({2, bS, nOut}).c_str(), ShapeUtils::shapeAsString(hI).c_str());
+    REQUIRE_TRUE(false, 0,
+                 "LSTM_LAYER operation: wrong shape of initial output, expected is %s, but got %s instead !",
+                 ShapeUtils::shapeAsString({2, bS, nOut}).c_str(), ShapeUtils::shapeAsString(hI).c_str());
     // initial cell  validation
     if (cI != nullptr && (cI->rankOf() != 3 || cI->sizeAt(0) != 2 || cI->sizeAt(1) != bS || cI->sizeAt(2) != nOut))
-      REQUIRE_TRUE(false, 0,
-                   "LSTM_LAYER operation: wrong shape of initial cell state, expected is %s, but got %s instead !",
-                   ShapeUtils::shapeAsString({2, bS, nOut}).c_str(), ShapeUtils::shapeAsString(cI).c_str());
+    REQUIRE_TRUE(false, 0,
+                 "LSTM_LAYER operation: wrong shape of initial cell state, expected is %s, but got %s instead !",
+                 ShapeUtils::shapeAsString({2, bS, nOut}).c_str(), ShapeUtils::shapeAsString(cI).c_str());
     // peephole weights validation
     if (Wp != nullptr && (Wp->rankOf() != 2 || Wp->sizeAt(0) != 2 || Wp->sizeAt(1) != 3 * nOut))
-      REQUIRE_TRUE(false, 0, "LSTM_LAYER operation: wrong peephole weights, expected is %s, but got %s instead !",
-                   ShapeUtils::shapeAsString({2, 3 * nOut}).c_str(), ShapeUtils::shapeAsString(Wp).c_str());
+    REQUIRE_TRUE(false, 0, "LSTM_LAYER operation: wrong peephole weights, expected is %s, but got %s instead !",
+                 ShapeUtils::shapeAsString({2, 3 * nOut}).c_str(), ShapeUtils::shapeAsString(Wp).c_str());
   }
 
   std::vector<float> params = {
@@ -263,38 +263,39 @@ CUSTOM_OP_IMPL(lstmLayer, 3, 1, false, 1, 5) {
     helpers::lstmLayerTimeLoop(x, Wx, Wr, b, seqLen, hI, cI, Wp, params, false, h, hL, cL);
   } else {  // bidirectional
 
-    NDArray WxFwd = (*Wx)({0, 1, 0, 0, 0, 0});
-    NDArray WxBwd = (*Wx)({1, 2, 0, 0, 0, 0});
-    NDArray WrFwd = (*Wr)({0, 1, 0, 0, 0, 0});
-    NDArray WrBwd = (*Wr)({1, 2, 0, 0, 0, 0});
+    NDArray *WxFwd = (*Wx)({0, 1, 0, 0, 0, 0});
+    NDArray *WxBwd = (*Wx)({1, 2, 0, 0, 0, 0});
+    NDArray *WrFwd = (*Wr)({0, 1, 0, 0, 0, 0});
+    NDArray *WrBwd = (*Wr)({1, 2, 0, 0, 0, 0});
+
 
     NDArray *WpFwd(nullptr), *WpBwd(nullptr), *bFwd(nullptr), *bBwd(nullptr), *hIFwd(nullptr), *hIBwd(nullptr),
         *cIFwd(nullptr), *cIBwd(nullptr), *hLFwd(nullptr), *hLBwd(nullptr), *cLFwd(nullptr), *cLBwd(nullptr),
         *hFwd(nullptr), *hBwd(nullptr);
 
     if (Wp) {
-      WpFwd = new NDArray((*Wp)({0, 1, 0, 0}));
-      WpBwd = new NDArray((*Wp)({1, 2, 0, 0}));
+      WpFwd = (*Wp)({0, 1, 0, 0});
+      WpBwd = (*Wp)({1, 2, 0, 0});
     }
     if (b) {
-      bFwd = new NDArray((*b)({0, 1, 0, 0}));
-      bBwd = new NDArray((*b)({1, 2, 0, 0}));
+      bFwd = (*b)({0, 1, 0, 0});
+      bBwd = (*b)({1, 2, 0, 0});
     }
     if (hI) {
-      hIFwd = new NDArray((*hI)({0, 1, 0, 0, 0, 0}));
-      hIBwd = new NDArray((*hI)({1, 2, 0, 0, 0, 0}));
+      hIFwd = (*hI)({0, 1, 0, 0, 0, 0});
+      hIBwd = (*hI)({1, 2, 0, 0, 0, 0});
     }
     if (cI) {
-      cIFwd = new NDArray((*cI)({0, 1, 0, 0, 0, 0}));
-      cIBwd = new NDArray((*cI)({1, 2, 0, 0, 0, 0}));
+      cIFwd =(*cI)({0, 1, 0, 0, 0, 0});
+      cIBwd = (*cI)({1, 2, 0, 0, 0, 0});
     }
     if (hL) {
-      hLFwd = new NDArray((*hL)({0, 1, 0, 0, 0, 0}));
-      hLBwd = new NDArray((*hL)({1, 2, 0, 0, 0, 0}));
+      hLFwd = (*hL)({0, 1, 0, 0, 0, 0});
+      hLBwd = (*hL)({1, 2, 0, 0, 0, 0});
     }
     if (cL) {
-      cLFwd = new NDArray((*cL)({0, 1, 0, 0, 0, 0}));
-      cLBwd = new NDArray((*cL)({1, 2, 0, 0, 0, 0}));
+      cLFwd = (*cL)({0, 1, 0, 0, 0, 0});
+      cLBwd = (*cL)({1, 2, 0, 0, 0, 0});
     }
 
     if (h) {
@@ -302,17 +303,17 @@ CUSTOM_OP_IMPL(lstmLayer, 3, 1, false, 1, 5) {
         hFwd = h;
         hBwd = new NDArray(h, false, h->getContext());
       } else if (directionMode == 3) {  // concat
-        hFwd = new NDArray(dataFormat <= 1 ? (*h)({0, 0, 0, 0, 0, nOut}) : (*h)({0, 0, 0, nOut, 0, 0}));
-        hBwd = new NDArray(dataFormat <= 1 ? (*h)({0, 0, 0, 0, nOut, 2 * nOut}) : (*h)({0, 0, nOut, 2 * nOut, 0, 0}));
+        hFwd = dataFormat <= 1 ? (*h)({0, 0, 0, 0, 0, nOut}) : (*h)({0, 0, 0, nOut, 0, 0});
+        hBwd = dataFormat <= 1 ? (*h)({0, 0, 0, 0, nOut, 2 * nOut}) : (*h)({0, 0, nOut, 2 * nOut, 0, 0});
       } else {  // directionMode == 4
-        hFwd = new NDArray((*h)({0, 0, 0, 1, 0, 0, 0, 0}));
-        hBwd = new NDArray((*h)({0, 0, 1, 2, 0, 0, 0, 0}));
+        hFwd = (*h)({0, 0, 0, 1, 0, 0, 0, 0});
+        hBwd = (*h)({0, 0, 1, 2, 0, 0, 0, 0});
       }
     }
 
     // FIXME - following two calls are independent and may run in different streams
-    helpers::lstmLayerTimeLoop(x, &WxFwd, &WrFwd, bFwd, seqLen, hIFwd, cIFwd, WpFwd, params, true, hFwd, hLFwd, cLFwd);
-    helpers::lstmLayerTimeLoop(x, &WxBwd, &WrBwd, bBwd, seqLen, hIBwd, cIBwd, WpBwd, params, false, hBwd, hLBwd, cLBwd);
+    helpers::lstmLayerTimeLoop(x, WxFwd, WrFwd, bFwd, seqLen, hIFwd, cIFwd, WpFwd, params, true, hFwd, hLFwd, cLFwd);
+    helpers::lstmLayerTimeLoop(x, WxBwd, WrBwd, bBwd, seqLen, hIBwd, cIBwd, WpBwd, params, false, hBwd, hLBwd, cLBwd);
 
     if (h && directionMode == 2) *h += *hBwd;
 
@@ -329,50 +330,54 @@ CUSTOM_OP_IMPL(lstmLayer, 3, 1, false, 1, 5) {
     delete cLFwd;
     delete cLBwd;
     delete hBwd;
+    delete WxFwd;
+    delete WxBwd;
+    delete WrFwd;
+    delete WrBwd;
     if (hFwd != h) delete hFwd;
   }
 
-  return sd::Status::OK;
+  return Status::OK;
 }
 
 DECLARE_TYPES(lstmLayer) {
-  getOpDescriptor()->setAllowedInputTypes(sd::DataType::ANY)->setAllowedOutputTypes({ALL_FLOATS});
+  getOpDescriptor()->setAllowedInputTypes(ANY)->setAllowedOutputTypes({ALL_FLOATS});
 }
 
 DECLARE_SHAPE_FN(lstmLayer) {
   const auto dataFormat = INT_ARG(0);  // for unidirectional: 0 = [sL, bS, nIn], 1 = [bS, sL ,nIn], 2 = [bS, nIn, sL],
-                                       // for bidirectional: 3 = [sL, 2, bS, nIn] (for ONNX)
+  // for bidirectional: 3 = [sL, 2, bS, nIn] (for ONNX)
   const auto directionMode = INT_ARG(1);  // direction: 0 = fwd, 1 = bwd, 2 = bidirectional sum, 3 = bidirectional
-                                          // concat, 4 = bidirectional extra output dim
+  // concat, 4 = bidirectional extra output dim
 
   const auto retFullSeq = B_ARG(5);  // indicates whether to return whole h {h_0, h_1, ... , h_sL-1}, if true, format
-                                     // would be [sL,bS,nOut] (exact shape depends on dataFormat argument)
+  // would be [sL,bS,nOut] (exact shape depends on dataFormat argument)
   const auto retLastH = B_ARG(6);    // indicates whether to return output at last time step only, in this case shape
-                                     // would be [bS, nOut] (exact shape depends on dataFormat argument)
+  // would be [bS, nOut] (exact shape depends on dataFormat argument)
   const auto retLastC = B_ARG(7);  // indicates whether to return cells state at last time step only, in this case shape
-                                   // would be [bS, nOut] (exact shape depends on dataFormat argument)
+  // would be [bS, nOut] (exact shape depends on dataFormat argument)
 
   const auto x = INPUT_VARIABLE(0);   // input
   const auto Wx = INPUT_VARIABLE(1);  // input weights
   const auto Wr = INPUT_VARIABLE(2);  // recurrent weights
 
   // evaluate dimensions
-  const sd::LongType sL = dataFormat == 3 ? x->sizeAt(0) : x->sizeAt(dataFormat);
-  const sd::LongType bS = dataFormat == 1 || dataFormat == 2 ? x->sizeAt(0) : x->sizeAt(1);
-  const sd::LongType nIn = dataFormat == 2 ? x->sizeAt(1) : x->sizeAt(2);
-  const sd::LongType nOut = Wx->sizeAt(-1) / 4;
+  const LongType sL = dataFormat == 3 ? x->sizeAt(0) : x->sizeAt(dataFormat);
+  const LongType bS = dataFormat == 1 || dataFormat == 2 ? x->sizeAt(0) : x->sizeAt(1);
+  const LongType nIn = dataFormat == 2 ? x->sizeAt(1) : x->sizeAt(2);
+  const LongType nOut = Wx->sizeAt(-1) / 4;
 
   DataType type;
   if (x->isR())
     type = x->dataType();
   else
-    type = sd::DataType::FLOAT32;
+    type = FLOAT32;
 
   auto shapes = SHAPELIST();
 
   // evaluate h shape (output)
   if (retFullSeq) {
-    std::vector<sd::LongType> hShape;
+    std::vector<LongType> hShape;
 
     if (directionMode <= 2) {  // single direction or bidirectional with sum
       if (dataFormat == 0)
@@ -398,7 +403,7 @@ DECLARE_SHAPE_FN(lstmLayer) {
 
   // evaluate hL shape (output at last step)
   if (retLastH) {
-    std::vector<sd::LongType> hLShape;
+    std::vector<LongType> hLShape;
 
     if (directionMode < 2)
       hLShape = {bS, nOut};
@@ -413,7 +418,7 @@ DECLARE_SHAPE_FN(lstmLayer) {
 
   // evaluate cL shape (cell state at last step)
   if (retLastC && !retLastH) {
-    std::vector<sd::LongType> cLShape;
+    std::vector<LongType> cLShape;
 
     if (directionMode < 2)
       cLShape = {bS, nOut};
@@ -557,10 +562,10 @@ CUSTOM_OP_IMPL(lstmLayer_bp, 4, 1, false, 1, 5) {
   // !!! dimension 3*nOut implies order it, ft, ot
 
   const auto dataFormat = INT_ARG(0);  // for unidirectional: 0 = [sL, bS, nIn], 1 = [bS, sL ,nIn], 2 = [bS, nIn, sL],
-                                       // for bidirectional: 3 = [sL, bS, nIn] && [sL, 2, bS, nOut] (for ONNX)
-  const auto directionMode =
-      INT_ARG(1);  // direction: 0 = fwd, 1 = bwd, 2 = bidirectional sum, 3 = bidirectional concat, 4 = bidirectional
-                   // extra output dim (in conjunction with format dataFormat = 3)
+  // for bidirectional: 3 = [sL, bS, nIn] && [sL, 2, bS, nOut] (for ONNX)
+  const auto directionMode = INT_ARG(1);
+  // direction: 0 = fwd, 1 = bwd, 2 = bidirectional sum, 3 = bidirectional concat, 4 = bidirectional
+  // extra output dim (in conjunction with format dataFormat = 3)
 
   // integer numbers corresponding to activations: 0=tanh, 1=relu, 2=sigmoid, 3=affine, 4=leaky relu, 5= thresholded
   // relu, 6=scaled tanh, 7=hard sigmoid, 8=ELU, 9=softsign, 10=softplus
@@ -574,7 +579,7 @@ CUSTOM_OP_IMPL(lstmLayer_bp, 4, 1, false, 1, 5) {
   const auto hasInitC = B_ARG(3);    // indicates whether initial cell state is provided
   const auto hasPH = B_ARG(4);       // indicates whether peephole connections are present
   const auto retFullSeq = B_ARG(5);  // indicates whether gradient vs. outputs is given for whole time sequence dLdh
-                                     // {dLdh_0, dLdh_1, ... , dLdh_sL-1}
+  // {dLdh_0, dLdh_1, ... , dLdh_sL-1}
   const auto retLastH = B_ARG(6);    // indicates whether gradient vs. output at last time step (dLdhL) is given
   const auto retLastC = B_ARG(7);    // indicates whether gradient vs. cell state at last time step (dLdcL) is given
 
@@ -585,7 +590,7 @@ CUSTOM_OP_IMPL(lstmLayer_bp, 4, 1, false, 1, 5) {
   const auto cellActHasBeta = cellAct == 3 || cellAct == 6;
   const auto outActHasBeta = outAct == 3 || outAct == 6;
 
-  sd::Unsigned count = 1;
+  LongType count = 1;
   const auto cellClip = T_ARG(0);  // cell clipping value, if it = 0 then do not apply clipping
   const auto gateAlpha = gateActHasAlpha ? T_ARG(count++) : 0;
   const auto gateBeta = gateActHasBeta ? T_ARG(count++) : 0;
@@ -608,10 +613,10 @@ CUSTOM_OP_IMPL(lstmLayer_bp, 4, 1, false, 1, 5) {
   const auto Wr = INPUT_VARIABLE(2);  // recurrent weights
 
   // evaluate dimensions
-  const sd::LongType sL = dataFormat == 3 ? x->sizeAt(0) : x->sizeAt(dataFormat);
-  const sd::LongType bS = dataFormat == 1 || dataFormat == 2 ? x->sizeAt(0) : x->sizeAt(1);
-  const sd::LongType nIn = dataFormat == 2 ? x->sizeAt(1) : x->sizeAt(2);
-  const sd::LongType nOut = Wx->sizeAt(-1) / 4;
+  const LongType sL = dataFormat == 3 ? x->sizeAt(0) : x->sizeAt(dataFormat);
+  const LongType bS = dataFormat == 1 || dataFormat == 2 ? x->sizeAt(0) : x->sizeAt(1);
+  const LongType nIn = dataFormat == 2 ? x->sizeAt(1) : x->sizeAt(2);
+  const LongType nOut = Wx->sizeAt(-1) / 4;
 
   // continue with input
   count = 3;
@@ -625,18 +630,18 @@ CUSTOM_OP_IMPL(lstmLayer_bp, 4, 1, false, 1, 5) {
   NDArray *dLdhL = nullptr;
   NDArray *dLdcL = nullptr;
   std::unique_ptr<NDArray> temp_dLdh, temp_dLdhL, temp_dLdcL;
-  std::vector<sd::LongType> expdLdhShape;
+  std::vector<LongType> expdLdhShape;
   // gradient vs. output
   if (retFullSeq) {
     int factor = directionMode <= 2 ? 1 : 2;
     if (dataFormat == 0)
-      expdLdhShape = std::vector<sd::LongType>{sL, bS, factor * nOut};
+      expdLdhShape = std::vector<LongType>{sL, bS, factor * nOut};
     else if (dataFormat == 1)
-      expdLdhShape = std::vector<sd::LongType>{bS, sL, factor * nOut};
+      expdLdhShape = std::vector<LongType>{bS, sL, factor * nOut};
     else if (dataFormat == 2)
-      expdLdhShape = std::vector<sd::LongType>{bS, factor * nOut, sL};
+      expdLdhShape = std::vector<LongType>{bS, factor * nOut, sL};
     else
-      expdLdhShape = std::vector<sd::LongType>{sL, 2, bS, nOut};
+      expdLdhShape = std::vector<LongType>{sL, 2, bS, nOut};
 
     dLdh = INPUT_VARIABLE(count++);
     if (dLdh->isScalar()) {
@@ -648,8 +653,9 @@ CUSTOM_OP_IMPL(lstmLayer_bp, 4, 1, false, 1, 5) {
   if (retLastH) {
     dLdhL = INPUT_VARIABLE(count++);
     if (dLdhL->isScalar()) {
+      std::vector<sd::LongType> shape =  directionMode < 2 ? std::vector<LongType>{bS, nOut} : std::vector<LongType>{2, bS, nOut};
       temp_dLdhL.reset(NDArrayFactory::valueOf(
-          directionMode < 2 ? std::vector<sd::LongType>{bS, nOut} : std::vector<sd::LongType>{2, bS, nOut}, *dLdhL,
+          shape, *dLdhL,
           x->ordering()));
       // refresh
       dLdhL = temp_dLdhL.get();
@@ -659,8 +665,9 @@ CUSTOM_OP_IMPL(lstmLayer_bp, 4, 1, false, 1, 5) {
   if (retLastC) {
     dLdcL = INPUT_VARIABLE(count++);
     if (dLdcL->isScalar()) {
+      std::vector<sd::LongType> shape = directionMode < 2 ? std::vector<LongType>{bS, nOut} : std::vector<LongType>{2, bS, nOut};
       temp_dLdcL.reset(NDArrayFactory::valueOf(
-          directionMode < 2 ? std::vector<sd::LongType>{bS, nOut} : std::vector<sd::LongType>{2, bS, nOut}, *dLdcL,
+          shape, *dLdcL,
           x->ordering()));
       // refresh
       dLdcL = temp_dLdcL.get();
@@ -682,87 +689,87 @@ CUSTOM_OP_IMPL(lstmLayer_bp, 4, 1, false, 1, 5) {
 
     // Wx validation
     if (Wx->rankOf() != 2 || Wx->sizeAt(0) != nIn)
-      REQUIRE_TRUE(false, 0,
-                   "LSTM_LAYER_BP operation: wrong shape of input weights, expected is %s, but got %s instead !",
-                   ShapeUtils::shapeAsString({nIn, 4 * nOut}).c_str(), ShapeUtils::shapeAsString(Wx).c_str());
+    REQUIRE_TRUE(false, 0,
+                 "LSTM_LAYER_BP operation: wrong shape of input weights, expected is %s, but got %s instead !",
+                 ShapeUtils::shapeAsString({nIn, 4 * nOut}).c_str(), ShapeUtils::shapeAsString(Wx).c_str());
     // Wr validation
     if (Wr->rankOf() != 2 || Wr->sizeAt(0) != nOut || Wr->sizeAt(1) != 4 * nOut)
-      REQUIRE_TRUE(false, 0,
-                   "LSTM_LAYER_BP operation: wrong shape of recurrent weights, expected is %s, but got %s instead !",
-                   ShapeUtils::shapeAsString({nOut, 4 * nOut}).c_str(), ShapeUtils::shapeAsString(Wr).c_str());
+    REQUIRE_TRUE(false, 0,
+                 "LSTM_LAYER_BP operation: wrong shape of recurrent weights, expected is %s, but got %s instead !",
+                 ShapeUtils::shapeAsString({nOut, 4 * nOut}).c_str(), ShapeUtils::shapeAsString(Wr).c_str());
     // biases validation
     if (b != nullptr && (b->rankOf() != 1 || b->sizeAt(0) != 4 * nOut))
-      REQUIRE_TRUE(false, 0, "LSTM_LAYER_BP operation: wrong shape of biases, expected is %s, but got %s instead !",
-                   ShapeUtils::shapeAsString({4 * nOut}).c_str(), ShapeUtils::shapeAsString(b).c_str());
+    REQUIRE_TRUE(false, 0, "LSTM_LAYER_BP operation: wrong shape of biases, expected is %s, but got %s instead !",
+                 ShapeUtils::shapeAsString({4 * nOut}).c_str(), ShapeUtils::shapeAsString(b).c_str());
     // initial output validation
     if (hI != nullptr && (hI->rankOf() != 2 || hI->sizeAt(0) != bS || hI->sizeAt(1) != nOut))
-      REQUIRE_TRUE(false, 0,
-                   "LSTM_LAYER_BP operation: wrong shape of initial output, expected is %s, but got %s instead !",
-                   ShapeUtils::shapeAsString({bS, nOut}).c_str(), ShapeUtils::shapeAsString(hI).c_str());
+    REQUIRE_TRUE(false, 0,
+                 "LSTM_LAYER_BP operation: wrong shape of initial output, expected is %s, but got %s instead !",
+                 ShapeUtils::shapeAsString({bS, nOut}).c_str(), ShapeUtils::shapeAsString(hI).c_str());
     // initial cell  validation
     if (cI != nullptr && (cI->rankOf() != 2 || cI->sizeAt(0) != bS || cI->sizeAt(1) != nOut))
-      REQUIRE_TRUE(false, 0,
-                   "LSTM_LAYER_BP operation: wrong shape of initial cell state, expected is %s, but got %s instead !",
-                   ShapeUtils::shapeAsString({bS, nOut}).c_str(), ShapeUtils::shapeAsString(cI).c_str());
+    REQUIRE_TRUE(false, 0,
+                 "LSTM_LAYER_BP operation: wrong shape of initial cell state, expected is %s, but got %s instead !",
+                 ShapeUtils::shapeAsString({bS, nOut}).c_str(), ShapeUtils::shapeAsString(cI).c_str());
     // peephole weights validation
     if (Wp != nullptr && (Wp->rankOf() != 1 || Wp->sizeAt(0) != 3 * nOut))
-      REQUIRE_TRUE(false, 0, "LSTM_LAYER_BP operation: wrong peephole weights, expected is %s, but got %s instead !",
-                   ShapeUtils::shapeAsString({3 * nOut}).c_str(), ShapeUtils::shapeAsString(Wp).c_str());
+    REQUIRE_TRUE(false, 0, "LSTM_LAYER_BP operation: wrong peephole weights, expected is %s, but got %s instead !",
+                 ShapeUtils::shapeAsString({3 * nOut}).c_str(), ShapeUtils::shapeAsString(Wp).c_str());
     // gradient vs. output at last time step validation
     if (dLdhL != nullptr && (dLdhL->rankOf() != 2 || dLdhL->sizeAt(0) != bS || dLdhL->sizeAt(1) != nOut))
-      REQUIRE_TRUE(false, 0,
-                   "LSTM_LAYER_BP operation: wrong shape of gradient vs. output at last time step, expected is %s, but "
-                   "got %s instead !",
-                   ShapeUtils::shapeAsString({bS, nOut}).c_str(), ShapeUtils::shapeAsString(dLdhL).c_str());
+    REQUIRE_TRUE(false, 0,
+                 "LSTM_LAYER_BP operation: wrong shape of gradient vs. output at last time step, expected is %s, but "
+                 "got %s instead !",
+                 ShapeUtils::shapeAsString({bS, nOut}).c_str(), ShapeUtils::shapeAsString(dLdhL).c_str());
     // gradient vs. cell state at last time step validation
     if (dLdcL != nullptr && (dLdcL->rankOf() != 2 || dLdcL->sizeAt(0) != bS || dLdcL->sizeAt(1) != nOut))
-      REQUIRE_TRUE(false, 0,
-                   "LSTM_LAYER_BP operation: wrong shape of gradient vs. cell state at last time, expected is %s, but "
-                   "got %s instead !",
-                   ShapeUtils::shapeAsString({bS, nOut}).c_str(), ShapeUtils::shapeAsString(dLdcL).c_str());
+    REQUIRE_TRUE(false, 0,
+                 "LSTM_LAYER_BP operation: wrong shape of gradient vs. cell state at last time, expected is %s, but "
+                 "got %s instead !",
+                 ShapeUtils::shapeAsString({bS, nOut}).c_str(), ShapeUtils::shapeAsString(dLdcL).c_str());
   } else {  // bidirectional
-            // Wx validation
+    // Wx validation
     if (Wx->rankOf() != 3 || Wx->sizeAt(0) != 2 || Wx->sizeAt(1) != nIn)
-      REQUIRE_TRUE(false, 0,
-                   "LSTM_LAYER_BP operation: wrong shape of input weights, expected is %s, but got %s instead !",
-                   ShapeUtils::shapeAsString({2, nIn, 4 * nOut}).c_str(), ShapeUtils::shapeAsString(Wx).c_str());
+    REQUIRE_TRUE(false, 0,
+                 "LSTM_LAYER_BP operation: wrong shape of input weights, expected is %s, but got %s instead !",
+                 ShapeUtils::shapeAsString({2, nIn, 4 * nOut}).c_str(), ShapeUtils::shapeAsString(Wx).c_str());
     // Wr validation
     if (Wr->rankOf() != 3 || Wr->sizeAt(0) != 2 || Wr->sizeAt(1) != nOut || Wr->sizeAt(2) != 4 * nOut)
-      REQUIRE_TRUE(false, 0,
-                   "LSTM_LAYER_BP operation: wrong shape of recurrent weights, expected is %s, but got %s instead !",
-                   ShapeUtils::shapeAsString({2, nOut, 4 * nOut}).c_str(), ShapeUtils::shapeAsString(Wr).c_str());
+    REQUIRE_TRUE(false, 0,
+                 "LSTM_LAYER_BP operation: wrong shape of recurrent weights, expected is %s, but got %s instead !",
+                 ShapeUtils::shapeAsString({2, nOut, 4 * nOut}).c_str(), ShapeUtils::shapeAsString(Wr).c_str());
     // biases validation
     if (b != nullptr && (b->rankOf() != 2 || b->sizeAt(0) != 2 || b->sizeAt(1) != 4 * nOut))
-      REQUIRE_TRUE(false, 0, "LSTM_LAYER_BP operation: wrong shape of biases, expected is %s, but got %s instead !",
-                   ShapeUtils::shapeAsString({2, 4 * nOut}).c_str(), ShapeUtils::shapeAsString(b).c_str());
+    REQUIRE_TRUE(false, 0, "LSTM_LAYER_BP operation: wrong shape of biases, expected is %s, but got %s instead !",
+                 ShapeUtils::shapeAsString({2, 4 * nOut}).c_str(), ShapeUtils::shapeAsString(b).c_str());
     // initial output validation
     if (hI != nullptr && (hI->rankOf() != 3 || hI->sizeAt(0) != 2 || hI->sizeAt(1) != bS || hI->sizeAt(2) != nOut))
-      REQUIRE_TRUE(false, 0,
-                   "LSTM_LAYER_BP operation: wrong shape of initial output, expected is %s, but got %s instead !",
-                   ShapeUtils::shapeAsString({2, bS, nOut}).c_str(), ShapeUtils::shapeAsString(hI).c_str());
+    REQUIRE_TRUE(false, 0,
+                 "LSTM_LAYER_BP operation: wrong shape of initial output, expected is %s, but got %s instead !",
+                 ShapeUtils::shapeAsString({2, bS, nOut}).c_str(), ShapeUtils::shapeAsString(hI).c_str());
     // initial cell  validation
     if (cI != nullptr && (cI->rankOf() != 3 || cI->sizeAt(0) != 2 || cI->sizeAt(1) != bS || cI->sizeAt(2) != nOut))
-      REQUIRE_TRUE(false, 0,
-                   "LSTM_LAYER_BP operation: wrong shape of initial cell state, expected is %s, but got %s instead !",
-                   ShapeUtils::shapeAsString({2, bS, nOut}).c_str(), ShapeUtils::shapeAsString(cI).c_str());
+    REQUIRE_TRUE(false, 0,
+                 "LSTM_LAYER_BP operation: wrong shape of initial cell state, expected is %s, but got %s instead !",
+                 ShapeUtils::shapeAsString({2, bS, nOut}).c_str(), ShapeUtils::shapeAsString(cI).c_str());
     // peephole weights validation
     if (Wp != nullptr && (Wp->rankOf() != 2 || Wp->sizeAt(0) != 2 || Wp->sizeAt(1) != 3 * nOut))
-      REQUIRE_TRUE(false, 0, "LSTM_LAYER_BP operation: wrong peephole weights, expected is %s, but got %s instead !",
-                   ShapeUtils::shapeAsString({2, 3 * nOut}).c_str(), ShapeUtils::shapeAsString(Wp).c_str());
+    REQUIRE_TRUE(false, 0, "LSTM_LAYER_BP operation: wrong peephole weights, expected is %s, but got %s instead !",
+                 ShapeUtils::shapeAsString({2, 3 * nOut}).c_str(), ShapeUtils::shapeAsString(Wp).c_str());
     // gradient vs. output at last time step validation
     if (dLdhL != nullptr &&
         (dLdhL->rankOf() != 3 || dLdhL->sizeAt(0) != 2 || dLdhL->sizeAt(1) != bS || dLdhL->sizeAt(2) != nOut))
-      REQUIRE_TRUE(false, 0,
-                   "LSTM_LAYER_BP operation: wrong shape of gradient vs. output at last time step, expected is %s, but "
-                   "got %s instead !",
-                   ShapeUtils::shapeAsString({2, bS, nOut}).c_str(), ShapeUtils::shapeAsString(dLdhL).c_str());
+    REQUIRE_TRUE(false, 0,
+                 "LSTM_LAYER_BP operation: wrong shape of gradient vs. output at last time step, expected is %s, but "
+                 "got %s instead !",
+                 ShapeUtils::shapeAsString({2, bS, nOut}).c_str(), ShapeUtils::shapeAsString(dLdhL).c_str());
     // gradient vs. cell state at last time step validation
     if (dLdcL != nullptr &&
         (dLdcL->rankOf() != 3 || dLdcL->sizeAt(0) != 2 || dLdcL->sizeAt(1) != bS || dLdcL->sizeAt(2) != nOut))
-      REQUIRE_TRUE(false, 0,
-                   "LSTM_LAYER_BP operation: wrong shape of gradient vs. cell state at last time, expected is %s, but "
-                   "got %s instead !",
-                   ShapeUtils::shapeAsString({2, bS, nOut}).c_str(), ShapeUtils::shapeAsString(dLdcL).c_str());
+    REQUIRE_TRUE(false, 0,
+                 "LSTM_LAYER_BP operation: wrong shape of gradient vs. cell state at last time, expected is %s, but "
+                 "got %s instead !",
+                 ShapeUtils::shapeAsString({2, bS, nOut}).c_str(), ShapeUtils::shapeAsString(dLdcL).c_str());
   }
 
   // gradient vs. output  validation
@@ -783,21 +790,25 @@ CUSTOM_OP_IMPL(lstmLayer_bp, 4, 1, false, 1, 5) {
 
     helpers::lstmLayerTimeLoopBp(x, Wx, Wr, b, seqLen, hI, cI, Wp, dLdh, dLdhL, dLdcL, params, true, dLdx, dLdWx, dLdWr,
                                  dLdb, dLdhI, dLdcI, dLdWp);
+
   } else if (directionMode == 1) {  // backward
 
     helpers::lstmLayerTimeLoopBp(x, Wx, Wr, b, seqLen, hI, cI, Wp, dLdh, dLdhL, dLdcL, params, false, dLdx, dLdWx,
                                  dLdWr, dLdb, dLdhI, dLdcI, dLdWp);
+
   } else {  // bidirectional
 
-    NDArray WxFwd = (*Wx)({0, 1, 0, 0, 0, 0});
-    NDArray WxBwd = (*Wx)({1, 2, 0, 0, 0, 0});
-    NDArray dLdWxFwd = (*dLdWx)({0, 1, 0, 0, 0, 0});
-    NDArray dLdWxBwd = (*dLdWx)({1, 2, 0, 0, 0, 0});
+    NDArray *WxFwd = (*Wx)({0, 1, 0, 0, 0, 0});
+    NDArray *WxBwd = (*Wx)({1, 2, 0, 0, 0, 0});
+    NDArray *dLdWxFwd = (*dLdWx)({0, 1, 0, 0, 0, 0});
+    NDArray *dLdWxBwd = (*dLdWx)({1, 2, 0, 0, 0, 0});
 
-    NDArray WrFwd = (*Wr)({0, 1, 0, 0, 0, 0});
-    NDArray WrBwd = (*Wr)({1, 2, 0, 0, 0, 0});
-    NDArray dLdWrFwd = (*dLdWr)({0, 1, 0, 0, 0, 0});
-    NDArray dLdWrBwd = (*dLdWr)({1, 2, 0, 0, 0, 0});
+    NDArray *WrFwd = (*Wr)({0, 1, 0, 0, 0, 0});
+    NDArray *WrBwd = (*Wr)({1, 2, 0, 0, 0, 0});
+    NDArray *dLdWrFwd = (*dLdWr)({0, 1, 0, 0, 0, 0});
+    NDArray *dLdWrBwd = (*dLdWr)({1, 2, 0, 0, 0, 0});
+
+
 
     NDArray *WpFwd(nullptr), *WpBwd(nullptr), *bFwd(nullptr), *bBwd(nullptr), *hIFwd(nullptr), *hIBwd(nullptr),
         *cIFwd(nullptr), *cIBwd(nullptr), *dLdhFwd(nullptr), *dLdhBwd(nullptr), *dLdhLFwd(nullptr), *dLdhLBwd(nullptr),
@@ -805,36 +816,36 @@ CUSTOM_OP_IMPL(lstmLayer_bp, 4, 1, false, 1, 5) {
         *dLdbBwd(nullptr), *dLdhIFwd(nullptr), *dLdhIBwd(nullptr), *dLdcIFwd(nullptr), *dLdcIBwd(nullptr);
 
     if (Wp) {
-      WpFwd = new NDArray((*Wp)({0, 1, 0, 0}));
-      WpBwd = new NDArray((*Wp)({1, 2, 0, 0}));
-      dLdWpFwd = new NDArray((*dLdWp)({0, 1, 0, 0}));
-      dLdWpBwd = new NDArray((*dLdWp)({1, 2, 0, 0}));
+      WpFwd = (*Wp)({0, 1, 0, 0});
+      WpBwd = (*Wp)({1, 2, 0, 0});
+      dLdWpFwd = (*dLdWp)({0, 1, 0, 0});
+      dLdWpBwd = (*dLdWp)({1, 2, 0, 0});
     }
     if (b) {
-      bFwd = new NDArray((*b)({0, 1, 0, 0}));
-      bBwd = new NDArray((*b)({1, 2, 0, 0}));
-      dLdbFwd = new NDArray((*dLdb)({0, 1, 0, 0}));
-      dLdbBwd = new NDArray((*dLdb)({1, 2, 0, 0}));
+      bFwd = (*b)({0, 1, 0, 0});
+      bBwd = (*b)({1, 2, 0, 0});
+      dLdbFwd = (*dLdb)({0, 1, 0, 0});
+      dLdbBwd = (*dLdb)({1, 2, 0, 0});
     }
     if (hI) {
-      hIFwd = new NDArray((*hI)({0, 1, 0, 0, 0, 0}));
-      hIBwd = new NDArray((*hI)({1, 2, 0, 0, 0, 0}));
-      dLdhIFwd = new NDArray((*dLdhI)({0, 1, 0, 0, 0, 0}));
-      dLdhIBwd = new NDArray((*dLdhI)({1, 2, 0, 0, 0, 0}));
+      hIFwd = (*hI)({0, 1, 0, 0, 0, 0});
+      hIBwd = (*hI)({1, 2, 0, 0, 0, 0});
+      dLdhIFwd = (*dLdhI)({0, 1, 0, 0, 0, 0});
+      dLdhIBwd = (*dLdhI)({1, 2, 0, 0, 0, 0});
     }
     if (cI) {
-      cIFwd = new NDArray((*cI)({0, 1, 0, 0, 0, 0}));
-      cIBwd = new NDArray((*cI)({1, 2, 0, 0, 0, 0}));
-      dLdcIFwd = new NDArray((*dLdcI)({0, 1, 0, 0, 0, 0}));
-      dLdcIBwd = new NDArray((*dLdcI)({1, 2, 0, 0, 0, 0}));
+      cIFwd = (*cI)({0, 1, 0, 0, 0, 0});
+      cIBwd = (*cI)({1, 2, 0, 0, 0, 0});
+      dLdcIFwd = (*dLdcI)({0, 1, 0, 0, 0, 0});
+      dLdcIBwd = (*dLdcI)({1, 2, 0, 0, 0, 0});
     }
     if (dLdhL) {
-      dLdhLFwd = new NDArray((*dLdhL)({0, 1, 0, 0, 0, 0}));
-      dLdhLBwd = new NDArray((*dLdhL)({1, 2, 0, 0, 0, 0}));
+      dLdhLFwd = (*dLdhL)({0, 1, 0, 0, 0, 0});
+      dLdhLBwd = (*dLdhL)({1, 2, 0, 0, 0, 0});
     }
     if (dLdcL) {
-      dLdcLFwd = new NDArray((*dLdcL)({0, 1, 0, 0, 0, 0}));
-      dLdcLBwd = new NDArray((*dLdcL)({1, 2, 0, 0, 0, 0}));
+      dLdcLFwd = (*dLdcL)({0, 1, 0, 0, 0, 0});
+      dLdcLBwd = (*dLdcL)({1, 2, 0, 0, 0, 0});
     }
 
     if (dLdh) {
@@ -842,24 +853,26 @@ CUSTOM_OP_IMPL(lstmLayer_bp, 4, 1, false, 1, 5) {
         dLdhFwd = dLdh;
         dLdhBwd = dLdh;
       } else if (directionMode == 3) {  // concat
-        dLdhFwd = new NDArray(dataFormat <= 1 ? (*dLdh)({0, 0, 0, 0, 0, nOut}) : (*dLdh)({0, 0, 0, nOut, 0, 0}));
-        dLdhBwd = new NDArray(dataFormat <= 1 ? (*dLdh)({0, 0, 0, 0, nOut, 2 * nOut})
-                                              : (*dLdh)({0, 0, nOut, 2 * nOut, 0, 0}));
+        dLdhFwd = dataFormat <= 1 ? (*dLdh)({0, 0, 0, 0, 0, nOut}) : (*dLdh)({0, 0, 0, nOut, 0, 0});
+        dLdhBwd = dataFormat <= 1 ? (*dLdh)({0, 0, 0, 0, nOut, 2 * nOut})
+                                              : (*dLdh)({0, 0, nOut, 2 * nOut, 0, 0});
       } else {  // directionMode == 4
-        dLdhFwd = new NDArray((*dLdh)({0, 0, 0, 1, 0, 0, 0, 0}));
-        dLdhBwd = new NDArray((*dLdh)({0, 0, 1, 2, 0, 0, 0, 0}));
+        dLdhFwd = (*dLdh)({0, 0, 0, 1, 0, 0, 0, 0});
+        dLdhBwd = (*dLdh)({0, 0, 1, 2, 0, 0, 0, 0});
       }
     }
 
-    NDArray dLdxBwd = dLdx->ulike();
+
+
+    NDArray *dLdxBwd = dLdx->ulike();
 
     // FIXME - following two calls are independent and may run in different streams
-    helpers::lstmLayerTimeLoopBp(x, &WxFwd, &WrFwd, bFwd, seqLen, hIFwd, cIFwd, WpFwd, dLdhFwd, dLdhLFwd, dLdcLFwd,
-                                 params, true, dLdx, &dLdWxFwd, &dLdWrFwd, dLdbFwd, dLdhIFwd, dLdcIFwd, dLdWpFwd);
-    helpers::lstmLayerTimeLoopBp(x, &WxBwd, &WrBwd, bBwd, seqLen, hIBwd, cIBwd, WpBwd, dLdhBwd, dLdhLBwd, dLdcLBwd,
-                                 params, false, &dLdxBwd, &dLdWxBwd, &dLdWrBwd, dLdbBwd, dLdhIBwd, dLdcIBwd, dLdWpBwd);
+    helpers::lstmLayerTimeLoopBp(x, WxFwd, WrFwd, bFwd, seqLen, hIFwd, cIFwd, WpFwd, dLdhFwd, dLdhLFwd, dLdcLFwd,
+                                 params, true, dLdx,dLdWxFwd, dLdWrFwd, dLdbFwd, dLdhIFwd, dLdcIFwd, dLdWpFwd);
+    helpers::lstmLayerTimeLoopBp(x, WxBwd, WrBwd, bBwd, seqLen, hIBwd, cIBwd, WpBwd, dLdhBwd, dLdhLBwd, dLdcLBwd,
+                                 params, false, dLdxBwd, dLdWxBwd, dLdWrBwd, dLdbBwd, dLdhIBwd, dLdcIBwd, dLdWpBwd);
 
-    *dLdx += dLdxBwd;
+    *dLdx += *dLdxBwd;
 
     delete WpFwd;
     delete WpBwd;
@@ -881,18 +894,32 @@ CUSTOM_OP_IMPL(lstmLayer_bp, 4, 1, false, 1, 5) {
     delete dLdhIBwd;
     delete dLdcIFwd;
     delete dLdcIBwd;
+    delete WxFwd;
+    delete WxBwd;
+    delete dLdWxFwd;
+    delete dLdWxBwd;
 
+    delete dLdWrBwd;
+    delete WrFwd;
+    delete WrBwd;
+    delete dLdWrFwd;
     if (!(dLdh && directionMode == 2)) {
       delete dLdhFwd;
       delete dLdhBwd;
     }
+
+    if(directionMode > 2) {
+      delete dLdhFwd;
+      delete dLdhBwd;
+    }
+
   }
 
-  return sd::Status::OK;
+  return Status::OK;
 }
 
 DECLARE_TYPES(lstmLayer_bp) {
-  getOpDescriptor()->setAllowedInputTypes(sd::DataType::ANY)->setAllowedOutputTypes({ALL_FLOATS});
+  getOpDescriptor()->setAllowedInputTypes(ANY)->setAllowedOutputTypes({ALL_FLOATS});
 }
 
 DECLARE_SHAPE_FN(lstmLayer_bp) {
@@ -914,11 +941,22 @@ DECLARE_SHAPE_FN(lstmLayer_bp) {
 
   auto outShapes = SHAPELIST(x->shapeInfo(), Wx->shapeInfo(), Wr->shapeInfo());
 
-  if (b != nullptr) outShapes->push_back(b->shapeInfo());
-  if (seqLen != nullptr) outShapes->push_back(seqLen->shapeInfo());
-  if (hI != nullptr) outShapes->push_back(hI->shapeInfo());
-  if (cI != nullptr) outShapes->push_back(cI->shapeInfo());
-  if (Wp != nullptr) outShapes->push_back(Wp->shapeInfo());
+  if (b != nullptr) {
+    outShapes->push_back(b->shapeInfo());
+  }
+  if (seqLen != nullptr) {
+    outShapes->push_back(seqLen->shapeInfo());
+  }
+  if (hI != nullptr) {
+    outShapes->push_back(hI->shapeInfo());
+  }
+  if (cI != nullptr) {
+    outShapes->push_back(cI->shapeInfo());
+  }
+
+  if (Wp != nullptr) {
+    outShapes->push_back(Wp->shapeInfo());
+  }
 
   return outShapes;
 }

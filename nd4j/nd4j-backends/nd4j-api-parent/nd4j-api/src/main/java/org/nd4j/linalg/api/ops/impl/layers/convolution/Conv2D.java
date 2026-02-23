@@ -26,6 +26,7 @@ import lombok.NoArgsConstructor;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
+
 import onnx.Onnx;
 import org.nd4j.autodiff.samediff.SDVariable;
 import org.nd4j.autodiff.samediff.SameDiff;
@@ -35,13 +36,14 @@ import org.nd4j.imports.NoOpNameFoundException;
 import org.nd4j.imports.converters.DifferentialFunctionClassHolder;
 import org.nd4j.imports.descriptors.properties.AttributeAdapter;
 import org.nd4j.imports.descriptors.properties.PropertyMapping;
-import org.nd4j.imports.descriptors.properties.adapters.*;
-import org.nd4j.imports.graphmapper.tf.TFGraphMapper;
+import org.nd4j.imports.descriptors.properties.adapters.ConditionalFieldValueIntIndexArrayAdapter;
+import org.nd4j.imports.descriptors.properties.adapters.NDArrayShapeAdapter;
+import org.nd4j.imports.descriptors.properties.adapters.SizeThresholdIntArrayIntIndexAdapter;
+import org.nd4j.imports.descriptors.properties.adapters.StringEqualsAdapter;
 import org.nd4j.linalg.api.buffer.DataType;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.api.ops.DynamicCustomOp;
 import org.nd4j.linalg.api.ops.impl.layers.convolution.config.Conv2DConfig;
-import org.nd4j.common.util.ArrayUtil;
 import org.nd4j.linalg.api.ops.impl.layers.convolution.config.PaddingMode;
 import org.nd4j.linalg.util.LinAlgExceptions;
 import org.tensorflow.framework.AttrValue;
@@ -99,17 +101,18 @@ public class Conv2D extends DynamicCustomOp {
     }
 
     protected void addArgs() {
-        addIArgument(config.getKH(),
-                config.getKW(),
-                config.getSH(),
-                config.getSW(),
-                config.getPH(),
-                config.getPW(),
-                config.getDH(),
-                config.getDW(),
-                config.getPaddingMode().index,
-                config.getDataFormat().equalsIgnoreCase("NCHW") ? 0 : 1,
-                config.getWeightsFormat().ordinal());
+        if(config != null)
+            addIArgument(config.getKH(),
+                    config.getKW(),
+                    config.getSH(),
+                    config.getSW(),
+                    config.getPH(),
+                    config.getPW(),
+                    config.getDH(),
+                    config.getDW(),
+                    config.getPaddingMode().index,
+                    config.getDataFormat().equalsIgnoreCase("NCHW") ? 0 : 1,
+                    config.getWeightsFormat().ordinal());
     }
 
 
@@ -209,8 +212,8 @@ public class Conv2D extends DynamicCustomOp {
 
     @Override
     public void initFromTensorFlow(NodeDef nodeDef, SameDiff initWith, Map<String, AttrValue> attributesForNode, GraphDef graph) {
-        TFGraphMapper.initFunctionFromProperties(nodeDef.getOp(), this, attributesForNode, nodeDef, graph);
-        addArgs();
+        throw new UnsupportedOperationException("Use the new Tensorflow Importer instead. This method is now removed.");
+
     }
 
     @Override

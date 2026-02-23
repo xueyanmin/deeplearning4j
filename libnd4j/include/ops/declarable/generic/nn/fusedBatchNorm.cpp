@@ -49,29 +49,19 @@ CUSTOM_OP_IMPL(fused_batch_norm, 3, 3, false, 0, 2) {
                "CUSTOM_OP fused_batch_norm: the rank of input x array must be equal to 4, but got %i instead !",
                x->rankOf());
 
-  int bS = x->sizeAt(0);  // batch size
-  int iH, iW, iD;         // input height, input width, input depth(number of channels)
+  int  iD;         // input height, input width, input depth(number of channels)
   if (dataFormat) {
     iD = x->sizeAt(1);
-    iH = x->sizeAt(2);
-    iW = x->sizeAt(3);
   } else {
     iD = x->sizeAt(3);
-    iH = x->sizeAt(1);
-    iW = x->sizeAt(2);
   }
 
-  auto xCast = x->cast(sd::DataType::FLOAT32);
-  // move to NWHC
-  /**
-   * TODO: TF has a permute to NWHC here:
-   * https://github.com/tensorflow/tensorflow/blob/ce34a83e03394492b1c4e5bb92fbd56da2ba7ce5/tensorflow/core/kernels/fused_batch_norm_op.cc#L137
-   *
-   * This should be done as well for us, but results are still off.
-   * Figure out differences.
-   */
+  auto* xCast = x->cast(sd::DataType::FLOAT32);
   if (dataFormat) {
-    xCast = xCast.permute({0, 2, 3, 1});
+    std::vector<LongType> permute = {0,2,3,1};
+    auto* xCastPermuted = xCast->permute(permute, false, false);
+    delete xCast;
+    xCast = xCastPermuted;
   }
   REQUIRE_TRUE(scale->rankOf() == 1 && scale->sizeAt(0) == iD, 0,
                "CUSTOM_OP fused_batch_norm: wrong shape of input scale array, expected is [%i], but got %s instead", iD,
@@ -108,51 +98,81 @@ CUSTOM_OP_IMPL(fused_batch_norm, 3, 3, false, 0, 2) {
 
   const int restSize = x->lengthOf() / iD;
 
-  auto xAffected = NDArrayFactory::create(x->ordering(), {restSize, iD}, mean->dataType(), block.launchContext());
-  xAffected.assign(xCast);
+  auto* xAffected = NDArrayFactory::create(x->ordering(), {restSize, iD}, mean->dataType(), block.launchContext());
+  xAffected->assign(xCast);
 
   const int restSizeMinusOne = (restSize > 1) ? (restSize - 1) : 1;
   const float restSizeInv = 1.0f / restSize;
   const float restSizeAdjust = (float)restSize / restSizeMinusOne;
 
   if (isTraining) {
-    auto sum = xAffected.reduceAlongDimension(reduce::Sum, {0});
-    sum *= restSizeInv;
+    std::vector<sd::LongType > dim = {0};
+    auto* sum = xAffected->reduceAlongDimension(reduce::Sum, &dim);
+    *sum *= restSizeInv;
     mean->assign(sum);
+    delete sum;
     *batchMean = *mean;
   } else
     *batchMean = 0.;
 
-  auto xCentered = xAffected - *mean;
-  xAffected -= *mean;
+  auto* xCentered = (*xAffected) - (*mean);
+  *xAffected -= *mean;
 
   if (isTraining) {
     int power = 2;
-    xAffected.applyScalar(scalar::Pow, power, xAffected);
-    auto sum = xAffected.reduceAlongDimension(reduce::Sum, {0});
-    sum *= restSizeInv;
+    xAffected->applyScalar(scalar::Pow, power, xAffected);
+    std::vector<sd::LongType > dim = {0};
+
+    auto* sum = xAffected->reduceAlongDimension(reduce::Sum, &dim);
+    *sum *= restSizeInv;
     variance->assign(sum);
-    auto varOutput = (*variance) * restSizeAdjust;
+    delete sum;
+    auto* varOutput = (*variance) * restSizeAdjust;
     batchVar->assign(varOutput);
+    delete varOutput;
   } else
     *batchVar = 0.;
 
-  auto scaledVariance = ((*variance + epsilon).transform(transform::RSqrt) * (*scale)).cast(xAffected.dataType());
-  auto xScaled1 = xCentered * scaledVariance;
-  auto xShifted1 = xScaled1 + *offset;
+  // Break down: ((*variance + epsilon).transform(transform::RSqrt) * (*scale)).cast(xAffected->dataType())
+  auto* variancePlusEps = (*variance) + epsilon;
+  variancePlusEps->applyTransform(transform::RSqrt, variancePlusEps);
+  auto* scaledVariance = (*variancePlusEps) * (*scale);
+  delete variancePlusEps;
+  auto* scaledVarianceCast = scaledVariance->cast(xAffected->dataType());
+  delete scaledVariance;
+  
+  auto* xScaled1 = (*xCentered) * (*scaledVarianceCast);
+  delete xCentered;
+  delete scaledVarianceCast;
+  
+  auto* xShifted1 = (*xScaled1) + (*offset);
+  delete xScaled1;
+  
   if (dataFormat) {
     // need to reshape from matrix to 4d then permute the ordering due to NWHC  ordering
-    auto reshaped = xShifted1.reshape(xCast.ordering(), xCast.getShapeAsVector());
-    reshaped.permutei({0, 3, 1, 2});
+    auto* newShapePtr = xCast->getShapeAsVector();
+    std::vector<LongType> newShape = *newShapePtr;
+    delete newShapePtr;
+    auto* reshaped = xShifted1->reshape(xCast->ordering(), newShape, false);
+    delete xShifted1;
+    reshaped->permutei({0, 3, 1, 2}, 0, false);
     y->assign(reshaped);
+    delete reshaped;
 
-  } else  // NWHC case
+  } else {  // NWHC case
     y->assign(xShifted1);
+    delete xShifted1;
+  }
 
   if (isTraining) {
     delete mean;
     delete variance;
   }
+
+  if(xCast != x) {
+    delete xCast;
+  }
+  delete xAffected;
 
   return sd::Status::OK;
 }
@@ -167,14 +187,7 @@ DECLARE_SHAPE_FN(fused_batch_norm) {
   REQUIRE_TRUE(scaleShapeInfo[0] == 1 && scaleShapeInfo[1] == iD, 0,
                "CUSTOM_OP fused_batch_norm: wrong shape of input scale array, expected is [%i], but got %s instead", iD,
                ShapeUtils::shapeAsString(scaleShapeInfo).c_str());
-
-  sd::LongType *outShapeInfo(nullptr), *batchMeanShapeInfo(nullptr), *batchVarShapeInfo(nullptr);
-
-  COPY_SHAPE(xShapeInfo, outShapeInfo);
-  COPY_SHAPE(scaleShapeInfo, batchMeanShapeInfo);
-  COPY_SHAPE(scaleShapeInfo, batchVarShapeInfo);
-
-  return SHAPELIST(CONSTANT(outShapeInfo), CONSTANT(batchMeanShapeInfo), CONSTANT(batchVarShapeInfo));
+  return SHAPELIST(CONSTANT(xShapeInfo), CONSTANT(scaleShapeInfo), CONSTANT(scaleShapeInfo));
 }
 
 }  // namespace ops

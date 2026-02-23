@@ -20,6 +20,7 @@
 
 package org.deeplearning4j.nn.layers;
 
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.deeplearning4j.exception.DL4JInvalidInputException;
 import org.deeplearning4j.nn.api.Layer;
@@ -86,7 +87,7 @@ public abstract class BaseLayer<LayerConfT extends org.deeplearning4j.nn.conf.la
 
         Gradient ret = new DefaultGradient();
 
-        if(hasBias()){
+        if(hasBias()) {
             INDArray biasGrad = gradientViews.get(DefaultParamInitializer.BIAS_KEY);
             delta.sum(biasGrad, 0); //biasGrad is initialized/zeroed first
             ret.gradientForVariable().put(DefaultParamInitializer.BIAS_KEY, biasGrad);
@@ -121,6 +122,7 @@ public abstract class BaseLayer<LayerConfT extends org.deeplearning4j.nn.conf.la
     }
 
     @Override
+    @SneakyThrows
     public void computeGradientAndScore(LayerWorkspaceMgr workspaceMgr) {
         if (this.input == null)
             return;
@@ -156,7 +158,7 @@ public abstract class BaseLayer<LayerConfT extends org.deeplearning4j.nn.conf.la
 
     @Override
     public void update(INDArray gradient, String paramType) {
-        setParam(paramType, getParam(paramType).addi(gradient));
+        setParam(paramType, getParam(paramType).addi(gradient.reshape(getParam(paramType).shape())));
     }
 
 
@@ -202,6 +204,7 @@ public abstract class BaseLayer<LayerConfT extends org.deeplearning4j.nn.conf.la
         int length = 0;
         for (String s : parameterList)
             length += getParam(s).length();
+        params = params.reshape(params.length());
         if (params.length() != length)
             throw new IllegalArgumentException("Unable to set parameters: must be of length " + length
                     + ", got params of length " + params.length() + " - " + layerId());
@@ -209,7 +212,7 @@ public abstract class BaseLayer<LayerConfT extends org.deeplearning4j.nn.conf.la
         Set<String> paramKeySet = this.params.keySet();
         for (String s : paramKeySet) {
             INDArray param = getParam(s);
-            INDArray get = params.get(NDArrayIndex.point(0), NDArrayIndex.interval(idx, idx + param.length()));
+            INDArray get = params.get(NDArrayIndex.interval(idx, idx + param.length()));
             if (param.length() != get.length())
                 throw new IllegalStateException("Parameter " + s + " should have been of length " + param.length()
                         + " but was " + get.length() + " - " + layerId());
@@ -269,7 +272,7 @@ public abstract class BaseLayer<LayerConfT extends org.deeplearning4j.nn.conf.la
      */
     protected INDArray getParamWithNoise(String param, boolean training, LayerWorkspaceMgr workspaceMgr){
         INDArray p;
-        if(layerConf().getWeightNoise() != null){
+        if(layerConf().getWeightNoise() != null) {
             if(training && weightNoiseParams.size() > 0 && weightNoiseParams.containsKey(param) ){
                 //Re-use these weights for both forward pass and backprop - don't want to use 2 different params here
                 //These should be cleared during  backprop
@@ -301,7 +304,6 @@ public abstract class BaseLayer<LayerConfT extends org.deeplearning4j.nn.conf.la
         INDArray W = getParamWithNoise(DefaultParamInitializer.WEIGHT_KEY, training, workspaceMgr);
         INDArray b = getParamWithNoise(DefaultParamInitializer.BIAS_KEY, training, workspaceMgr);
         INDArray g = (hasLayerNorm() ? getParam(DefaultParamInitializer.GAIN_KEY) : null);
-
         INDArray input = this.input.castTo(dataType);
 
         //Input validation:
@@ -317,17 +319,17 @@ public abstract class BaseLayer<LayerConfT extends org.deeplearning4j.nn.conf.la
                             + W.size(0) + ") " + layerId());
         }
 
-
-        INDArray ret = workspaceMgr.createUninitialized(ArrayType.ACTIVATIONS, W.dataType(), input.size(0), W.size(1));
-        input.castTo(ret.dataType()).mmuli(W, ret);     //TODO Can we avoid this cast? (It sohuld be a no op if not required, however)
+        //scope out of workspaces here to avoid borrow clashes
+        INDArray ret = workspaceMgr.create(ArrayType.ACTIVATIONS,W.dataType(),new long[]{ input.size(0), W.size(1)},'f');
+        input.mmuli(W, ret);
 
         INDArray preNorm = ret;
-        if(hasLayerNorm()){
+        if(hasLayerNorm()) {
             preNorm = (forBackprop ? ret.dup(ret.ordering()) : ret);
             Nd4j.getExecutioner().exec(new LayerNorm(preNorm, g, ret, true, 1));
         }
 
-        if(hasBias()){
+        if(hasBias()) {
             ret.addiRowVector(b);
         }
 
@@ -335,10 +337,15 @@ public abstract class BaseLayer<LayerConfT extends org.deeplearning4j.nn.conf.la
             applyMask(ret);
         }
 
-        return new Pair<>(ret, preNorm);
+        return new Pair<>(workspaceMgr.leverageTo(ArrayType.ACTIVATIONS,ret), workspaceMgr.leverageTo(ArrayType.ACTIVATIONS,preNorm));
+
+
+
+
     }
 
     @Override
+    @SneakyThrows
     public INDArray activate(boolean training, LayerWorkspaceMgr workspaceMgr) {
         INDArray z = preOutput(training, workspaceMgr);
         INDArray ret = layerConf().getActivationFn().getActivation(z, training);
@@ -355,10 +362,10 @@ public abstract class BaseLayer<LayerConfT extends org.deeplearning4j.nn.conf.la
         double scoreSum = 0.0;
         for (Map.Entry<String, INDArray> e : paramTable().entrySet()) {
             List<Regularization> l = layerConf().getRegularizationByParam(e.getKey());
-            if(l == null || l.isEmpty()){
+            if(l == null || l.isEmpty()) {
                 continue;
             }
-            for(Regularization r : l){
+            for(Regularization r : l) {
                 scoreSum += r.score(e.getValue(), getIterationCount(), getEpochCount());
             }
         }

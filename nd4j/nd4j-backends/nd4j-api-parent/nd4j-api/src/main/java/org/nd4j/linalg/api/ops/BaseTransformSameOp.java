@@ -23,9 +23,11 @@ package org.nd4j.linalg.api.ops;
 import org.nd4j.autodiff.samediff.SDVariable;
 import org.nd4j.autodiff.samediff.SameDiff;
 import org.nd4j.common.base.Preconditions;
+import org.nd4j.linalg.api.buffer.DataBuffer;
 import org.nd4j.linalg.api.buffer.DataType;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.api.shape.LongShapeDescriptor;
+import org.nd4j.linalg.factory.Nd4j;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -53,8 +55,8 @@ public abstract class BaseTransformSameOp extends BaseTransformOp implements Tra
         super(sameDiff, i_v, inPlace);
     }
 
-    public BaseTransformSameOp(SameDiff sameDiff, SDVariable i_v, long[] shape, boolean inPlace, Object[] extraArgs) {
-        super(sameDiff, i_v, shape, inPlace, extraArgs);
+    public BaseTransformSameOp(SameDiff sameDiff, SDVariable i_v,  boolean inPlace, Object[] extraArgs) {
+        super(sameDiff, i_v, inPlace, extraArgs);
     }
 
     public BaseTransformSameOp(SameDiff sameDiff, SDVariable i_v, Object[] extraArgs) {
@@ -117,26 +119,29 @@ public abstract class BaseTransformSameOp extends BaseTransformOp implements Tra
     }
 
     @Override
-    public List<LongShapeDescriptor> calculateOutputShape() {
+    public List<DataBuffer> calculateOutputShape() {
         return calculateOutputShape(null);
     }
 
     @Override
-    public List<LongShapeDescriptor> calculateOutputShape(OpContext oc) {
+    public List<DataBuffer> calculateOutputShape(OpContext oc) {
         INDArray x = oc != null ? oc.getInputArray(0) : x();
         if(x == null)
             return Collections.emptyList();
-
-        return Collections.singletonList(LongShapeDescriptor.fromShape(x.shape(), x.dataType()));
+        if(x.isEmpty()) {
+            LongShapeDescriptor longShapeDescriptor = LongShapeDescriptor.emptyWithShape(x.shape(),x.dataType());
+            return Collections.singletonList(Nd4j.createBuffer(longShapeDescriptor.toShapeInfo()));
+        }
+        return Collections.singletonList(Nd4j.createBuffer(LongShapeDescriptor.fromShape(x.shape(), x.dataType()).toShapeInfo()));
     }
 
     @Override
-    public List<org.nd4j.linalg.api.buffer.DataType> calculateOutputDataTypes(List<org.nd4j.linalg.api.buffer.DataType> dataTypes){
+    public List<DataType> calculateOutputDataTypes(List<DataType> dataTypes){
         //All same transform ops: always same output type as input type
         Preconditions.checkState(dataTypes != null, "Expected exactly 1 or more input datatype for %s, got input %s", getClass(), dataTypes);
 
-        org.nd4j.linalg.api.buffer.DataType check = null;
-        for(org.nd4j.linalg.api.buffer.DataType dataType : dataTypes) {
+        DataType check = null;
+        for(DataType dataType : dataTypes) {
             if(check != null) {
                 Preconditions.checkState(dataType == check,"Data types must all be the same!");
             } else {

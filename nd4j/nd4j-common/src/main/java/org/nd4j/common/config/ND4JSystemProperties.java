@@ -20,14 +20,20 @@
 
 package org.nd4j.common.config;
 
-import org.nd4j.common.resources.Resources;
-import org.nd4j.common.resources.strumpf.ResourceFile;
-import org.nd4j.common.resources.strumpf.StrumpfResolver;
 
 import java.io.File;
 import java.net.URL;
 
 public class ND4JSystemProperties {
+
+
+    /**
+     * Applicability: always.
+     * Description: Nd4j
+     * has a DeallocatorService for handling automatic
+     * deallocation of ndarrays. This can cause crashes.
+     */
+    public final static String NO_ARRAY_GC = "org.nd4j.noarraygc";
 
     /**
      * Applicability: Always<br>
@@ -158,6 +164,128 @@ public class ND4JSystemProperties {
      * This is optional. Multiple directories may be specified, using comma-separated paths
      */
     public static final String RESOURCES_LOCAL_DIRS = "org.nd4j.strumpf.resource.dirs";
+
+    /**
+     * Whether caching should be enabled for samediff memory managers.
+     * This ia mainly for the default ArrayCacheMemoryMgr.
+     * Sometimes arrays for performance reasons get reused
+     * during a samediff inference session. This may have bad side effects (especially involving views)
+     * This allows enabling or disabling of that behavior.
+     */
+    public final static String SAMEDIFF_MEMORY_CACHE_ENABLE = "org.nd4j.autodiff.samediff.cache.enable";
+
+    /**
+     * Used to trigger loading the import reflection cache. This allows the user to control the initial scan
+     * of the ImportReflectionCache in samediff-import-onnx and samediff-import-tensorflow.
+     * Sometimes delayed initialization is favorable for use cases like graalvm AOT.
+     */
+    public final static String INIT_IMPORT_REFLECTION_CACHE = "org.nd4j.samediff.frameworkimport.initcache";
+
+
+    /**
+     * Used to point to a json resource that contains json for a ClassGraph ScanResult.
+     * This may be needed when using AOT. Graalvm can not handle classpath scanning very well.
+     * A pre scanned resource option will allow model import that relies on annotation scanning
+     * to operate even when using AOT.
+     */
+    public final static String CLASS_GRAPH_SCAN_RESOURCES = "org.nd4j.samediff.frameworkimport.classgraph.scan.json";
+
+    /**
+     * Whether to initialize the native ops holder or not.
+     * Depending on whether we are running in native image or not, disabling automatic initialization
+     * and setting the relevant native ops elsewhere might be necessary.
+     * For more see {@link org.nd4j.nativeblas.NativeOpsHolder }
+     */
+    public final static String INIT_NATIVEOPS_HOLDER = "org.nd4j.nativeblas.nativeops.init";
+
+
+
+    /**
+     * Maximum memory fraction to use as cache. For more see:
+     * https://github.com/deeplearning4j/deeplearning4j/blob/2f08cc208b3bae1007bbbb001938d17c15926a09/nd4j/nd4j-backends/nd4j-api-parent/nd4j-api/src/main/java/org/nd4j/autodiff/samediff/internal/memory/ArrayCacheMemoryMgr.java#L156-L157
+     */
+    public final static String CACHE_MEM_FRACTION = "org.nd4j.cache.cache_mem_fraction";
+    /**
+     * Below this size (elements), don't apply the
+     * "largerArrayMaxMultiple" rule.
+     * For more see: https://github.com/deeplearning4j/deeplearning4j/blob/2f08cc208b3bae1007bbbb001938d17c15926a09/nd4j/nd4j-backends/nd4j-api-parent/nd4j-api/src/main/java/org/nd4j/autodiff/samediff/internal/memory/ArrayCacheMemoryMgr.java#L156-L157
+     */
+    public final static String SMALL_ARRAY_THRESHOLD = "org.nd4j.cache.cache_small_array_threshold";
+
+    /**
+     * Maximum multiple of the requested size to
+     * return from the cache. If an array of size
+     * 1024 is requested, and largerArrayMaxMultiple
+     * is 2.0, then we'll return from the cache
+     * the array with the smallest data buffer up to
+     * 2.0*1024 elements; otherwise we'll return
+     * a new array
+     *
+     *  For more see: https://github.com/deeplearning4j/deeplearning4j/blob/2f08cc208b3bae1007bbbb001938d17c15926a09/nd4j/nd4j-backends/nd4j-api-parent/nd4j-api/src/main/java/org/nd4j/autodiff/samediff/internal/memory/ArrayCacheMemoryMgr.java#L156-L157
+     */
+    public final static String LARGE_ARRAY_MAX_MULTIPLE = "org.nd4j.cache.large_array_max_multiple";
+
+    /**
+     * For usage with the EventLogger. When the event logger is enabled, extra information will be tracked
+     * including allocations, deallocations and other difficult to track down events.
+     * Note that enabling this will add a certain amount of overhead.
+     */
+    public final static String EVENT_LOGGER_ENABLED = "org.nd4j.linalg.profiler.eventlogger.enabled";
+
+    /**
+     * For usage with the EventLogger. Tells the event logger to
+     * format its log output as a date instead of the default nanoseconds.
+     */
+    public final static String EVENT_LOGGER_FORMAT_AS_DATE = "org.nd4j.linalg.profiler.eventlogger.logdate";
+
+
+    /**
+     * Set the package names to be scanned when using udfs.
+     * The value should be a comma separated list.
+     */
+    public final static String UDF_NAME_SPACES = "org.nd4j.linalg.api.ops.udf.packages";
+
+
+    /**
+     * Set the  classes to be used in fully qualified format (org.nd4j.ClassName something for example..)
+     * Note this will be checked BEFORE UDF_NAME_SPACES. Pick only 1  to use.
+     * The value should be a comma separated list.
+     */
+    public final static String UDF_CLASSES = "org.nd4j.linalg.api.ops.udf.classes";
+
+    /**
+     * Sets the number of threads to be used with the deallocator service.
+     */
+
+    public final static String DEALLOCATOR_SERVICE_GC_THREADS = "org.nd4j.deallocator.threads";
+
+
+    /**
+     * Set the priority for the cpu backend.
+     */
+    public final static String BACKEND_PRIORITY_CPU = "org.nd4j.cpu.priority";
+
+    /**
+     * Set the priority for the cuda backend.
+     */
+    public final static String BACKEND_PRIORITY_GPU = "org.nd4j.gpu.priority";
+
+
+    /**
+     * Set the priority for the aurora backend.
+     */
+    public final static String BACKEND_PRIORITY_AURORA = "org.nd4j.aurora.priority";
+
+
+    /**
+     * Related to nd4j array events.
+     * When determining the point of invocation or point of origin:
+     * aka the points where the ndarray event was triggered
+     * or the originating call site that kicked off the event
+     * These properties represent patterns of regexes to exclude
+     * from scanning when detrermining where the ndarray event was triggered.
+     */
+    public final static String ND4J_EVENT_LOG_POINT_OF_ORIGIN_PATTERNS = "org.nd4j.linalg.profiler.pointoforigin.patterns";
 
     private ND4JSystemProperties() {
     }

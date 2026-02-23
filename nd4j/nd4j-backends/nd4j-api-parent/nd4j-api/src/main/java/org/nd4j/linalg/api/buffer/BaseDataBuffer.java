@@ -23,16 +23,24 @@ package org.nd4j.linalg.api.buffer;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
-import org.bytedeco.javacpp.*;
+import org.bytedeco.javacpp.BytePointer;
+import org.bytedeco.javacpp.Pointer;
 import org.bytedeco.javacpp.indexer.*;
 import org.nd4j.common.config.ND4JSystemProperties;
-import org.nd4j.linalg.api.memory.MemoryWorkspace;
 import org.nd4j.common.primitives.AtomicBoolean;
 import org.nd4j.common.primitives.AtomicDouble;
 import org.nd4j.common.primitives.Triple;
 import org.nd4j.common.util.ArrayUtil;
+import org.nd4j.linalg.api.memory.Deallocator;
+import org.nd4j.linalg.api.memory.MemoryWorkspace;
+import org.nd4j.linalg.api.ndarray.INDArray;
+import org.nd4j.linalg.api.ops.OpContext;
+import org.nd4j.linalg.api.ops.impl.transforms.comparison.Eps;
+import org.nd4j.linalg.factory.Nd4j;
+import org.nd4j.nativeblas.OpaqueDataBuffer;
 
 import java.io.*;
+import java.math.BigInteger;
 import java.nio.*;
 import java.util.Collection;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -49,7 +57,7 @@ public abstract class BaseDataBuffer implements DataBuffer {
     private static int TO_STRING_MAX;
     static {
         String s = System.getProperty(ND4JSystemProperties.DATABUFFER_TO_STRING_MAX_ELEMENTS);
-        if(s != null ){
+        if(s != null) {
             try {
                 TO_STRING_MAX = Integer.parseInt(s);
             } catch (NumberFormatException e){
@@ -60,14 +68,19 @@ public abstract class BaseDataBuffer implements DataBuffer {
             TO_STRING_MAX = 1000;
         }
     }
+    protected transient OpaqueDataBuffer ptrDataBuffer;
+    protected transient Deallocator deallocator;
+    protected StackTraceElement[] allocationTrace =  Nd4j.getEnvironment().isFuncTracePrintAllocate()
+            || Nd4j.getEnvironment().isFuncTracePrintJavaOnly() ?
+            Thread.currentThread().getStackTrace() : null;
+
 
     protected DataType type;
     protected long length;
+
+    protected long deallocationId;
     protected long underlyingLength;
-    protected long offset;
     protected byte elementSize;
-    //protected transient ByteBuffer wrappedBuffer;
-    protected transient DataBuffer wrappedDataBuffer;
     protected transient long workspaceGenerationId = 0L;
 
     protected AllocationMode allocationMode;
@@ -78,17 +91,24 @@ public abstract class BaseDataBuffer implements DataBuffer {
     protected transient boolean attached = false;
     protected transient MemoryWorkspace parentWorkspace;
 
-    // Allocator-related stuff. Moved down here to avoid opType casting.
-    protected transient DataBuffer originalBuffer;
-    protected transient long originalOffset = 0;
 
     protected transient boolean constant = false;
-    protected transient boolean released = false;
+    protected transient AtomicBoolean released = new AtomicBoolean(false);
 
     protected transient AtomicBoolean referenced = new AtomicBoolean(false);
-    //protected transient Collection<WeakReference<BaseDataBuffer>> references = new ArrayList<>();
 
     public BaseDataBuffer() {}
+
+
+    @Override
+    public StackTraceElement[] allocationTrace() {
+        return allocationTrace;
+    }
+
+    @Override
+    public Deallocator deallocator() {
+        return deallocator;
+    }
 
     /**
      * Initialize the opType of this buffer
@@ -96,19 +116,23 @@ public abstract class BaseDataBuffer implements DataBuffer {
     protected abstract void initTypeAndSize();
 
     @Override
+    public OpaqueDataBuffer opaqueBuffer() {
+        if (released.get())
+            throw new IllegalStateException("You can't use DataBuffer once it was released via close() call");
+        return ptrDataBuffer;
+    }
+
+    @Override
     public int getElementSize() {
         return elementSize;
     }
 
 
+
     @Override
     public long getGenerationId() {
-        if(parentWorkspace != null){
+        if(parentWorkspace != null) {
             return workspaceGenerationId;
-        } else if(wrappedDataBuffer != null && wrappedDataBuffer.isAttached()){
-            return wrappedDataBuffer.getGenerationId();
-        } else if(originalBuffer != null && originalBuffer.isAttached()){
-            return originalBuffer.getGenerationId();
         }
         return workspaceGenerationId;
     }
@@ -128,11 +152,13 @@ public abstract class BaseDataBuffer implements DataBuffer {
         this.length = length;
         this.allocationMode = AllocationMode.MIXED_DATA_TYPES;
         this.underlyingLength = length;
-        this.wrappedDataBuffer = this;
 
-        if (length > 0) {
+        if (length > 0 || indexer != null) {
             this.pointer = pointer;
             setIndexer(indexer);
+        }
+        if(!Nd4j.getDeallocatorService().getListeners().isEmpty()) {
+            Nd4j.getDeallocatorService().registerDataBufferToListener(this);
         }
     }
 
@@ -143,63 +169,6 @@ public abstract class BaseDataBuffer implements DataBuffer {
 
     protected void pickReferent(BaseDataBuffer referent) {
         referenced.compareAndSet(false, true);
-        //references.add(new WeakReference<BaseDataBuffer>(this));
-    }
-
-    /**
-     *
-     * Meant for creating another view of a buffer
-     * @param underlyingBuffer the underlying buffer to create a view from
-     * @param length the length of the view
-     * @param offset the offset for the view
-     */
-    protected BaseDataBuffer(DataBuffer underlyingBuffer, long length, long offset) {
-        if (length < 0)
-            throw new IllegalArgumentException("Length must be >= 0");
-
-        if (length == 0)
-            length = 1;
-
-
-
-        initTypeAndSize();
-        this.length = length;
-        this.offset = offset;
-        this.allocationMode = underlyingBuffer.allocationMode();
-        this.elementSize = (byte) underlyingBuffer.getElementSize();
-        this.underlyingLength = underlyingBuffer.underlyingLength();
-        this.wrappedDataBuffer = underlyingBuffer;
-
-        // we're not referencing constant buffers
-        if (!underlyingBuffer.isConstant())
-            ((BaseDataBuffer) underlyingBuffer).pickReferent(this);
-
-
-        // Adding link to original databuffer
-        if (underlyingBuffer.originalDataBuffer() == null) {
-            this.originalBuffer = underlyingBuffer;
-            this.originalOffset = offset;
-        } else {
-
-            this.originalBuffer = underlyingBuffer.originalDataBuffer();
-
-            // FIXME: please don't remove this comment, since there's probably a bug in current offset() impl,
-            // and this line will change originalOffset accroding to proper offset() impl
-            // FIXME: raver119@gmail.com
-            this.originalOffset = offset; // + underlyingBuffer.originalOffset();
-        }
-
-        pointer = underlyingBuffer.pointer();
-        setIndexer(underlyingBuffer.indexer());
-    }
-
-    /**
-     * Original DataBuffer.
-     * In case if we have a view derived from another view, derived from some other view, original DataBuffer will point to the originating DataBuffer, where all views come from.
-     */
-    @Override
-    public DataBuffer originalDataBuffer() {
-        return originalBuffer;
     }
 
 
@@ -207,7 +176,6 @@ public abstract class BaseDataBuffer implements DataBuffer {
     protected void setNioBuffer() {
         if (elementSize * length >= Integer.MAX_VALUE)
             throw new IllegalArgumentException("Unable to create buffer of length " + length);
-        //wrappedBuffer = pointer().asByteBuffer();
 
     }
 
@@ -218,7 +186,7 @@ public abstract class BaseDataBuffer implements DataBuffer {
      */
     @Override
     public Indexer indexer() {
-        if (released)
+        if (released.get())
             throw new IllegalStateException("You can't use DataBuffer once it was released");
 
         return indexer;
@@ -226,35 +194,14 @@ public abstract class BaseDataBuffer implements DataBuffer {
 
     @Override
     public Pointer pointer() {
-        if (released)
+        if (released.get())
             throw new IllegalStateException("You can't use DataBuffer once it was released");
+        if (released.get())
+            throw new IllegalStateException("This buffer was already released via close() call");
 
-        if (underlyingDataBuffer() != null && underlyingDataBuffer() != this) {
-            if (underlyingDataBuffer().wasClosed())
-                throw new IllegalStateException("You can't use DataBuffer once it was released");
-
-            return underlyingDataBuffer().pointer();
-        } else {
-            if (underlyingDataBuffer() != null)
-                if (((BaseDataBuffer) underlyingDataBuffer()).released)
-                    throw new IllegalStateException("Underlying buffer was released via close() call");
-
-            if (released)
-                throw new IllegalStateException("This buffer was already released via close() call");
-
-            return pointer;
-        }
+        return pointer;
     }
 
-    @Override
-    public DataBuffer underlyingDataBuffer() {
-        return wrappedDataBuffer;
-    }
-
-    @Override
-    public long offset() {
-        return offset;
-    }
 
     @Override
     public AllocationMode allocationMode() {
@@ -286,22 +233,12 @@ public abstract class BaseDataBuffer implements DataBuffer {
 
     @Override
     public void copyAtStride(DataBuffer buf, long n, long stride, long yStride, long offset, long yOffset) {
-        if (dataType() == DataType.FLOAT) {
-            for (int i = 0; i < n; i++) {
-                put(offset + i * stride, buf.getFloat(yOffset + i * yStride));
-            }
-        } else {
-            for (int i = 0; i < n; i++) {
-                put(offset + i * stride, buf.getDouble(yOffset + i * yStride));
-            }
-        }
-
+        Nd4j.getNativeOps().copyBuffer(buf.opaqueBuffer(),n,this.opaqueBuffer(),offset,yOffset);
     }
 
     @Override
     @Deprecated
     public void removeReferencing(String id) {
-        //referencing.remove(id);
     }
 
     @Override
@@ -313,59 +250,10 @@ public abstract class BaseDataBuffer implements DataBuffer {
 
     public abstract Pointer addressPointer();
 
-    /*
-    @Override
-    public Pointer addressPointer() {
-        if (released)
-            throw new IllegalStateException("You can't use DataBuffer once it was released");
-
-        if (offset() > 0) {
-            Pointer ret;
-            // offset is accounted at native side
-            final long retAddress = pointer().address();
-            // directly set address at construction since Pointer.address has not setter.
-            if (dataType() == DataType.DOUBLE) {
-                ret = new DoublePointer(pointer()) {
-                    {
-                        address = retAddress;
-                    }
-                };
-            } else if (dataType() == DataType.FLOAT) {
-                ret = new FloatPointer(pointer()) {
-                    {
-                        address = retAddress;
-                    }
-                };
-            } else if (dataType() == DataType.INT) {
-                ret = new IntPointer(pointer()) {
-                    {
-                        address = retAddress;
-                    }
-                };
-            } else if (dataType() == DataType.LONG) {
-                ret = new LongPointer(pointer()) {
-                    {
-                        address = retAddress;
-                    }
-                };
-            } else {
-                ret = new Pointer(pointer()) {
-                    {
-                        address = retAddress;
-                    }
-                };
-            }
-            ret.limit(ret.limit() - offset());
-            ret.capacity(ret.capacity() - offset());
-            return ret;
-        }
-        return pointer();
-    }
-    */
 
     @Override
     public long address() {
-        if (released)
+        if (released.get())
             throw new IllegalStateException("You can't use DataBuffer once it was released");
 
         return pointer().address();
@@ -374,7 +262,6 @@ public abstract class BaseDataBuffer implements DataBuffer {
     @Override
     @Deprecated
     public void addReferencing(String id) {
-        //referencing.add(id);
     }
 
     @Override
@@ -383,7 +270,7 @@ public abstract class BaseDataBuffer implements DataBuffer {
             throw new IllegalArgumentException("Indices and data length must be the same");
         if (indices.length > length())
             throw new IllegalArgumentException("More elements than space to assign. This buffer is of length "
-                            + length() + " where the indices are of length " + data.length);
+                    + length() + " where the indices are of length " + data.length);
         for (int i = 0; i < indices.length; i++) {
             put(indices[i], data[i]);
         }
@@ -393,51 +280,38 @@ public abstract class BaseDataBuffer implements DataBuffer {
 
     @Override
     public void setData(int[] data) {
-        for (int i = 0; i < data.length; i++) {
-            put(i, data[i]);
-        }
+        put(data);
     }
 
     @Override
     public void setData(float[] data) {
-        for (int i = 0; i < data.length; i++) {
-            put(i, data[i]);
-        }
+        put(data);
     }
 
     @Override
     public void setData(double[] data) {
-        for (int i = 0; i < data.length; i++) {
-            put(i, data[i]);
-        }
+        put(data);
     }
 
     @Override
     public void setData(long[] data) {
-        for (int i = 0; i < data.length; i++) {
-            put(i, data[i]);
-        }
+        put(data);
     }
 
     @Override
     public void setData(byte[] data) {
-        for (int i = 0; i < data.length; i++) {
-            put(i, data[i]);
-        }
+        put(data);
     }
 
     @Override
     public void setData(short[] data) {
-        for (int i = 0; i < data.length; i++) {
-            put(i, data[i]);
-        }
+        put(data);
     }
+
 
     @Override
     public void setData(boolean[] data) {
-        for (int i = 0; i < data.length; i++) {
-            put(i, data[i]);
-        }
+        put(data);
     }
 
     @Override
@@ -446,7 +320,7 @@ public abstract class BaseDataBuffer implements DataBuffer {
             throw new IllegalArgumentException("Indices and data length must be the same");
         if (indices.length > length())
             throw new IllegalArgumentException("More elements than space to assign. This buffer is of length "
-                            + length() + " where the indices are of length " + data.length);
+                    + length() + " where the indices are of length " + data.length);
         for (int i = 0; i < indices.length; i += inc) {
             put(indices[i], data[i]);
         }
@@ -456,7 +330,7 @@ public abstract class BaseDataBuffer implements DataBuffer {
     public void assign(DataBuffer data) {
         if (data.length() != length())
             throw new IllegalArgumentException("Unable to assign buffer of length " + data.length()
-                            + " to this buffer of length " + length());
+                    + " to this buffer of length " + length());
 
         for (int i = 0; i < data.length(); i++) {
             put(i, data.getDouble(i));
@@ -556,8 +430,9 @@ public abstract class BaseDataBuffer implements DataBuffer {
     @Override
     public DataBuffer dup() {
         DataBuffer ret = create(length);
-        for (int i = 0; i < ret.length(); i++)
-            ret.put(i, getDouble(i));
+        Nd4j.getNativeOps().copyBuffer(ret.opaqueBuffer(),
+                length, opaqueBuffer(), 0, 0);
+
 
         return ret;
     }
@@ -611,9 +486,10 @@ public abstract class BaseDataBuffer implements DataBuffer {
         val dataType = dataType();
         switch (dataType) {
             case DOUBLE:
+                double[] data = asDouble();
                 try {
                     for (int i = 0; i < length(); i++) {
-                        dos.writeDouble(getDouble(i));
+                        dos.writeDouble(data[i]);
                     }
                 } catch (IOException e) {
                     throw new RuntimeException(e);
@@ -621,8 +497,9 @@ public abstract class BaseDataBuffer implements DataBuffer {
                 break;
             case FLOAT:
                 try {
+                    float[] dataFloat = asFloat();
                     for (int i = 0; i < length(); i++) {
-                        dos.writeFloat(getFloat(i));
+                        dos.writeFloat(dataFloat[i]);
                     }
                 } catch (IOException e) {
                     throw new RuntimeException(e);
@@ -630,8 +507,10 @@ public abstract class BaseDataBuffer implements DataBuffer {
                 break;
             case HALF:
                 try {
+                    float[] dataFloat = asFloat();
+
                     for (int i = 0; i < length(); i++) {
-                        dos.writeShort(HalfIndexer.fromFloat(getFloat(i)));
+                        dos.writeShort(HalfIndexer.fromFloat(dataFloat[i]));
                     }
                 } catch (IOException e) {
                     throw new RuntimeException(e);
@@ -639,8 +518,9 @@ public abstract class BaseDataBuffer implements DataBuffer {
                 break;
             case BOOL:
                 try {
+                    int[] ints = asInt();
                     for (int i = 0; i < length(); i++) {
-                        dos.writeByte(getInt(i) == 0 ? (byte) 0 : (byte) 1);
+                        dos.writeByte(ints[i] == 0 ? (byte) 0 : (byte) 1);
                     }
                 } catch (IOException e) {
                     throw new RuntimeException(e);
@@ -668,7 +548,7 @@ public abstract class BaseDataBuffer implements DataBuffer {
             case SHORT:
                 try{
                     for (int i = 0; i < length(); i++) {
-                            dos.writeShort(getShort(i));
+                        dos.writeShort(getShort(i));
                     }
                 } catch (IOException e) {
                     throw new RuntimeException(e);
@@ -714,14 +594,14 @@ public abstract class BaseDataBuffer implements DataBuffer {
                 break;
             case UINT64:
                 //Treat unsigned long (UINT64) as 8 bytes
-                byte[] temp2 = new byte[(int)(8*length)];
+                byte[] temp2 = new byte[(int)(8 * length)];
                 asNio().get(temp2);
                 try {
                     if(ByteOrder.nativeOrder().equals(ByteOrder.LITTLE_ENDIAN)) {
                         //Switch endianness to big endian
                         for (int i = 0; i < temp2.length / 8; i++) {
-                            for( int j=0; j<8; j++ ){
-                                dos.write(temp2[8 * i + (7-j)]);
+                            for( int j = 0; j < 8; j++) {
+                                dos.write(temp2[8 * i + (7 - j)]);
                             }
                         }
                     } else {
@@ -734,14 +614,14 @@ public abstract class BaseDataBuffer implements DataBuffer {
                 break;
             case UINT32:
                 //Treat unsigned integer (UINT32) as 4 bytes
-                byte[] temp3 = new byte[(int)(4*length)];
+                byte[] temp3 = new byte[(int)(4 * length)];
                 asNio().get(temp3);
                 try {
                     if(ByteOrder.nativeOrder().equals(ByteOrder.LITTLE_ENDIAN)) {
                         //Switch endianness to big endian
                         for (int i = 0; i < temp3.length / 4; i++) {
-                            for( int j=0; j<4; j++ ){
-                                dos.write(temp3[4 * i + (3-j)]);
+                            for( int j = 0; j < 4; j++) {
+                                dos.write(temp3[4 * i + (3 - j)]);
                             }
                         }
                     } else {
@@ -765,6 +645,19 @@ public abstract class BaseDataBuffer implements DataBuffer {
                 throw new UnsupportedOperationException("Unknown data type: [" + dataType + "]");
         }
         return bos.toByteArray();
+    }
+
+    @Override
+    public boolean[] asBoolean() {
+        if(length >= Integer.MAX_VALUE)
+            throw new IllegalArgumentException("Unable to create array of length " + length);
+        boolean[] ret = new boolean[(int) length];
+        for(int i = 0; i < ret.length; i++) {
+            ret[i] = getIntUnsynced(i) > 0;
+        }
+
+        return ret;
+
     }
 
     @Override
@@ -809,7 +702,7 @@ public abstract class BaseDataBuffer implements DataBuffer {
 
     @Override
     public double getDouble(long i) {
-        if (released)
+        if (released.get())
             throw new IllegalStateException("You can't use DataBuffer once it was released");
 
         if (indexer == null) {
@@ -831,6 +724,7 @@ public abstract class BaseDataBuffer implements DataBuffer {
             case SHORT:
                 return ((ShortIndexer) indexer).get(i);
             case UINT64:
+                return ((ULongIndexer) indexer).get(i).doubleValue();
             case LONG:
                 return ((LongIndexer) indexer).get(i);
             case BOOL:
@@ -848,7 +742,7 @@ public abstract class BaseDataBuffer implements DataBuffer {
 
     @Override
     public long getLong(long i) {
-        if (released)
+        if (released.get())
             throw new IllegalStateException("You can't use DataBuffer once it was released");
 
         switch (dataType()) {
@@ -861,20 +755,21 @@ public abstract class BaseDataBuffer implements DataBuffer {
             case HALF:
                 return (long) ((HalfIndexer) indexer).get( i);
             case UINT64:    //Fall through
+                return  ((ULongIndexer) indexer).get(i).longValue();
             case LONG:
                 return ((LongIndexer) indexer).get(i);
             case UINT32:
-                return (long) ((UIntIndexer) indexer).get(i);
+                return ((UIntIndexer) indexer).get(i);
             case INT:
-                return (long) ((IntIndexer) indexer).get(i);
+                return ((IntIndexer) indexer).get(i);
             case UINT16:
-                return (long) ((UShortIndexer) indexer).get(i);
+                return ((UShortIndexer) indexer).get(i);
             case SHORT:
-                return (long) ((ShortIndexer) indexer).get(i);
+                return ((ShortIndexer) indexer).get(i);
             case BYTE:
-                return (long) ((ByteIndexer) indexer).get(i);
+                return ((ByteIndexer) indexer).get(i);
             case UBYTE:
-                return (long) ((UByteIndexer) indexer).get(i);
+                return ((UByteIndexer) indexer).get(i);
             case BOOL:
                 return  ((BooleanIndexer) indexer).get(i) ? 1L : 0L;
             default:
@@ -888,7 +783,7 @@ public abstract class BaseDataBuffer implements DataBuffer {
      * @return
      */
     protected short getShort(long i) {
-        if (released)
+        if (released.get())
             throw new IllegalStateException("You can't use DataBuffer once it was released");
 
         switch (dataType()) {
@@ -908,8 +803,9 @@ public abstract class BaseDataBuffer implements DataBuffer {
             case SHORT:
                 return ((ShortIndexer) indexer).get(i);
             case BYTE:
-                return  (short) ((ByteIndexer) indexer).get(i);
+                return ((ByteIndexer) indexer).get(i);
             case UINT64:
+                return (short) ((ULongIndexer) indexer).get(i).shortValue();
             case LONG:
                 return (short) ((LongIndexer) indexer).get(i);
             case FLOAT:
@@ -925,12 +821,12 @@ public abstract class BaseDataBuffer implements DataBuffer {
      * @return
      */
     public static short fromFloat(float v) {
-        return ArrayUtil.fromFloat(v);        
+        return ArrayUtil.fromFloat(v);
     }
 
     @Override
     public float getFloat(long i) {
-        if (released)
+        if (released.get())
             throw new IllegalStateException("You can't use DataBuffer once it was released");
 
         switch (dataType()) {
@@ -945,7 +841,7 @@ public abstract class BaseDataBuffer implements DataBuffer {
             case UINT16:
                 return ((UShortIndexer) indexer).get(i);
             case SHORT:
-                return (float) ((ShortIndexer) indexer).get(i);
+                return ((ShortIndexer) indexer).get(i);
             case BFLOAT16:
                 return ((Bfloat16Indexer) indexer).get(i);
             case HALF:
@@ -953,8 +849,9 @@ public abstract class BaseDataBuffer implements DataBuffer {
             case UBYTE:
                 return (float) ((UByteIndexer) indexer).get(i);
             case BYTE:
-                return (float) ((ByteIndexer) indexer).get(i);
-            case UINT64:  //Fall through
+                return ((ByteIndexer) indexer).get(i);
+            case UINT64:
+                return ((ULongIndexer) indexer).get(i).floatValue();
             case LONG:
                 return (float)  ((LongIndexer) indexer).get(i);
             case FLOAT:
@@ -966,7 +863,7 @@ public abstract class BaseDataBuffer implements DataBuffer {
 
     @Override
     public int getInt(long i) {
-        if (released)
+        if (released.get())
             throw new IllegalStateException("You can't use DataBuffer once it was released");
 
         switch (dataType()) {
@@ -990,7 +887,8 @@ public abstract class BaseDataBuffer implements DataBuffer {
                 return ((UByteIndexer) indexer).get(i);
             case BYTE:
                 return ((ByteIndexer) indexer).get(i);
-            case UINT64:  //Fall through
+            case UINT64:
+                return ((ULongIndexer) indexer).get(i).intValue();
             case LONG:
                 return (int) ((LongIndexer) indexer).get(i);
             case FLOAT:
@@ -1002,14 +900,14 @@ public abstract class BaseDataBuffer implements DataBuffer {
 
     @Override
     public Number getNumber(long i) {
-        if (released)
+        if (released.get())
             throw new IllegalStateException("You can't use DataBuffer once it was released");
 
         if (dataType() == DataType.DOUBLE)
             return getDouble(i);
-        else if (dataType() == DataType.INT)
+        else if (dataType() == DataType.INT || dataType() == DataType.INT32)
             return getInt(i);
-        else if (dataType() == DataType.LONG)
+        else if (dataType() == DataType.LONG || dataType() == DataType.INT64)
             return getLong(i);
         return getFloat(i);
     }
@@ -1017,10 +915,10 @@ public abstract class BaseDataBuffer implements DataBuffer {
     public abstract void pointerIndexerByCurrentType(DataType currentType);
 
     public void putByDestinationType(long i, Number element, DataType globalType) {
-        if (globalType == DataType.INT || type == DataType.INT || globalType == DataType.UINT16 || globalType == DataType.UBYTE || globalType == DataType.SHORT|| globalType == DataType.BYTE || globalType == DataType.BOOL) {
+        if (globalType == DataType.INT32 || globalType == DataType.INT || type == DataType.INT || globalType == DataType.UINT16 || globalType == DataType.UBYTE || globalType == DataType.SHORT|| globalType == DataType.BYTE || globalType == DataType.BOOL) {
             int anElement = element.intValue();
             put(i, anElement);
-        } else if (globalType == DataType.LONG || type == DataType.LONG || globalType == DataType.UINT32 || globalType == DataType.UINT64) {
+        } else if (globalType == DataType.INT64 || globalType == DataType.LONG || type == DataType.LONG || globalType == DataType.UINT32 || globalType == DataType.UINT64) {
             long anElement = element.longValue();
             put(i, anElement);
         } else if (globalType == DataType.FLOAT || globalType == DataType.HALF || globalType == DataType.BFLOAT16) {
@@ -1034,9 +932,12 @@ public abstract class BaseDataBuffer implements DataBuffer {
         }
     }
 
+
+
+
     @Override
     public void put(long i, float element) {
-        if (released)
+        if (released.get())
             throw new IllegalStateException("You can't use DataBuffer once it was released");
 
         switch (dataType()) {
@@ -1062,6 +963,8 @@ public abstract class BaseDataBuffer implements DataBuffer {
                 ((IntIndexer) indexer).put(i, (int) element);
                 break;
             case UINT64:
+                ((ULongIndexer) indexer).put(i,  BigInteger.valueOf((long) element));
+                break;
             case LONG:
                 ((LongIndexer) indexer).put(i, (long) element);
                 break;
@@ -1084,7 +987,7 @@ public abstract class BaseDataBuffer implements DataBuffer {
 
     @Override
     public void put(long i, double element) {
-        if (released)
+        if (released.get())
             throw new IllegalStateException("You can't use DataBuffer once it was released");
 
         switch (dataType()) {
@@ -1110,6 +1013,8 @@ public abstract class BaseDataBuffer implements DataBuffer {
                 ((IntIndexer) indexer).put(i, (int) element);
                 break;
             case UINT64:
+                ((ULongIndexer) indexer).put(i,BigInteger.valueOf((long) element));
+                break;
             case LONG:
                 ((LongIndexer) indexer).put(i, (long) element);
                 break;
@@ -1130,9 +1035,62 @@ public abstract class BaseDataBuffer implements DataBuffer {
         }
     }
 
+
+
+    @Override
+    public void put(long i, short element) {
+        if (released.get())
+            throw new IllegalStateException("You can't use DataBuffer once it was released");
+
+        switch (dataType()) {
+            case BOOL:
+                ((BooleanIndexer) indexer).put(i, element == 0 ? false : true);
+                break;
+            case BYTE:
+                ((ByteIndexer) indexer).put(i,  (byte) element);
+                break;
+            case UBYTE:
+                ((UByteIndexer) indexer).put(i,  element);
+                break;
+            case UINT16:
+                ((UShortIndexer) indexer).put(i,  element);
+                break;
+            case SHORT:
+                ((ShortIndexer) indexer).put(i, element);
+                break;
+            case UINT32:
+                ((UIntIndexer) indexer).put(i, element);
+                break;
+            case INT:
+                ((IntIndexer) indexer).put(i, element);
+                break;
+            case UINT64: //Fall through
+                ((ULongIndexer) indexer).put(i,BigInteger.valueOf(element));
+                break;
+            case LONG:
+                ((LongIndexer) indexer).put(i,element);
+                break;
+            case BFLOAT16:
+                ((Bfloat16Indexer) indexer).put(i, element);
+                break;
+            case HALF:
+                ((HalfIndexer) indexer).put(i, element);
+                break;
+            case FLOAT:
+                ((FloatIndexer) indexer).put(i, element);
+                break;
+            case DOUBLE:
+                ((DoubleIndexer) indexer).put(i, element);
+                break;
+            default:
+                throw new UnsupportedOperationException("Unsupported data type: " + dataType());
+        }
+    }
+
+
     @Override
     public void put(long i, int element) {
-        if (released)
+        if (released.get())
             throw new IllegalStateException("You can't use DataBuffer once it was released");
 
         switch (dataType()) {
@@ -1158,8 +1116,10 @@ public abstract class BaseDataBuffer implements DataBuffer {
                 ((IntIndexer) indexer).put(i, element);
                 break;
             case UINT64: //Fall through
+                ((ULongIndexer) indexer).put(i,BigInteger.valueOf(element));
+                break;
             case LONG:
-                ((LongIndexer) indexer).put(i, element);
+                ((LongIndexer) indexer).put(i,element);
                 break;
             case BFLOAT16:
                 ((Bfloat16Indexer) indexer).put(i, element);
@@ -1180,7 +1140,7 @@ public abstract class BaseDataBuffer implements DataBuffer {
 
     @Override
     public void put(long i, boolean element) {
-        if (released)
+        if (released.get())
             throw new IllegalStateException("You can't use DataBuffer once it was released");
 
         switch (dataType()) {
@@ -1206,6 +1166,8 @@ public abstract class BaseDataBuffer implements DataBuffer {
                 ((IntIndexer) indexer).put(i, element ? 1 : 0);
                 break;
             case UINT64:
+                ((ULongIndexer) indexer).put(i, BigInteger.valueOf(element ? 1 : 0));
+                break;
             case LONG:
                 ((LongIndexer) indexer).put(i, element ? 1 : 0);
                 break;
@@ -1227,8 +1189,8 @@ public abstract class BaseDataBuffer implements DataBuffer {
     }
 
     @Override
-    public void put(long i, long element) {
-        if (released)
+    public void put(long i,long element) {
+        if (released.get())
             throw new IllegalStateException("You can't use DataBuffer once it was released");
 
         switch (dataType()) {
@@ -1254,6 +1216,8 @@ public abstract class BaseDataBuffer implements DataBuffer {
                 ((IntIndexer) indexer).put(i, (int) element);
                 break;
             case UINT64:
+                ((ULongIndexer) indexer).put(i, ULongIndexer.toBigInteger(element));
+                break;
             case LONG:
                 ((LongIndexer) indexer).put(i, element);
                 break;
@@ -1275,6 +1239,363 @@ public abstract class BaseDataBuffer implements DataBuffer {
     }
 
     @Override
+    public void put(float[] element) {
+        if (released.get())
+            throw new IllegalStateException("You can't use DataBuffer once it was released");
+
+        switch (dataType()) {
+            case BOOL:
+
+                ((BooleanIndexer) indexer).put(0,ArrayUtil.fromFloat(element));
+                break;
+            case BYTE:
+                ((ByteIndexer) indexer).put(0,ArrayUtil.toBytes(element));
+                break;
+            case UBYTE:
+                ((UByteIndexer) indexer).put(0,ArrayUtil.toIntArray(element));
+                break;
+            case UINT16:
+                ((UShortIndexer) indexer).put(0,ArrayUtil.toInts(element));
+                break;
+            case SHORT:
+                ((ShortIndexer) indexer).put(0,ArrayUtil.toShorts(element));
+                break;
+            case UINT32:
+                ((UIntIndexer) indexer).put(0,ArrayUtil.toLongArray(element));
+                break;
+            case INT:
+                ((IntIndexer) indexer).put(0,ArrayUtil.toIntArray(element));
+                break;
+            case UINT64:
+                BigInteger[] bigIntegers = ArrayUtil.toBigInteger(element);
+                ((ULongIndexer) indexer).put(0,bigIntegers);
+                break;
+            case LONG:
+                ((LongIndexer) indexer).put(0,ArrayUtil.toLongs(element));
+                break;
+            case BFLOAT16:
+                ((Bfloat16Indexer) indexer).put(0,element);
+                break;
+            case HALF:
+                ((HalfIndexer) indexer).put(0,element);
+                break;
+            case FLOAT:
+                ((FloatIndexer) indexer).put(0,element);
+                break;
+            case DOUBLE:
+                ((DoubleIndexer) indexer).put(0,ArrayUtil.toDoubleArray(element));
+                break;
+            default:
+                throw new IllegalStateException("Unsupported type: " + dataType());
+        }
+    }
+
+    @Override
+    public void put(double[] element) {
+        if (released.get())
+            throw new IllegalStateException("You can't use DataBuffer once it was released");
+
+        switch (dataType()) {
+            case BOOL:
+                ((BooleanIndexer) indexer).put(0,ArrayUtil.toBooleanArray(element));
+                break;
+            case BYTE:
+                ((ByteIndexer) indexer).put(0,ArrayUtil.toBytes(element));
+                break;
+            case UBYTE:
+                ((UByteIndexer) indexer).put(0,ArrayUtil.toIntArray(element));
+                break;
+            case UINT16:
+                ((UShortIndexer) indexer).put(0,ArrayUtil.toInts(element));
+                break;
+            case SHORT:
+                ((ShortIndexer) indexer).put(0,ArrayUtil.toShorts(element));
+                break;
+            case UINT32:
+                ((UIntIndexer) indexer).put(0,ArrayUtil.toLongArray(element));
+                break;
+            case INT:
+                ((IntIndexer) indexer).put(0,ArrayUtil.toIntArray(element));
+                break;
+            case UINT64:
+                BigInteger[] bigIntegers = ArrayUtil.toBigInteger(element);
+                ((ULongIndexer) indexer).put(0,bigIntegers);
+                break;
+            case LONG:
+                ((LongIndexer) indexer).put(0,ArrayUtil.toLongArray(element));
+                break;
+            case BFLOAT16:
+                ((Bfloat16Indexer) indexer).put(0,ArrayUtil.toFloatArray(element));
+                break;
+            case HALF:
+                ((HalfIndexer) indexer).put(0,ArrayUtil.toFloatArray(element));
+                break;
+            case FLOAT:
+                ((FloatIndexer) indexer).put(0,ArrayUtil.toFloatArray(element));
+                break;
+            case DOUBLE:
+                ((DoubleIndexer) indexer).put(0,ArrayUtil.toDoubleArray(element));
+                break;
+            default:
+                throw new UnsupportedOperationException("Unsupported data type: " + dataType());
+        }
+    }
+
+    @Override
+    public void put(int[] element) {
+        if (released.get())
+            throw new IllegalStateException("You can't use DataBuffer once it was released");
+
+        switch (dataType()) {
+            case BOOL:
+                ((BooleanIndexer) indexer).put(0,ArrayUtil.toBooleanArray(element));
+                break;
+            case BYTE:
+                ((ByteIndexer) indexer).put(0,ArrayUtil.toBytes(element));
+                break;
+            case UBYTE:
+                ((UByteIndexer) indexer).put(0,ArrayUtil.toIntArray(element));
+                break;
+            case UINT16:
+                ((UShortIndexer) indexer).put(0,ArrayUtil.toIntArray(element));
+                break;
+            case SHORT:
+                ((ShortIndexer) indexer).put(0,ArrayUtil.toShorts(element));
+                break;
+            case UINT32:
+                ((UIntIndexer) indexer).put(0,ArrayUtil.toLongArray(element));
+                break;
+            case INT:
+                ((IntIndexer) indexer).put(0, element);
+                break;
+            case UINT64: //Fall through
+                BigInteger[] map = ArrayUtil.toBigInteger(element);
+                ((ULongIndexer) indexer).put(0,map);
+                break;
+            case LONG:
+                ((LongIndexer) indexer).put(0,ArrayUtil.toLongArray(element));
+                break;
+            case BFLOAT16:
+                ((Bfloat16Indexer) indexer).put(0, ArrayUtil.toFloatArray(element));
+                break;
+            case HALF:
+                ((HalfIndexer) indexer).put(0, ArrayUtil.toFloatArray(element));
+                break;
+            case FLOAT:
+                ((FloatIndexer) indexer).put(0,ArrayUtil.toFloatArray(element));
+                break;
+            case DOUBLE:
+                ((DoubleIndexer) indexer).put(0,ArrayUtil.toDouble(element));
+                break;
+            default:
+                throw new UnsupportedOperationException("Unsupported data type: " + dataType());
+        }
+    }
+
+    @Override
+    public void put(boolean[] element) {
+        if (released.get())
+            throw new IllegalStateException("You can't use DataBuffer once it was released");
+
+        switch (dataType()) {
+            case BOOL:
+                ((BooleanIndexer) indexer).put(0, element);
+                break;
+            case BYTE:
+                ((ByteIndexer) indexer).put(0,ArrayUtil.toBytes(element));
+                break;
+            case UBYTE:
+                ((UByteIndexer) indexer).put(0,ArrayUtil.toIntArray(element));
+                break;
+            case UINT16:
+                ((UShortIndexer) indexer).put(0,ArrayUtil.toIntArray(element));
+                break;
+            case SHORT:
+                ((ShortIndexer) indexer).put(0,ArrayUtil.toShorts(element));
+                break;
+            case UINT32:
+                ((UIntIndexer) indexer).put(0,ArrayUtil.toLongArray(element));
+                break;
+            case INT:
+                ((IntIndexer) indexer).put(0,ArrayUtil.toIntArray(element));
+                break;
+            case UINT64:
+                ((ULongIndexer) indexer).put(0,ArrayUtil.toBigInteger(element));
+                break;
+            case LONG:
+                ((LongIndexer) indexer).put(0,ArrayUtil.toLongArray(element));
+                break;
+            case BFLOAT16:
+                ((Bfloat16Indexer) indexer).put(0,ArrayUtil.toFloatArray(element));
+                break;
+            case HALF:
+                ((HalfIndexer) indexer).put(0,ArrayUtil.toFloatArray(element));
+                break;
+            case FLOAT:
+                ((FloatIndexer) indexer).put(0,ArrayUtil.toFloatArray(element));
+                break;
+            case DOUBLE:
+                ((DoubleIndexer) indexer).put(0,ArrayUtil.toDoubleArray(element));
+                break;
+            default:
+                throw new UnsupportedOperationException("Unsupported data type: " + dataType());
+        }
+    }
+
+
+    @Override
+    public void put(short[] element) {
+        if (released.get())
+            throw new IllegalStateException("You can't use DataBuffer once it was released");
+
+        switch (dataType()) {
+            case BOOL:
+                ((BooleanIndexer) indexer).put(0, ArrayUtil.toBooleanArray(element));
+                break;
+            case BYTE:
+                ((ByteIndexer) indexer).put(0,ArrayUtil.toBytes(element));
+                break;
+            case UBYTE:
+                ((UByteIndexer) indexer).put(0,ArrayUtil.toIntArray(element));
+                break;
+            case UINT16:
+                ((UShortIndexer) indexer).put(0,ArrayUtil.toIntArray(element));
+                break;
+            case SHORT:
+                ((ShortIndexer) indexer).put(0,element);
+                break;
+            case UINT32:
+                ((UIntIndexer) indexer).put(0,ArrayUtil.toLongArray(element));
+                break;
+            case INT:
+                ((IntIndexer) indexer).put(0,ArrayUtil.toIntArray(element));
+                break;
+            case UINT64:
+                ((ULongIndexer) indexer).put(0,ArrayUtil.toBigInteger(element));
+                break;
+            case LONG:
+                ((LongIndexer) indexer).put(0,ArrayUtil.toLongs(element));
+                break;
+            case BFLOAT16:
+                ((Bfloat16Indexer) indexer).put(0,ArrayUtil.toFloatArray(element));
+                break;
+            case HALF:
+                ((HalfIndexer) indexer).put(0,ArrayUtil.toFloatArray(element));
+                break;
+            case FLOAT:
+                ((FloatIndexer) indexer).put(0,ArrayUtil.toFloatArray(element));
+                break;
+            case DOUBLE:
+                ((DoubleIndexer) indexer).put(0,ArrayUtil.toDoubleArray(element));
+                break;
+            default:
+                throw new UnsupportedOperationException("Unsupported data type: " + dataType());
+        }
+    }
+
+
+    @Override
+    public void put(byte[] element) {
+        if (released.get())
+            throw new IllegalStateException("You can't use DataBuffer once it was released");
+
+        switch (dataType()) {
+            case BOOL:
+                ((BooleanIndexer) indexer).put(0, ArrayUtil.toBooleanArray(element));
+                break;
+            case BYTE:
+                ((ByteIndexer) indexer).put(0,element);
+                break;
+            case UBYTE:
+                ((UByteIndexer) indexer).put(0,ArrayUtil.toIntArraySimple(element));
+                break;
+            case UINT16:
+                ((UShortIndexer) indexer).put(0,ArrayUtil.toIntArraySimple(element));
+                break;
+            case SHORT:
+                ((ShortIndexer) indexer).put(0,ArrayUtil.toShorts(element));
+                break;
+            case UINT32:
+                ((UIntIndexer) indexer).put(0,ArrayUtil.toLongArray(element));
+                break;
+            case INT:
+                ((IntIndexer) indexer).put(0,ArrayUtil.toIntArraySimple(element));
+                break;
+            case UINT64:
+                ((ULongIndexer) indexer).put(0,ArrayUtil.toBigInteger(element));
+                break;
+            case LONG:
+                ((LongIndexer) indexer).put(0,ArrayUtil.toLongArray(element));
+                break;
+            case BFLOAT16:
+                ((Bfloat16Indexer) indexer).put(0,ArrayUtil.toFloatArraySimple(element));
+                break;
+            case HALF:
+                ((HalfIndexer) indexer).put(0,ArrayUtil.toFloatArraySimple(element));
+                break;
+            case FLOAT:
+                ((FloatIndexer) indexer).put(0,ArrayUtil.toFloatArraySimple(element));
+                break;
+            case DOUBLE:
+                ((DoubleIndexer) indexer).put(0,ArrayUtil.toDoubleArraySimple(element));
+                break;
+            default:
+                throw new UnsupportedOperationException("Unsupported data type: " + dataType());
+        }
+    }
+
+    @Override
+    public void put(long[] element) {
+        if (released.get())
+            throw new IllegalStateException("You can't use DataBuffer once it was released");
+
+        switch (dataType()) {
+            case BOOL:
+                ((BooleanIndexer) indexer).put(0,ArrayUtil.toBooleanArray(element));
+                break;
+            case BYTE:
+                ((ByteIndexer) indexer).put(0,ArrayUtil.toByteArraySimple(element));
+                break;
+            case UBYTE:
+                ((UByteIndexer) indexer).put(0,ArrayUtil.toIntArray(element));
+                break;
+            case UINT16:
+                ((UShortIndexer) indexer).put(0,ArrayUtil.toIntArray(element));
+                break;
+            case SHORT:
+                ((ShortIndexer) indexer).put(0,ArrayUtil.toShorts(element));
+                break;
+            case UINT32:
+                ((UIntIndexer) indexer).put(0,element);
+                break;
+            case INT:
+                ((IntIndexer) indexer).put(0,ArrayUtil.toIntArray(element));
+                break;
+            case UINT64:
+                ((ULongIndexer) indexer).put(0,ArrayUtil.toBigInteger(element));
+                break;
+            case LONG:
+                ((LongIndexer) indexer).put(0,ArrayUtil.toLongArray(element));
+                break;
+            case BFLOAT16:
+                ((Bfloat16Indexer) indexer).put(0,ArrayUtil.toFloatArray(element));
+                break;
+            case HALF:
+                ((HalfIndexer) indexer).put(0,ArrayUtil.toFloatArray(element));
+                break;
+            case FLOAT:
+                ((FloatIndexer) indexer).put(0,ArrayUtil.toFloatArray(element));
+                break;
+            case DOUBLE:
+                ((DoubleIndexer) indexer).put(0,ArrayUtil.toDoubles(element));
+                break;
+            default:
+                throw new UnsupportedOperationException("Unsupported data type: " + dataType());
+        }
+    }
+
+
+    @Override
     @Deprecated
     public boolean dirty() {
         return false;
@@ -1291,48 +1612,25 @@ public abstract class BaseDataBuffer implements DataBuffer {
 
     @Override
     public IntBuffer asNioInt() {
-        if (offset() >= Integer.MAX_VALUE)
-            throw new IllegalStateException("Index out of bounds " + offset());
+        return wrappedBuffer().asIntBuffer();
 
-        if (offset() == 0) {
-            return wrappedBuffer().asIntBuffer();
-        } else
-            return (IntBuffer) wrappedBuffer().asIntBuffer().position((int) offset());
     }
 
     @Override
     public LongBuffer asNioLong() {
-        if (offset() >= Integer.MAX_VALUE)
-            throw new IllegalStateException("Index out of bounds " + offset());
-
-        if (offset() == 0) {
-            return wrappedBuffer().asLongBuffer();
-        } else
-            return (LongBuffer) wrappedBuffer().asLongBuffer().position((int) offset());
+        return wrappedBuffer().asLongBuffer();
     }
 
     @Override
     public DoubleBuffer asNioDouble() {
-        if (offset() >= Integer.MAX_VALUE)
-            throw new IllegalStateException("Index out of bounds " + offset());
+        return wrappedBuffer().asDoubleBuffer();
 
-        if (offset() == 0) {
-            return wrappedBuffer().asDoubleBuffer();
-        } else {
-            return (DoubleBuffer) wrappedBuffer().asDoubleBuffer().position((int) (offset()));
-        }
     }
 
     @Override
     public FloatBuffer asNioFloat() {
-        if (offset() >= Integer.MAX_VALUE)
-            throw new IllegalStateException("Index out of bounds " + offset());
+        return wrappedBuffer().asFloatBuffer();
 
-        if (offset() == 0) {
-            return wrappedBuffer().asFloatBuffer();
-        } else {
-            return (FloatBuffer) wrappedBuffer().asFloatBuffer().position((int) (offset()));
-        }
 
     }
 
@@ -1346,6 +1644,7 @@ public abstract class BaseDataBuffer implements DataBuffer {
         //note here that the final put will take care of the offset
         for (long i = offset; i < length(); i++)
             put(i, value.doubleValue());
+
     }
 
     @Override
@@ -1389,7 +1688,7 @@ public abstract class BaseDataBuffer implements DataBuffer {
     public void assign(long[] offsets, long[] strides, long n, DataBuffer... buffers) {
         if (offsets.length != strides.length || strides.length != buffers.length)
             throw new IllegalArgumentException(
-                            "Unable to assign buffers, please specify equal lengths strides, offsets, and buffers");
+                    "Unable to assign buffers, please specify equal lengths strides, offsets, and buffers");
         int count = 0;
         for (int i = 0; i < buffers.length; i++) {
             //note here that the final put will take care of the offset
@@ -1430,15 +1729,21 @@ public abstract class BaseDataBuffer implements DataBuffer {
 
     @Override
     public boolean equals(Object o) {
-        // FIXME: this is BAD. it takes too long to work, and it breaks general equals contract
         if (o instanceof DataBuffer) {
             DataBuffer d = (DataBuffer) o;
             if (d.length() != length())
                 return false;
-            for (int i = 0; i < length(); i++) {
-                double eps = Math.abs(getDouble(i) - d.getDouble(i));
-                if (eps > 1e-12)
-                    return false;
+
+            if(d.dataType() != dataType())
+                return false;
+            try (OpContext ctx = Nd4j.getExecutioner().buildContext()) {
+                INDArray arr1 = Nd4j.create(d);
+                INDArray arr2 = Nd4j.create(this);
+                ctx.setInputArrays(arr1, arr2);
+                INDArray exec = Nd4j.getExecutioner().exec(new Eps(arr1, arr2, Nd4j.createUninitialized(DataType.BOOL, length())));
+                return exec.all();
+            } catch (Exception e) {
+                throw new RuntimeException("Error comparing DataBuffers", e);
             }
         }
 
@@ -1508,7 +1813,6 @@ public abstract class BaseDataBuffer implements DataBuffer {
 
                 // we should switch types here
 
-                //wrappedBuffer = pointer().asByteBuffer();
 
             } else if (savedMode.equals(AllocationMode.LONG_SHAPE)) {
                 length = len;
@@ -1746,8 +2050,8 @@ public abstract class BaseDataBuffer implements DataBuffer {
             mant &= 0x3ff; // discard subnormal bit
         } // else +/-0 -> +/-0
         return Float.intBitsToFloat( // combine all parts
-                        (hbits & 0x8000) << 16 // sign  << ( 31 - 15 )
-                                        | (exp | mant) << 13); // value << ( 23 - 10 )
+                (hbits & 0x8000) << 16 // sign  << ( 31 - 15 )
+                        | (exp | mant) << 13); // value << ( 23 - 10 )
     }
 
 
@@ -1805,20 +2109,8 @@ public abstract class BaseDataBuffer implements DataBuffer {
     @Override
     public int hashCode() {
         int result = (int) length;
-        //result = 31 * result + (referencing != null ? referencing.hashCode() : 0);
-        //result = 31 * result + (isPersist ? 1 : 0);
         result = 31 * result + (allocationMode != null ? allocationMode.hashCode() : 0);
         return result;
-    }
-
-    /**
-     * Returns the offset of the buffer relative to originalDataBuffer
-     *
-     * @return
-     */
-    @Override
-    public long originalOffset() {
-        return originalOffset;
     }
 
     /**
@@ -1840,7 +2132,20 @@ public abstract class BaseDataBuffer implements DataBuffer {
      * @param reallyConstant
      */
     public void setConstant(boolean reallyConstant) {
+        deallocator().setConstant(reallyConstant);
         this.constant = reallyConstant;
+        Nd4j.getDeallocatorService().getReferenceMap().remove(this.deallocationId);
+
+    }
+
+    @Override
+    public boolean shouldDeAllocate() {
+        return !isConstant() && !released.get();
+    }
+
+    @Override
+    public int targetDevice() {
+        return 0;
     }
 
     /**
@@ -1872,15 +2177,11 @@ public abstract class BaseDataBuffer implements DataBuffer {
 
     @Override
     public MemoryWorkspace getParentWorkspace() {
-        if(parentWorkspace != null){
+        if(parentWorkspace != null) {
             return parentWorkspace;
         }
-        if(wrappedDataBuffer != null && wrappedDataBuffer.isAttached() && wrappedDataBuffer.getParentWorkspace() != null){
-            return wrappedDataBuffer.getParentWorkspace();
-        }
-        if(originalBuffer != null && originalBuffer.isAttached() && originalBuffer.getParentWorkspace() != null){
-            return originalBuffer.getParentWorkspace();
-        }
+
+
         return null;
     }
 
@@ -1896,50 +2197,28 @@ public abstract class BaseDataBuffer implements DataBuffer {
 
     @Override
     public boolean closeable() {
-        if (released || isAttached() || isConstant())
+        if (released.get() || isAttached() || isConstant())
             return false;
 
-        if (wrappedDataBuffer != null && wrappedDataBuffer != this)
-            return false;
 
         return true;
     }
 
-    protected void markReleased() {
-        this.released = true;
-/*
-        for (val r:references) {
-            val b = r.get();
-
-            if (b != null)
-                b.markReleased();
-        }
-        */
-    }
 
     @Override
     public void close()  {
         if (!closeable())
             throw new IllegalStateException("Can't release this data buffer");
 
-        // notifying other databuffers that their underlying
-        /*
-        for (val r:references) {
-
-            val b = r.get();
-
-            if (b != null)
-                b.markReleased();
-        }
-         */
-
         release();
     }
 
     protected void release() {
-        this.released = true;
+        this.released.set(true);
         this.indexer = null;
         this.pointer = null;
+        this.ptrDataBuffer = null;  // Clear opaque buffer to prevent stale pointer access
+        Nd4j.getDeallocatorService().getReferenceMap().remove(deallocationId);
     }
 
     @Override
@@ -1950,10 +2229,7 @@ public abstract class BaseDataBuffer implements DataBuffer {
 
     @Override
     public boolean wasClosed() {
-        if (wrappedDataBuffer != null && wrappedDataBuffer != this)
-            return wrappedDataBuffer.wasClosed();
-
-        return released;
+        return released.get();
     }
 
 

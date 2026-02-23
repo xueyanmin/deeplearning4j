@@ -26,7 +26,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>org.deeplearning4j</groupId>
+        <groupId>org.eclipse.deeplearning4j</groupId>
         <artifactId>deeplearning4j-ui-parent</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
@@ -35,11 +35,12 @@
 
     <dependencies>
         <dependency>
-            <groupId>org.deeplearning4j</groupId>
+            <groupId>org.eclipse.deeplearning4j</groupId>
             <artifactId>deeplearning4j-ui</artifactId>
             <version>${deeplearning4j.version}</version>
         </dependency>
     </dependencies>
+
 
     <build>
         <plugins>
@@ -139,15 +140,5 @@
         </plugins>
     </build>
 
-    <profiles>
-        <profile>
-            <id>nd4j-tests-cpu</id>
-        </profile>
-        <profile>
-            <id>nd4j-tests-cuda</id>
-        </profile>
-  <profile>
-            <id>nd4j-tests-aurora</id>
-        </profile>
-    </profiles>
+
 </project>

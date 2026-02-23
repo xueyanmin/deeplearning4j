@@ -24,6 +24,7 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import lombok.Data;
 import org.deeplearning4j.nn.modelimport.keras.exceptions.InvalidKerasConfigurationException;
+import org.deeplearning4j.nn.modelimport.keras.utils.KerasModelUtils;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.factory.Nd4j;
 import org.nd4j.linalg.indexing.INDArrayIndex;
@@ -35,8 +36,6 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
-
-import static org.deeplearning4j.nn.modelimport.keras.utils.KerasModelUtils.parseJsonString;
 
 @Data
 public class TimeSeriesGenerator {
@@ -65,7 +64,7 @@ public class TimeSeriesGenerator {
     public static TimeSeriesGenerator fromJson(String jsonFileName)
             throws IOException, InvalidKerasConfigurationException {
         String json = new String(Files.readAllBytes(Paths.get(jsonFileName)));
-        Map<String, Object> timeSeriesBaseConfig = parseJsonString(json);
+        Map<String, Object> timeSeriesBaseConfig = KerasModelUtils.parseJsonString(json);
         Map<String, Object> timeSeriesConfig;
         if (timeSeriesBaseConfig.containsKey("config"))
             timeSeriesConfig = (Map<String, Object>) timeSeriesBaseConfig.get("config");
@@ -155,7 +154,8 @@ public class TimeSeriesGenerator {
         for (int j = 0; j < rows.rows(); j++) {
             long idx = (long) rows.getDouble(j);
             INDArrayIndex indices = NDArrayIndex.interval(idx - this.length, this.samplingRate, idx);
-            samples.putSlice(j, this.data.get(indices));
+            INDArray slice = this.data.get(indices);
+            samples.putSlice(j, slice);
             INDArrayIndex point = NDArrayIndex.point((long) rows.getDouble(j));
             targets.putSlice(j, this.targets.get(point));
         }

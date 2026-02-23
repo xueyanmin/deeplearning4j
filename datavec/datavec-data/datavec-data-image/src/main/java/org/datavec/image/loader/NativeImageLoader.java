@@ -43,7 +43,7 @@ import java.nio.ByteOrder;
 import org.bytedeco.leptonica.*;
 import org.bytedeco.opencv.opencv_core.*;
 
-import static org.bytedeco.leptonica.global.lept.*;
+import static org.bytedeco.leptonica.global.leptonica.*;
 import static org.bytedeco.opencv.global.opencv_core.*;
 import static org.bytedeco.opencv.global.opencv_imgcodecs.*;
 import static org.bytedeco.opencv.global.opencv_imgproc.*;
@@ -388,10 +388,10 @@ public class NativeImageLoader extends BaseImageLoader {
         long[] stride = ret.stride();
         boolean done = false;
         PagedPointer pagedPointer = new PagedPointer(pointer, rows * cols * channels,
-                ret.data().offset() * Nd4j.sizeOfDataType(ret.data().dataType()));
+                ret.offset() * Nd4j.sizeOfDataType(ret.data().dataType()));
 
         if (pointer instanceof FloatPointer) {
-            FloatIndexer retidx = FloatIndexer.create((FloatPointer) pagedPointer.asFloatPointer(),
+            FloatIndexer retidx = FloatIndexer.create(pagedPointer.asFloatPointer(),
                     new long[] {channels, rows, cols}, new long[] {stride[0], stride[1], stride[2]}, direct);
             if (idx instanceof UByteIndexer) {
                 UByteIndexer ubyteidx = (UByteIndexer) idx;
@@ -753,7 +753,7 @@ public class NativeImageLoader extends BaseImageLoader {
         }
         int rank = array.rank();
         long[] stride = array.stride();
-        long offset = array.data().offset();
+        long offset = array.offset();
         Pointer pointer = array.data().pointer().position(offset);
 
         long rows = array.size(rank == 3 ? 1 : 2);
@@ -833,9 +833,6 @@ public class NativeImageLoader extends BaseImageLoader {
             case MINIBATCH:
                 data = Nd4j.create(pixa.n(), 1, 1, pixa.pix(0).h(), pixa.pix(0).w());
                 break;
-//            case CHANNELS:
-//                data = Nd4j.create(1, pixa.n(), 1, pixa.pix(0).h(), pixa.pix(0).w());
-//                break;
             case FIRST:
                 data = Nd4j.create(1, 1, 1, pixa.pix(0).h(), pixa.pix(0).w());
                 PIX pix = pixa.pix(0);
@@ -856,11 +853,10 @@ public class NativeImageLoader extends BaseImageLoader {
                 case MINIBATCH:
                     index = new INDArrayIndex[]{NDArrayIndex.point(i),NDArrayIndex.all(), NDArrayIndex.all(),NDArrayIndex.all(),NDArrayIndex.all()};
                     break;
-//                case CHANNELS:
-//                    index = new INDArrayIndex[]{NDArrayIndex.all(), NDArrayIndex.point(i), NDArrayIndex.all(), NDArrayIndex.all(),NDArrayIndex.all()};
-//                    break;
+//
                 default: throw new UnsupportedOperationException("Unsupported MultiPageMode: " + multiPageMode);
             }
+
             data.put(index , currentD.get(NDArrayIndex.all(), NDArrayIndex.all(), NDArrayIndex.all(),NDArrayIndex.all()));
         }
 

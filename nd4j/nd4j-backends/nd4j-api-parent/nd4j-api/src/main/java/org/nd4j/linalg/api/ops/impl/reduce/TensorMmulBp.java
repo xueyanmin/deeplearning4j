@@ -30,17 +30,16 @@ import org.nd4j.linalg.api.ops.DynamicCustomOp;
 import java.util.List;
 
 @EqualsAndHashCode
-public class TensorMmulBp  extends DynamicCustomOp  {
+public class TensorMmulBp  extends DynamicCustomOp {
 
     public TensorMmulBp(){}
 
-    public TensorMmulBp(SameDiff samediff, SDVariable x, SDVariable y, SDVariable gradAtOutput, int[][] axes) {
-        this(samediff, x, y, gradAtOutput, axes[0], axes[1] );
+    public TensorMmulBp(SameDiff samediff, SDVariable x, SDVariable y,SDVariable c, SDVariable gradAtOutput, int[][] axes) {
+        this(samediff, x, y, c,gradAtOutput, axes[0], axes[1]);
     }
 
-    public TensorMmulBp(SameDiff samediff, SDVariable x, SDVariable y, SDVariable gradAtOutput, int[] axesX, int[] axesY ) {
-        super(null, samediff, new SDVariable[]{x,y, gradAtOutput});
-        int[][] axes = new int[][]{axesX, axesY};
+    public TensorMmulBp(SameDiff samediff, SDVariable x, SDVariable y,SDVariable c, SDVariable gradAtOutput, int[] axesX, int[] axesY ) {
+        super(null, samediff, new SDVariable[]{x,y, c,gradAtOutput});
         addIArgument(axesX.length);
         addIArgument(axesX);
         addIArgument(axesY.length);
@@ -48,12 +47,11 @@ public class TensorMmulBp  extends DynamicCustomOp  {
     }
 
     public TensorMmulBp(INDArray x, INDArray y, INDArray gradAtOutput, int[][] axes) {
-        this(x, y, gradAtOutput, axes[0], axes[1] );
+        this(x, y, gradAtOutput, axes[0], axes[1]);
     }
 
-    public TensorMmulBp(INDArray x, INDArray y, INDArray gradAtOutput, int[] axesX, int[] axesY ) {
-        super(null,new INDArray[]{x, y, gradAtOutput},null);
-        int[][] axes = new int[][]{axesX, axesY};
+    public TensorMmulBp(INDArray x, INDArray y, INDArray gradAtOutput, int[] axesX, int[] axesY) {
+        super(null,new INDArray[]{x, y,null, gradAtOutput},null);
         addIArgument(axesX.length);
         addIArgument(axesX);
         addIArgument(axesY.length);
@@ -64,9 +62,8 @@ public class TensorMmulBp  extends DynamicCustomOp  {
         this(x, y, gradAtOutput, dldx, dldy, axes[0], axes[1] );
     }
 
-    public TensorMmulBp(INDArray x, INDArray y, INDArray gradAtOutput, INDArray dldx, INDArray dldy, int[] axesX, int[] axesY  ) {
+    public TensorMmulBp(INDArray x, INDArray y, INDArray gradAtOutput, INDArray dldx, INDArray dldy, int[] axesX, int[] axesY ) {
             super(null, new INDArray[]{x, y, gradAtOutput}, new INDArray[]{dldx, dldy});
-            int[][] axes = new int[][]{axesX, axesY};
             addIArgument(axesX.length);
             addIArgument(axesX);
             addIArgument(axesY.length);
@@ -85,7 +82,7 @@ public class TensorMmulBp  extends DynamicCustomOp  {
 
     @Override
     public List<DataType> calculateOutputDataTypes(List<DataType> dataTypes) {
-        Preconditions.checkState(dataTypes != null && dataTypes.size() == 3, "Expected exactly 3 inputs to tensormmul_bp op, got %s", dataTypes);
+        Preconditions.checkState(dataTypes != null && dataTypes.size() == 4, "Expected exactly 3 inputs to tensormmul_bp op, got %s", dataTypes);
         Preconditions.checkState(dataTypes.get(0).isFPType() && dataTypes.get(1).isFPType() && dataTypes.get(0).isFPType(), "Inputs to tensormmul_bp op must both be a floating" +
                 "point type: got %s", dataTypes);
         return dataTypes.subList(0, 2);

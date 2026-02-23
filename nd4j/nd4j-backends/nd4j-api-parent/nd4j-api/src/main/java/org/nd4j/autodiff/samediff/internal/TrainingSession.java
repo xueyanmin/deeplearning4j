@@ -29,6 +29,8 @@ import org.nd4j.autodiff.samediff.SDVariable;
 import org.nd4j.autodiff.samediff.SameDiff;
 import org.nd4j.autodiff.samediff.TrainingConfig;
 import org.nd4j.autodiff.samediff.VariableType;
+import org.nd4j.autodiff.samediff.config.ExecutionResult;
+import org.nd4j.autodiff.samediff.config.SDValue;
 import org.nd4j.common.base.Preconditions;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.api.ops.OpContext;
@@ -73,6 +75,16 @@ public class TrainingSession extends InferenceSession {
                                   MultiDataSet batch, List<String> lossVariables, List<Listener> listeners, At at) {
         this.config = config;
         this.updaters = updaters;
+        if(batch != null) {
+            batch.setCloseable(false);
+        }
+
+        //ensure input arrays aren't closed
+        if(placeholders != null) {
+            placeholders.entrySet().stream().forEach(entry -> {
+                entry.getValue().setCloseable(false);
+            });
+        }
 
         //Preprocess listeners, get the relevant ones
         if (listeners == null) {
@@ -109,8 +121,12 @@ public class TrainingSession extends InferenceSession {
 
         //Also add evaluations - in case we want to evaluate something that isn't required to determine loss
         // (hence wouldn't normally be calculated)
-        if(config.getTrainEvaluations() != null){
+        if(config.getTrainEvaluations() != null) {
             requiredActivations.addAll(config.getTrainEvaluations().keySet());
+        }
+
+        if(sameDiff.getLossVariables() != null) {
+            requiredActivations.addAll(sameDiff.getLossVariables());
         }
 
         //Set up losses
@@ -124,6 +140,7 @@ public class TrainingSession extends InferenceSession {
 
         //Do training iteration
         List<String> outputVars = new ArrayList<>(gradVarToVarMap.keySet());    //TODO this should be empty, and grads calculated in requiredActivations
+        outputVars.addAll(lossVariables);
         Map<String, INDArray> m = output(outputVars, placeholders, batch, requiredActivations, listeners, at);
 
 
@@ -155,10 +172,10 @@ public class TrainingSession extends InferenceSession {
     }
 
     @Override
-    public INDArray[] getOutputs(Pair<SameDiffOp, OpContext> opPair, FrameIter outputFrameIter, Set<VarId> opInputs, Set<VarId> allIterInputs,
-                                 Set<String> constAndPhInputs, List<Listener> listeners, At at, MultiDataSet batch, Set<String> allReqVariables) {
+    public ExecutionResult getOutputs(Pair<SameDiffOp, OpContext> opPair, FrameIter outputFrameIter, Set<VarId> opInputs, Set<VarId> allIterInputs,
+                                      Set<String> constAndPhInputs, List<Listener> listeners, At at, MultiDataSet batch, Set<String> allReqVariables, Map<String, SDValue> otherPlaceHolders) {
         //Get outputs from InferenceSession
-        INDArray[] out = super.getOutputs(opPair, outputFrameIter, opInputs, allIterInputs, constAndPhInputs, listeners, at, batch, allReqVariables);
+        ExecutionResult out = super.getOutputs(opPair, outputFrameIter, opInputs, allIterInputs, constAndPhInputs, listeners, at, batch, allReqVariables, otherPlaceHolders);
         SameDiffOp op = opPair.getFirst();
 
         List<String> outputs = op.getOutputsOfOp();
@@ -167,7 +184,7 @@ public class TrainingSession extends InferenceSession {
             //If this is a loss variable - record it
             if (lossVarsToLossIdx.containsKey(s)) {
                 int lossIdx = lossVarsToLossIdx.get(s);
-                INDArray arr = out[outIdx];
+                INDArray arr = out.resultAt(outIdx);
                 double l = arr.isScalar() ? arr.getDouble(0) : arr.sumNumber().doubleValue();
                 currIterLoss[lossIdx] += l;
             }
@@ -178,6 +195,8 @@ public class TrainingSession extends InferenceSession {
                 //log.info("Calculated gradient for variable \"{}\": (grad var name: \"{}\")", varName, s);
 
                 Variable gradVar = sameDiff.getVariables().get(s);
+                if(!gradVar.getVariable().dataType().isFPType())
+                    continue;
                 if (gradVar.getInputsForOp() != null && gradVar.getInputsForOp().isEmpty()) {
                     //Should be rare, and we should handle this by tracking dependencies, and only update when safe
                     // (i.e., dependency tracking)
@@ -188,7 +207,7 @@ public class TrainingSession extends InferenceSession {
                 Preconditions.checkState(u != null, "No updater found for variable \"%s\"", varName);
 
                 Variable var = sameDiff.getVariables().get(varName);
-                INDArray gradArr = out[outIdx];
+                INDArray gradArr = out.resultAt(outIdx);
                 INDArray paramArr = var.getVariable().getArr();
 
                 //Pre-updater regularization (L1, L2)

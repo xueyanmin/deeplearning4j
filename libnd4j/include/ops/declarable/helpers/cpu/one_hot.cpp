@@ -17,92 +17,81 @@
  ******************************************************************************/
 
 //
-// @author raver119@gmail.com
+// @author Yurii Shyrma (iuriish@yahoo.com), created on 30.05.2019
 //
-#include "../one_hot.h"
+// CPU implementation of one_hot helper
+//
 
 #include <execution/Threads.h>
-#include <helpers/ConstantTadHelper.h>
-#include <helpers/TAD.h>
+#include <ops/declarable/helpers/one_hot.h>
+#include <system/op_boilerplate.h>
 
 namespace sd {
 namespace ops {
 namespace helpers {
-template <typename Z, typename I>
-static void onehot_(void* voutput, sd::LongType const* zShapeInfo, void const* vindices, sd::LongType const* iShapeInfo,
-                    int axis, double on, double off) {
-  auto output = reinterpret_cast<Z*>(voutput);
-  auto indices = reinterpret_cast<I const*>(vindices);
 
-  auto tadPack = sd::ConstantTadHelper::getInstance().tadForDimensions(zShapeInfo, {axis});
+template <typename X, typename Z>
+static void onehotImpl_(NDArray* indices, NDArray* output,
+                        const LongType axis, const LongType depth,
+                        const double on, const double off) {
+    auto xBuffer = indices->bufferAsT<X>();
+    auto zBuffer = output->bufferAsT<Z>();
 
-  auto iLen = static_cast<unsigned int>(shape::length(iShapeInfo));
-  auto tLen = static_cast<unsigned int>(shape::length(tadPack.primaryShapeInfo()));
-  auto numTads = static_cast<unsigned int>(tadPack.numberOfTads());
-  auto tadEws = shape::elementWiseStride(tadPack.primaryShapeInfo());
+    auto xShapeInfo = indices->shapeInfo();
+    auto zShapeInfo = output->shapeInfo();
 
-  if (iLen != numTads) throw std::runtime_error("OneHot: number of TADs should be equal to number of indices");
+    const int xRank = shape::rank(xShapeInfo);
+    const int zRank = shape::rank(zShapeInfo);
+    const sd::LongType* xShape = shape::shapeOf(xShapeInfo);
+    const sd::LongType* zShape = shape::shapeOf(zShapeInfo);
+    const sd::LongType* xStride = shape::stride(xShapeInfo);
+    const sd::LongType* zStride = shape::stride(zShapeInfo);
+    const sd::LongType zLen = output->lengthOf();
 
-  if (shape::elementWiseStride(zShapeInfo) != 1 || shape::elementWiseStride(iShapeInfo) != 1)
-    throw std::runtime_error("OneHot: op expects output and indices to have elementWiseStride to be equal to 1");
+    const Z onVal = static_cast<Z>(on);
+    const Z offVal = static_cast<Z>(off);
 
-  Z zero = static_cast<Z>(off);
-  Z one = static_cast<Z>(on);
-
-  if (tadEws >= 1) {
     auto func = PRAGMA_THREADS_FOR {
-      for (auto e = 0; e < stop; e++) {
-        auto cO = output + tadPack.primaryOffsets()[e];
+        for (auto i = start; i < stop; i++) {
+            sd::LongType coord[SD_MAX_RANK];
 
-        auto idx = static_cast<int>(indices[e]);
-        if (idx < 0 || idx >= tLen) {
-          PRAGMA_OMP_SIMD
-          for (unsigned int t = 0; t < tLen; t++) {
-            cO[t * tadEws] = zero;
-          }
-        } else {
-          PRAGMA_OMP_SIMD
-          for (unsigned int t = 0; t < tLen; t++) {
-            cO[t * tadEws] = idx == t ? one : zero;
-          }
+            // Compute output coordinate and offset
+            INDEX2COORDS(i, zRank, zShape, coord);
+            sd::LongType zOffset;
+            COORDS2INDEX(zRank, zStride, coord, zOffset);
+
+            // Extract depth coordinate and shift axis
+            const auto depthCoord = coord[axis];
+            for (int j = axis; j < zRank - 1; ++j) {
+                coord[j] = coord[j + 1];
+            }
+
+            // Compute input offset
+            sd::LongType xOffset;
+            COORDS2INDEX(xRank, xStride, coord, xOffset);
+
+            // Check if the depth matches the index
+            const LongType idx = static_cast<LongType>(xBuffer[xOffset]);
+            zBuffer[zOffset] = (depthCoord == idx) ? onVal : offVal;
         }
-      }
     };
 
-    samediff::Threads::parallel_tad(func, 0, numTads);
-  } else {
-    auto func = PRAGMA_THREADS_FOR {
-      for (auto e = start; e < stop; e++) {
-        auto cO = output + tadPack.primaryOffsets()[e];
-
-        auto idx = static_cast<int>(indices[e]);
-        if (idx < 0 || idx >= tLen) {
-          PRAGMA_OMP_SIMD
-          for (unsigned int t = 0; t < tLen; t++) {
-            cO[shape::getIndexOffset(t, tadPack.primaryShapeInfo())] = zero;
-          }
-        } else {
-          PRAGMA_OMP_SIMD
-          for (unsigned int t = 0; t < tLen; t++) {
-            cO[shape::getIndexOffset(t, tadPack.primaryShapeInfo())] = idx == t ? one : zero;
-          }
-        }
-      }
-    };
-
-    samediff::Threads::parallel_tad(func, 0, numTads);
-  }
+    samediff::Threads::parallel_for(func, 0, zLen);
 }
 
-void onehot(const sd::LaunchContext* context, const NDArray* indices, NDArray* output, const sd::Unsigned axis,
-            const sd::Unsigned depth, const double on, const double off) {
-  auto zType = output->dataType();
-  auto iType = indices->dataType();
+void onehot(const LaunchContext* context, NDArray* indices, NDArray* output,
+            const LongType axis, const LongType depth, const double on, const double off) {
+    const auto xType = indices->dataType();
+    const auto zType = output->dataType();
 
-  BUILD_DOUBLE_SELECTOR(zType, iType, onehot_,
-                        (output->buffer(), output->shapeInfo(), indices->buffer(), indices->shapeInfo(), axis, on, off),
-                        SD_COMMON_TYPES, SD_COMMON_TYPES);
+    NDArray::prepareSpecialUse({output}, {indices});
+
+    BUILD_DOUBLE_SELECTOR(xType, zType, onehotImpl_, (indices, output, axis, depth, on, off),
+                          SD_COMMON_TYPES, SD_COMMON_TYPES);
+
+    NDArray::registerSpecialUse({output}, {indices});
 }
+
 }  // namespace helpers
 }  // namespace ops
 }  // namespace sd

@@ -20,15 +20,11 @@
 
 package org.nd4j.linalg.api.ops.impl.shape;
 
-import lombok.val;
 import onnx.Onnx;
 import org.nd4j.autodiff.samediff.SDVariable;
 import org.nd4j.autodiff.samediff.SameDiff;
-import org.nd4j.autodiff.samediff.serde.FlatBuffersMapper;
 import org.nd4j.common.base.Preconditions;
 import org.nd4j.imports.NoOpNameFoundException;
-import org.nd4j.imports.descriptors.properties.adapters.DataTypeAdapter;
-import org.nd4j.imports.graphmapper.tf.TFGraphMapper;
 import org.nd4j.linalg.api.buffer.DataType;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.api.ops.DynamicCustomOp;
@@ -91,11 +87,8 @@ public class Shape extends DynamicCustomOp {
 
     @Override
     public void initFromTensorFlow(NodeDef nodeDef, SameDiff initWith, Map<String, AttrValue> attributesForNode, GraphDef graph) {
-        super.initFromTensorFlow(nodeDef, initWith, attributesForNode, graph);
+        throw new UnsupportedOperationException("Use the new Tensorflow Importer instead. This method is now removed.");
 
-        dataType = TFGraphMapper.convertType(nodeDef.getAttrOrThrow("out_type").getType());
-        val dtype = DataTypeAdapter.dtypeConv(nodeDef.getAttrOrThrow("out_type").getType());
-        iArguments.add((long) FlatBuffersMapper.getDataTypeAsByte(dtype));
     }
 
     @Override
@@ -124,7 +117,10 @@ public class Shape extends DynamicCustomOp {
     public List<DataType> calculateOutputDataTypes(List<DataType> dataTypes) {
         Preconditions.checkState(dataTypes.size() == 1, "Expected list with exactly 1 datatype for %s, got %s", getClass(), dataTypes);
         if(!dArguments.isEmpty())
-            return Collections.singletonList(dataTypes.get(0));
+            return Collections.singletonList(dArguments.get(0));
+        else if(dataType != null && dArguments.isEmpty()) {
+            dArguments.add(dataType);
+        }
         return Collections.singletonList(dataType == null ? DataType.LONG : dataType);
     }
 }

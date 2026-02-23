@@ -23,21 +23,20 @@ package org.deeplearning4j.nn.modelimport.keras.layers;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.extern.slf4j.Slf4j;
+import org.deeplearning4j.nn.modelimport.keras.KerasLayer;
+import org.deeplearning4j.nn.modelimport.keras.exceptions.InvalidKerasConfigurationException;
+import org.deeplearning4j.nn.modelimport.keras.exceptions.UnsupportedKerasConfigurationException;
+import org.deeplearning4j.nn.modelimport.keras.utils.KerasLossUtils;
 import org.deeplearning4j.nn.conf.inputs.InputType;
 import org.deeplearning4j.nn.conf.layers.CnnLossLayer;
 import org.deeplearning4j.nn.conf.layers.FeedForwardLayer;
 import org.deeplearning4j.nn.conf.layers.LossLayer;
 import org.deeplearning4j.nn.conf.layers.RnnLossLayer;
-import org.deeplearning4j.nn.modelimport.keras.KerasLayer;
-import org.deeplearning4j.nn.modelimport.keras.exceptions.InvalidKerasConfigurationException;
-import org.deeplearning4j.nn.modelimport.keras.exceptions.UnsupportedKerasConfigurationException;
 import org.nd4j.linalg.activations.Activation;
 import org.nd4j.linalg.lossfunctions.ILossFunction;
 import org.nd4j.linalg.lossfunctions.LossFunctions;
 
 import java.util.ArrayList;
-
-import static org.deeplearning4j.nn.modelimport.keras.utils.KerasLossUtils.mapLossFunction;
 
 @Slf4j
 @Data
@@ -81,7 +80,7 @@ public class KerasLoss extends KerasLayer {
         this.inboundLayerNames = new ArrayList<>();
         this.inboundLayerNames.add(inboundLayerName);
         try {
-            loss = mapLossFunction(kerasLoss, conf);
+            loss = KerasLossUtils.mapLossFunction(kerasLoss, conf);
         } catch (UnsupportedKerasConfigurationException e) {
             if (enforceTrainingConfig)
                 throw e;

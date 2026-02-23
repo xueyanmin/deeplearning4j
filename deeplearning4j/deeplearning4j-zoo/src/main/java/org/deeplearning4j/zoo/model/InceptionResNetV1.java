@@ -22,7 +22,6 @@ package org.deeplearning4j.zoo.model;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.NoArgsConstructor;
 import org.deeplearning4j.nn.api.Model;
 import org.deeplearning4j.nn.api.OptimizationAlgorithm;
 import org.deeplearning4j.nn.conf.*;
@@ -83,7 +82,7 @@ public class InceptionResNetV1 extends ZooModel {
                         .addLayer("bottleneck", new DenseLayer.Builder().nIn(5376).nOut(embeddingSize).build(),
                                         "avgpool")
                         // Embeddings
-                        .addVertex("embeddings", new L2NormalizeVertex(new int[] {1}, 1e-10), "bottleneck")
+                        .addVertex("embeddings", new L2NormalizeVertex(new long[] {1}, 1e-10), "bottleneck")
                         // Output
                         .addLayer("outputLayer",
                                         new CenterLossOutputLayer.Builder()

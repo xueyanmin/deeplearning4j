@@ -214,6 +214,51 @@ public class SDLoss extends SDOps {
    * @param logitInput Inputs (NUMERIC type)
    * @param targetLabelLengths Length of the target label (NUMERIC type)
    * @param logitInputLengths Length of the input (NUMERIC type)
+   * @param blankIndex The index of the blank label
+   * @return output Ctc loss  (NUMERIC type)
+   */
+  public SDVariable ctcLoss(SDVariable targetLabels, SDVariable logitInput,
+      SDVariable targetLabelLengths, SDVariable logitInputLengths, int blankIndex) {
+    SDValidation.validateNumerical("ctcLoss", "targetLabels", targetLabels);
+    SDValidation.validateNumerical("ctcLoss", "logitInput", logitInput);
+    SDValidation.validateNumerical("ctcLoss", "targetLabelLengths", targetLabelLengths);
+    SDValidation.validateNumerical("ctcLoss", "logitInputLengths", logitInputLengths);
+    SDVariable out = new org.nd4j.linalg.api.ops.impl.loss.CtcLoss(sd,targetLabels, logitInput, targetLabelLengths, logitInputLengths, blankIndex).outputVariable();
+    out.markAsLoss();
+    return out;
+  }
+
+  /**
+   * CTC Loss: Connectionist Temporal Classification Loss. See:<br>
+   * https://dl.acm.org/citation.cfm?id=1143891<br>
+   *
+   * @param name name May be null. Name for the output variable
+   * @param targetLabels Label array (NUMERIC type)
+   * @param logitInput Inputs (NUMERIC type)
+   * @param targetLabelLengths Length of the target label (NUMERIC type)
+   * @param logitInputLengths Length of the input (NUMERIC type)
+   * @param blankIndex The index of the blank label
+   * @return output Ctc loss  (NUMERIC type)
+   */
+  public SDVariable ctcLoss(String name, SDVariable targetLabels, SDVariable logitInput,
+      SDVariable targetLabelLengths, SDVariable logitInputLengths, int blankIndex) {
+    SDValidation.validateNumerical("ctcLoss", "targetLabels", targetLabels);
+    SDValidation.validateNumerical("ctcLoss", "logitInput", logitInput);
+    SDValidation.validateNumerical("ctcLoss", "targetLabelLengths", targetLabelLengths);
+    SDValidation.validateNumerical("ctcLoss", "logitInputLengths", logitInputLengths);
+    SDVariable out =  new org.nd4j.linalg.api.ops.impl.loss.CtcLoss(sd,targetLabels, logitInput, targetLabelLengths, logitInputLengths, blankIndex).outputVariable();
+    out.markAsLoss();
+    return sd.updateVariableNameAndReference(out, name);
+  }
+
+  /**
+   * CTC Loss: Connectionist Temporal Classification Loss. See:<br>
+   * https://dl.acm.org/citation.cfm?id=1143891<br>
+   *
+   * @param targetLabels Label array (NUMERIC type)
+   * @param logitInput Inputs (NUMERIC type)
+   * @param targetLabelLengths Length of the target label (NUMERIC type)
+   * @param logitInputLengths Length of the input (NUMERIC type)
    * @return output Ctc loss  (NUMERIC type)
    */
   public SDVariable ctcLoss(SDVariable targetLabels, SDVariable logitInput,
@@ -222,7 +267,7 @@ public class SDLoss extends SDOps {
     SDValidation.validateNumerical("ctcLoss", "logitInput", logitInput);
     SDValidation.validateNumerical("ctcLoss", "targetLabelLengths", targetLabelLengths);
     SDValidation.validateNumerical("ctcLoss", "logitInputLengths", logitInputLengths);
-    SDVariable out = new org.nd4j.linalg.api.ops.impl.loss.CtcLoss(sd,targetLabels, logitInput, targetLabelLengths, logitInputLengths).outputVariable();
+    SDVariable out = new org.nd4j.linalg.api.ops.impl.loss.CtcLoss(sd,targetLabels, logitInput, targetLabelLengths, logitInputLengths, 0).outputVariable();
     out.markAsLoss();
     return out;
   }
@@ -244,7 +289,7 @@ public class SDLoss extends SDOps {
     SDValidation.validateNumerical("ctcLoss", "logitInput", logitInput);
     SDValidation.validateNumerical("ctcLoss", "targetLabelLengths", targetLabelLengths);
     SDValidation.validateNumerical("ctcLoss", "logitInputLengths", logitInputLengths);
-    SDVariable out =  new org.nd4j.linalg.api.ops.impl.loss.CtcLoss(sd,targetLabels, logitInput, targetLabelLengths, logitInputLengths).outputVariable();
+    SDVariable out =  new org.nd4j.linalg.api.ops.impl.loss.CtcLoss(sd,targetLabels, logitInput, targetLabelLengths, logitInputLengths, 0).outputVariable();
     out.markAsLoss();
     return sd.updateVariableNameAndReference(out, name);
   }
@@ -1062,43 +1107,6 @@ public class SDLoss extends SDOps {
     SDValidation.validateNumerical("sparseSoftmaxCrossEntropy", "logits", logits);
     SDValidation.validateInteger("sparseSoftmaxCrossEntropy", "labels", labels);
     SDVariable out =  new org.nd4j.linalg.api.ops.impl.loss.SparseSoftmaxCrossEntropyLossWithLogits(sd,logits, labels).outputVariable();
-    out.markAsLoss();
-    return sd.updateVariableNameAndReference(out, name);
-  }
-
-  /**
-   * Weighted cross entropy loss with logits<br>
-   *
-   * @param targets targets array (NUMERIC type)
-   * @param inputs input array (NUMERIC type)
-   * @param weights eights array. May be null. If null, a weight of 1.0 is used (NUMERIC type)
-   * @return output Loss variable (NUMERIC type)
-   */
-  public SDVariable weightedCrossEntropyWithLogits(SDVariable targets, SDVariable inputs,
-      SDVariable weights) {
-    SDValidation.validateNumerical("weightedCrossEntropyWithLogits", "targets", targets);
-    SDValidation.validateNumerical("weightedCrossEntropyWithLogits", "inputs", inputs);
-    SDValidation.validateNumerical("weightedCrossEntropyWithLogits", "weights", weights);
-    SDVariable out = new org.nd4j.linalg.api.ops.impl.loss.WeightedCrossEntropyLoss(sd,targets, inputs, weights).outputVariable();
-    out.markAsLoss();
-    return out;
-  }
-
-  /**
-   * Weighted cross entropy loss with logits<br>
-   *
-   * @param name name May be null. Name for the output variable
-   * @param targets targets array (NUMERIC type)
-   * @param inputs input array (NUMERIC type)
-   * @param weights eights array. May be null. If null, a weight of 1.0 is used (NUMERIC type)
-   * @return output Loss variable (NUMERIC type)
-   */
-  public SDVariable weightedCrossEntropyWithLogits(String name, SDVariable targets,
-      SDVariable inputs, SDVariable weights) {
-    SDValidation.validateNumerical("weightedCrossEntropyWithLogits", "targets", targets);
-    SDValidation.validateNumerical("weightedCrossEntropyWithLogits", "inputs", inputs);
-    SDValidation.validateNumerical("weightedCrossEntropyWithLogits", "weights", weights);
-    SDVariable out =  new org.nd4j.linalg.api.ops.impl.loss.WeightedCrossEntropyLoss(sd,targets, inputs, weights).outputVariable();
     out.markAsLoss();
     return sd.updateVariableNameAndReference(out, name);
   }

@@ -21,14 +21,15 @@
 //
 
 #include <system/op_boilerplate.h>
+
 #if NOT_EXCLUDED(OP_cast)
 
 #include <array/DataTypeUtils.h>
 #include <ops/declarable/CustomOperations.h>
-
+#include <ops/declarable/helpers/assign.h>
 namespace sd {
 namespace ops {
-CUSTOM_OP_IMPL(cast, 1, 1, false, 0, 1) {
+CUSTOM_OP_IMPL(cast, 1, 1, false, 0, -2) {
   auto input = INPUT_VARIABLE(0);
   auto output = OUTPUT_VARIABLE(0);
 
@@ -37,7 +38,9 @@ CUSTOM_OP_IMPL(cast, 1, 1, false, 0, 1) {
     return sd::Status::OK;
   }
 
-  if (!block.isInplace()) output->assign(input);
+  if (!block.isInplace()) {
+    helpers::assign(block.launchContext(), output, input);
+  }
 
   STORE_RESULT(output);
   return sd::Status::OK;
@@ -46,11 +49,33 @@ DECLARE_SYN(Cast, cast);
 
 DECLARE_SHAPE_FN(cast) {
   auto inShape = inputShape->at(0);
+  if(!block.getDArguments()->empty()) {
+    DataType newType = block.dataType(0);
+    auto desc = new ShapeDescriptor(inShape, newType, true);
+    auto newShapeInfo = ConstantShapeHelper::getInstance().createShapeInfo(desc);
+    
+    // FIX: Clean up the ShapeDescriptor after use
+    delete desc;
+    
+    auto compDataType = ArrayOptions::dataType(newShapeInfo);
+    if(compDataType != newType) {
+      std::string errorMessage;
+      errorMessage += "cast: new data type is ";
+      errorMessage += DataTypeUtils::asString(newType);
+      errorMessage += " data type from new constant created data type ";
+      errorMessage += DataTypeUtils::asString(compDataType);
+      errorMessage += "\n";
+      THROW_EXCEPTION(errorMessage.c_str());
+    }
+    auto ret =  SHAPELIST(newShapeInfo);
+    return ret;
 
-  auto it = INT_ARG(0);
-  DataType newType = DataTypeUtils::fromInt(it);
-
-  return SHAPELIST(ConstantShapeHelper::getInstance().createShapeInfo(ShapeDescriptor(inShape, newType)));
+  } else {
+    auto it = INT_ARG(0);
+    DataType newType = DataTypeUtils::fromInt(it);
+    auto ret =  SHAPELIST(ConstantShapeHelper::getInstance().castToDataType(inShape,newType));
+    return ret;
+  }
 }
 
 DECLARE_TYPES(cast) {

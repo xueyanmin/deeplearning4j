@@ -27,6 +27,7 @@ import org.nd4j.samediff.frameworkimport.FrameworkImporter
 import org.nd4j.samediff.frameworkimport.ir.IRGraph
 import org.nd4j.samediff.frameworkimport.onnx.OnnxImportGraph
 import org.nd4j.samediff.frameworkimport.onnx.convertToOnnxTensors
+import org.nd4j.samediff.frameworkimport.onnx.definitions.OnnxOpDeclarations
 import org.nd4j.samediff.frameworkimport.onnx.ir.OnnxIRGraph
 import org.nd4j.samediff.frameworkimport.onnx.opdefs.OnnxOpDescriptorLoader
 import org.nd4j.samediff.frameworkimport.opdefs.OpDescriptorLoaderHolder
@@ -42,7 +43,9 @@ class OnnxFrameworkImporter: FrameworkImporter {
     val onnxOpDescriptorLoader = OnnxOpDescriptorLoader()
     val registry = onnxOpDescriptorLoader.createOpMappingRegistry<Onnx.GraphProto,Onnx.NodeProto,Onnx.NodeProto,Onnx.TensorProto,Onnx.AttributeProto,Onnx.AttributeProto,Onnx.TensorProto.DataType>()
     val loadedGraphBuilder = Onnx.GraphProto.newBuilder()
+
     init {
+        OnnxOpDeclarations.init()
         loader.values.forEach { loadedGraphBuilder.addNode(it) }
     }
 
@@ -53,15 +56,25 @@ class OnnxFrameworkImporter: FrameworkImporter {
         return OnnxIRGraph(loadGraph.graph, registry)
     }
 
-    override fun runImport(fileName: String, dynamicVariables: Map<String, INDArray>,suggestDynamicVariables: Boolean): SameDiff {
+    override fun runImport(
+        fileName: String,
+        dynamicVariables: Map<String, INDArray>,
+        suggestDynamicVariables: Boolean,
+        trackVariableChanges: Boolean
+    ): SameDiff {
         val loadGraph = loadGraph(fileName)
         if(suggestDynamicVariables) {
             val newDynamicVariables  = suggestDynamicVariables(loadGraph as IRGraph<GeneratedMessageV3, GeneratedMessageV3, GeneratedMessageV3, GeneratedMessageV3, GeneratedMessageV3, GeneratedMessageV3, ProtocolMessageEnum>)
             val dynamicVariablesConverted = convertToOnnxTensors(newDynamicVariables)
-            return onnxImporter.importGraph(loadGraph,null,null, dynamicVariablesConverted,registry)
+            val ret =   onnxImporter.importGraph(loadGraph, null, null, dynamicVariablesConverted, registry, trackVariableChanges)
+            ret.outputs().addAll(loadGraph.outputList)
+            return ret
         } else {
             val dynamicVariablesConverted = convertToOnnxTensors(dynamicVariables)
-            return onnxImporter.importGraph(loadGraph,null,null, dynamicVariablesConverted,registry)
+            val ret =  onnxImporter.importGraph(loadGraph, null, null, dynamicVariablesConverted, registry, trackVariableChanges)
+            ret.outputs().addAll(loadGraph.outputList)
+            return ret
+
         }
 
     }
@@ -75,6 +88,13 @@ class OnnxFrameworkImporter: FrameworkImporter {
     override fun suggestDynamicVariables(irGraph: IRGraph<GeneratedMessageV3, GeneratedMessageV3, GeneratedMessageV3, GeneratedMessageV3, GeneratedMessageV3, GeneratedMessageV3, ProtocolMessageEnum>): Map<String, INDArray> {
         val graph = irGraph as OnnxIRGraph
         val ret = HashMap<String,INDArray>()
+        for(i in 0 until graph.inputList.size) {
+            if(irGraph.shapeOfInput(graph.inputAt(i)) == null) {
+                throw IllegalArgumentException("Unable to suggest dynamic variables. No shape found for input $i named ${graph.inputAt(i)}")
+            }
+        }
+
+
         for(i in 0 until graph.inputList.size) {
             var inputShape = graph.shapeOfInput(graph.inputAt(i))
             val dType = graph.dataTypeForVariable(graph.inputAt(i))

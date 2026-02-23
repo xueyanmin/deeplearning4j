@@ -116,6 +116,26 @@ public class NDLoss {
    * @param logitInput Inputs (NUMERIC type)
    * @param targetLabelLengths Length of the target label (NUMERIC type)
    * @param logitInputLengths Length of the input (NUMERIC type)
+   * @param blankIndex The index of the blank label
+   * @return output Ctc loss  (NUMERIC type)
+   */
+  public INDArray ctcLoss(INDArray targetLabels, INDArray logitInput, INDArray targetLabelLengths,
+      INDArray logitInputLengths, int blankIndex) {
+    NDValidation.validateNumerical("ctcLoss", "targetLabels", targetLabels);
+    NDValidation.validateNumerical("ctcLoss", "logitInput", logitInput);
+    NDValidation.validateNumerical("ctcLoss", "targetLabelLengths", targetLabelLengths);
+    NDValidation.validateNumerical("ctcLoss", "logitInputLengths", logitInputLengths);
+    return Nd4j.exec(new org.nd4j.linalg.api.ops.impl.loss.CtcLoss(targetLabels, logitInput, targetLabelLengths, logitInputLengths, blankIndex))[0];
+  }
+
+  /**
+   * CTC Loss: Connectionist Temporal Classification Loss. See:<br>
+   * https://dl.acm.org/citation.cfm?id=1143891<br>
+   *
+   * @param targetLabels Label array (NUMERIC type)
+   * @param logitInput Inputs (NUMERIC type)
+   * @param targetLabelLengths Length of the target label (NUMERIC type)
+   * @param logitInputLengths Length of the input (NUMERIC type)
    * @return output Ctc loss  (NUMERIC type)
    */
   public INDArray ctcLoss(INDArray targetLabels, INDArray logitInput, INDArray targetLabelLengths,
@@ -124,7 +144,7 @@ public class NDLoss {
     NDValidation.validateNumerical("ctcLoss", "logitInput", logitInput);
     NDValidation.validateNumerical("ctcLoss", "targetLabelLengths", targetLabelLengths);
     NDValidation.validateNumerical("ctcLoss", "logitInputLengths", logitInputLengths);
-    return Nd4j.exec(new org.nd4j.linalg.api.ops.impl.loss.CtcLoss(targetLabels, logitInput, targetLabelLengths, logitInputLengths))[0];
+    return Nd4j.exec(new org.nd4j.linalg.api.ops.impl.loss.CtcLoss(targetLabels, logitInput, targetLabelLengths, logitInputLengths, 0))[0];
   }
 
   /**
@@ -483,21 +503,5 @@ public class NDLoss {
     NDValidation.validateNumerical("sparseSoftmaxCrossEntropy", "logits", logits);
     NDValidation.validateInteger("sparseSoftmaxCrossEntropy", "labels", labels);
     return Nd4j.exec(new org.nd4j.linalg.api.ops.impl.loss.SparseSoftmaxCrossEntropyLossWithLogits(logits, labels))[0];
-  }
-
-  /**
-   * Weighted cross entropy loss with logits<br>
-   *
-   * @param targets targets array (NUMERIC type)
-   * @param inputs input array (NUMERIC type)
-   * @param weights eights array. May be null. If null, a weight of 1.0 is used (NUMERIC type)
-   * @return output Loss variable (NUMERIC type)
-   */
-  public INDArray weightedCrossEntropyWithLogits(INDArray targets, INDArray inputs,
-      INDArray weights) {
-    NDValidation.validateNumerical("weightedCrossEntropyWithLogits", "targets", targets);
-    NDValidation.validateNumerical("weightedCrossEntropyWithLogits", "inputs", inputs);
-    NDValidation.validateNumerical("weightedCrossEntropyWithLogits", "weights", weights);
-    return Nd4j.exec(new org.nd4j.linalg.api.ops.impl.loss.WeightedCrossEntropyLoss(targets, inputs, weights))[0];
   }
 }

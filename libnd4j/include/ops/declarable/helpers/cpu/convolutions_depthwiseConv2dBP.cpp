@@ -24,15 +24,16 @@
 #include <ops/declarable/helpers/col2im.h>
 #include <ops/declarable/helpers/convolutions.h>
 #include <ops/declarable/helpers/im2col.h>
+#if NOT_EXCLUDED(OP_col2im) && NOT_EXCLUDED(OP_im2col)
 
 namespace sd {
 namespace ops {
 
 //////////////////////////////////////////////////////////////////////////
 template <typename X, typename Y>
-static void depthwiseConv2dBP_(const NDArray* input, const NDArray* weights, const NDArray* bias, const NDArray* gradO,
-                               NDArray* gradI, NDArray* gradW, NDArray* gradB, const int kH, const int kW, const int sH,
-                               const int sW, int pH, int pW, const int dH, const int dW, const int paddingMode,
+static void depthwiseConv2dBP_(NDArray* input, NDArray* weights, NDArray* bias, NDArray* gradO,
+                               NDArray* gradI, NDArray* gradW, NDArray* gradB, const LongType kH, const LongType kW, const LongType sH,
+                               const LongType sW, LongType pH, LongType pW, const LongType dH, const LongType dW, const int paddingMode,
                                const int isNCHW, const int wFormat) {
   // input    [bS, iH, iW, iC] (NDHWC) or [bS, iC, iH, iW] (NCDHW)
   // weights  [kH, kW, iC, mC], [mC, iC, kH, kW], [mC, kH, kW, iC]
@@ -53,9 +54,9 @@ static void depthwiseConv2dBP_(const NDArray* input, const NDArray* weights, con
   //  paddingMode 0-VALID, 1-SAME
   //  isNCHW      0-NHWC, 1-NCHW
 
-  int bS, iC, iH, iW, mC, oC, oH, oW;  // batch size, input channels, input height/width, channels multiplier(oC =
-                                       // iC*mC), output channels, output height/width
-  int indIOioC, indIiH, indWmC, indWiC, indWkH, indOoH;  // corresponding indexes
+  LongType bS, iC, iH, iW, mC, oC, oH, oW;  // batch size, input channels, input height/width, channels multiplier(oC =
+  // iC*mC), output channels, output height/width
+  LongType indIOioC, indIiH, indWmC, indWiC, indWkH, indOoH;  // corresponding indexes
   ConvolutionUtils::getSizesAndIndexesConv2d(isNCHW, wFormat, *input, *gradO, bS, iC, iH, iW, oC, oH, oW, indIOioC,
                                              indIiH, indWiC, indWmC, indWkH, indOoH);
   mC = weights->sizeAt(indWmC);  // channels multiplier
@@ -70,8 +71,9 @@ static void depthwiseConv2dBP_(const NDArray* input, const NDArray* weights, con
     modifGradO1 = {{3, 0, 1, 2, 4},
                    {iC, bS * oH * oW, mC}};                // [bS,oH,oW,iC,mC] -> [iC,bS,oH,oW,mC] -> [iC,bS*oH*oW,mC]
     modifGradO2 = {{3, 0, 1, 2}, {iC, mC, bS * oH * oW}};  // [bS,oH,oW,iC*mC] -> [iC*mC,bS,oH,oW] -> [iC,mC,bS*oH*oW]
-    input = new NDArray(input->permute({0, 3, 1, 2}));     // [bS,iH,iW,iC]    -> [bS,iC,iH,iW]
-    gradI = new NDArray(gradI->permute({0, 3, 1, 2}));     // [bS,iH,iW,iC]    -> [bS,iC,iH,iW]
+    std::vector<sd::LongType> perm = {0,3,1,2};
+    input = input->permute(perm, false, false);     // [bS,iH,iW,iC]    -> [bS,iC,iH,iW]
+    gradI = gradI->permute(perm, false, false);     // [bS,iH,iW,iC]    -> [bS,iC,iH,iW]
   } else {
     gradOreShape = {bS, iC, mC, oH, oW};  // [bS,iC*mC,oH,oW] -> [bS,iC,mC,oH,oW]
     modifGradO1 = {{1, 0, 3, 4, 2},
@@ -89,22 +91,26 @@ static void depthwiseConv2dBP_(const NDArray* input, const NDArray* weights, con
   if (paddingMode == 1)  // SAME
     ConvolutionUtils::calcPadding2D(pH, pW, oH, oW, iH, iW, kH, kW, sH, sW, dH, dW);
 
-  NDArray columns(input->ordering(), {bS, iC, kH, kW, oH, oW}, input->dataType(), input->getContext());
-  NDArray gradOreshaped = gradO->reshape(gradO->ordering(), gradOreShape);
+  std::vector<LongType> colShape = {bS, iC, kH, kW, oH, oW};
+  NDArray columns(input->ordering(), colShape, input->dataType(), input->getContext());
+  NDArray *gradOreshaped = gradO->reshape(gradO->ordering(), gradOreShape);
 
   // ----- calculation of gradW and gradB ----- //
-
+  NDArray *zero = NDArrayFactory::create(0.f, input->getContext());
   helpers::im2col(
       *input->getContext(), *input, columns, kH, kW, sH, sW, pH, pW, dH, dW,
-      NDArrayFactory::create(0.f, input->getContext()));  // [bS, iC, iH, iW] is convoluted to [bS, iC, kH, kW, oH, oW]
-  sd::MmulHelper::tensorDot(&columns, &gradOreshaped, gradW, modifColumns, modifGradO1,
+  *zero);  // [bS, iC, iH, iW] is convoluted to [bS, iC, kH, kW, oH, oW]
+  sd::MmulHelper::tensorDot(&columns, gradOreshaped, gradW, modifColumns, modifGradO1,
                             modifWeights);  // [iC, kW*kH, bS*oH*oW] x [iC, bS*oH*oW, mC] = [iC, kH*kW, mC]
 
+  delete zero;
   // ----- calculation of gradB ----- //
   if (gradB) {
     NDArray* gradBR = gradB;
-    if (gradB->rankOf() == 2) gradBR = new NDArray(gradB->reshape(gradB->ordering(), {(int)gradB->lengthOf()}, false));
-    gradO->reduceAlongDimension(reduce::Sum, *gradBR, {0, indOoH, indOoH + 1});  // sum over bS, oH, oW
+    std::vector<LongType> shape = {gradB->lengthOf()};
+    if (gradB->rankOf() == 2) gradBR =gradB->reshape(gradB->ordering(), shape, false);
+    std::vector<sd::LongType> axes = {0, indOoH, indOoH + 1};
+    gradO->reduceAlongDimension(reduce::Sum, gradBR, &axes);  // sum over bS, oH, oW
 
     if (gradBR != gradB) delete gradBR;
   }
@@ -112,19 +118,21 @@ static void depthwiseConv2dBP_(const NDArray* input, const NDArray* weights, con
   //----- calculation of gradI -----//
   sd::MmulHelper::tensorDot(weights, gradO, &columns, modifWeights, modifGradO2,
                             modifColumns);  // [iC, kH*kW, mC] x [iC, mC, bS*oH*oW] = [iC, kW*kH, bS*oH*oW]
-  helpers::col2im(*input->getContext(), columns, *gradI, sH, sW, pH, pW, iH, iW, dH,
+  helpers::col2im(*input->getContext(), &columns, gradI, sH, sW, pH, pW, iH, iW, dH,
                   dW);  // [bS, iC, kH, kW, oH, oW] is de-convoluted to [bS, iC, iH, iW]
 
   if (!isNCHW) {
     delete input;
     delete gradI;
   }
+
+  delete gradOreshaped;
 }
 
-void ConvolutionUtils::depthwiseConv2dBP(sd::graph::Context& block, const NDArray* input, const NDArray* weights,
-                                         const NDArray* bias, const NDArray* gradO, NDArray* gradI, NDArray* gradW,
-                                         NDArray* gradB, const int kH, const int kW, const int sH, const int sW, int pH,
-                                         int pW, const int dH, const int dW, const int paddingMode, const int isNCHW,
+void ConvolutionUtils::depthwiseConv2dBP(graph::Context& block, NDArray* input, NDArray* weights,
+                                         NDArray* bias, NDArray* gradO, NDArray* gradI, NDArray* gradW,
+                                         NDArray* gradB, const LongType kH, const LongType kW, const LongType sH, const LongType sW, LongType pH,
+                                         LongType pW, const LongType dH, const LongType dW, const int paddingMode, const int isNCHW,
                                          const int wFormat) {
   BUILD_SINGLE_SELECTOR_TWICE(
       input->dataType(), depthwiseConv2dBP_,
@@ -134,3 +142,4 @@ void ConvolutionUtils::depthwiseConv2dBP(sd::graph::Context& block, const NDArra
 
 }  // namespace ops
 }  // namespace sd
+#endif

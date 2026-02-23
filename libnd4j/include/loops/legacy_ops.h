@@ -23,9 +23,6 @@
 #ifndef PROJECT_LEGACY_OPS_H
 #define PROJECT_LEGACY_OPS_H
 
-#define AGGREGATE_OPS                                                                                                 \
-  (0, aggregateOps::HierarchicSoftmax), (1, aggregateOps::Dot), (2, aggregateOps::Axpy), (3, aggregateOps::SkipGram), \
-      (4, aggregateOps::CBOW), (5, aggregateOps::GEMM)
 
 #define BROADCAST_INT_OPS \
   (0, ShiftLeft), (1, ShiftRight), (2, CyclicShiftLeft), (3, CyclicShiftRight), (4, IntAnd), (5, IntOr), (6, IntXor)
@@ -88,6 +85,9 @@
       (43, TruncateMod), (44, SquaredReverseSubtract), (45, ReversePow), (46, DivideNoNan), (47, IGamma),              \
       (48, IGammac), (49, RELUDerivative)
 
+#define SCALAR_STRING_OPS                                                                                                     \
+  (0, AssignString)
+
 #define REDUCE3_OPS                                                                                    \
   (0, ManhattanDistance), (1, EuclideanDistance), (2, CosineSimilarity), (3, Dot), (4, EqualsWithEps), \
       (5, CosineDistance), (6, JaccardDistance), (7, SimpleHammingDistance)
@@ -98,11 +98,11 @@
   (0, Any), (1, All), (2, IsFinite), (3, IsInfOrNan), (4, IsNan), (5, IsInf), (6, IsPositive), (7, IsNegative)
 
 #define REDUCE_SAME_OPS \
-  (0, Sum), (1, Max), (2, Min), (3, Prod), (4, ASum), (5, AMax), (6, AMin), (7, ReduceSameBenchmarkOp)
+  (0, Sum), (1, Max), (2, Min), (3, Prod), (4, ASum), (5, AMax), (6, AMin)
 
 #define REDUCE_FLOAT_OPS                                                                                         \
   (0, Mean), (1, AMean), (2, Norm1), (3, Norm2), (4, NormMax), (5, NormFrobenius), (6, NormP), (7, SquaredNorm), \
-      (8, Entropy), (9, LogEntropy), (10, ShannonEntropy), (12, ReduceFloatBenchmarkOp)
+      (8, Entropy), (9, LogEntropy), (10, ShannonEntropy)
 
 #define RANDOM_OPS                                                                                                   \
   (0, UniformDistribution), (1, DropOut), (2, DropOutInverted), (3, ProbablisticMerge), (4, Linspace), (5, Choice),  \

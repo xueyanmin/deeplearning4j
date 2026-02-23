@@ -20,7 +20,13 @@
 
 package org.deeplearning4j.nn.conf.preprocessor;
 
-import lombok.*;
+import lombok.AccessLevel;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.val;
+
 import org.deeplearning4j.nn.api.MaskState;
 import org.deeplearning4j.nn.conf.InputPreProcessor;
 import org.deeplearning4j.nn.conf.RNNFormat;
@@ -101,7 +107,7 @@ public class CnnToRnnPreProcessor implements InputPreProcessor {
     public INDArray backprop(INDArray output, int miniBatchSize, LayerWorkspaceMgr workspaceMgr) {
         if (output.ordering() == 'c' || !Shape.hasDefaultStridesForShape(output))
             output = output.dup('f');
-        if (rnnDataFormat == RNNFormat.NWC){
+        if (rnnDataFormat == RNNFormat.NWC) {
             output = output.permute(0, 2, 1);
         }
         val shape = output.shape();

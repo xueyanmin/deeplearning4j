@@ -28,18 +28,18 @@
 #include <helpers/ShapeUtils.h>
 #include <helpers/StringUtils.h>
 #include <ops/declarable/helpers/sparse_to_dense.h>
-
+#include <system/selective_rendering.h>
 namespace sd {
 namespace ops {
 namespace helpers {
 template <typename X, typename I>
-static void fill_(const void *vvalues, const void *vindices, void *voutput, const sd::LongType *zShapeInfo,
+static void fill_(const void *vvalues, const void *vindices, void *voutput, const LongType *zShapeInfo,
                   uint8_t rank, uint64_t length) {
   auto values = reinterpret_cast<const X *>(vvalues);
   auto indices = reinterpret_cast<const I *>(vindices);
   auto output = reinterpret_cast<X *>(voutput);
 
-  int coords[SD_MAX_RANK];
+  LongType coords[SD_MAX_RANK];
   uint64_t pos = 0;
   for (uint64_t e = 0L; e < length; e++) {
     // indices come in blocks
@@ -48,19 +48,18 @@ static void fill_(const void *vvalues, const void *vindices, void *voutput, cons
     }
 
     // fill output at given coords with sparse value
-    output[shape::getOffset(zShapeInfo, coords)] = values[e];
+    LongType offset;
+    COORDS2INDEX(rank, shape::stride(zShapeInfo), coords, offset);
+    output[offset] = values[e];
   }
 }
-
-void compat_sparse_to_dense(const NDArray &values, const NDArray &indices, NDArray *def, NDArray &output) {
+void compat_sparse_to_dense(NDArray& values, NDArray& indices, NDArray* def, NDArray& output) {
   // make sure host buffer is updated
-  values.syncToHost();
-  indices.syncToHost();
-  output.syncToHost();
 
   auto rank = output.rankOf();
 
   if (output.isS()) {
+    NDArray::preparePrimaryUse({&output}, {&values, &indices, def});
     // string case is not so trivial, since elements might, and probably will, have different sizes
     auto numValues = values.lengthOf();
     auto numElements = output.lengthOf();
@@ -74,20 +73,21 @@ void compat_sparse_to_dense(const NDArray &values, const NDArray &indices, NDArr
     // now we make sure our output buffer can hold results
     output.dataBuffer()->expand(bufferLength + headerLength);
 
-    std::vector<sd::LongType> outputCoords(rank);
-    std::vector<sd::LongType> valueCoords(rank);
+    std::vector<LongType> outputCoords(rank);
+    std::vector<LongType> valueCoords(rank);
 
-    auto offsetsBuffer = output.bufferAsT<sd::LongType>();
-    auto dataBuffer = reinterpret_cast<uint8_t *>(offsetsBuffer + output.lengthOf());
+    auto offsetsBuffer = output.bufferAsT<LongType>();
+    auto dataBuffer = reinterpret_cast<uint8_t*>(offsetsBuffer + output.lengthOf());
 
     offsetsBuffer[0] = 0;
 
     // getting initial value coords
-    for (int e = 0; e < rank; e++) valueCoords[e] = indices.e<sd::LongType>(e);
+    for (int e = 0; e < rank; e++) valueCoords[e] = indices.e<LongType>(e);
 
     // write results individually
-    for (sd::LongType e = 0; e < numElements; e++) {
-      auto vIndex = shape::coords2index(output.shapeInfo(), valueCoords.data());
+    for (LongType e = 0; e < numElements; e++) {
+      LongType vIndex;
+      COORDS2INDEX(rank, shape::stride(output.shapeInfo()), valueCoords.data(), vIndex);
       auto cLength = 0L;
       std::string str;
       if (vIndex == e) {
@@ -107,25 +107,24 @@ void compat_sparse_to_dense(const NDArray &values, const NDArray &indices, NDArr
       // writing down offset
       offsetsBuffer[e + 1] = cLength;
     }
+    NDArray::registerPrimaryUse({&output}, {&values, &indices, def});
   } else {
     // numeric case is trivial, since all elements have equal sizes
 
     // write out default values, if they are present
     if (def != nullptr) {
       output.assign(def);
-
-      // make sure output is synced back
-      output.syncToHost();
     }
-
+    NDArray::preparePrimaryUse({&output}, {&values, &indices});
     // write out values
+    auto valuesDType = values.dataType();
+    auto indicesDataType = indices.dataType();
     BUILD_DOUBLE_SELECTOR(
         values.dataType(), indices.dataType(), fill_,
         (values.buffer(), indices.buffer(), output.buffer(), output.shapeInfo(), rank, values.lengthOf()),
         SD_COMMON_TYPES, SD_INDEXING_TYPES);
+    NDArray::registerPrimaryUse({&output}, {&values, &indices});
   }
-  // copy back to device, if there's any
-  output.syncToDevice();
 }
 }  // namespace helpers
 }  // namespace ops

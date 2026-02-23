@@ -35,11 +35,11 @@ CONFIGURABLE_OP_IMPL(adjust_hue, 1, 1, true, 0, 0) {
   auto output = OUTPUT_VARIABLE(0);
 
   // just skip op if input is empty
-  if (input->isEmpty()) return sd::Status::OK;
+  if (input->isEmpty()) return Status::OK;
 
   const int rank = input->rankOf();
   const int arg_size = block.getIArguments()->size();
-  const int dimC = arg_size > 0 ? (INT_ARG(0) >= 0 ? INT_ARG(0) : INT_ARG(0) + rank) : rank - 1;
+  const LongType dimC = arg_size > 0 ? (INT_ARG(0) >= 0 ? INT_ARG(0) : INT_ARG(0) + rank) : rank - 1;
 
   REQUIRE_TRUE(block.numT() > 0 || block.width() > 1, 0, "ADJUST_HUE: delta factor is required !");
   REQUIRE_TRUE(rank >= 3, 0, "ADJUST_HUE: op expects rank of input array to be >= 3, but got %i instead", rank);
@@ -57,20 +57,34 @@ CONFIGURABLE_OP_IMPL(adjust_hue, 1, 1, true, 0, 0) {
     delta = INPUT_VARIABLE(1);
   else {
     delta = new NDArray(output->dataType(), block.launchContext());
-    delta->p(0, T_ARG(0));
+#ifdef HAS_DOUBLE
+    delta->p(0, static_cast<double>(T_ARG(0)));
+#elif defined(HAS_FLOAT32)
+    delta->p(0, static_cast<float>(T_ARG(0)));
+#else
+#error "No floating-point type available for adjust_hue operation"
+#endif
   }
 
-  REQUIRE_TRUE(-1. <= delta->e<double>(0) && delta->e<double>(0) <= 1., 0,
+#ifdef HAS_DOUBLE
+  auto deltaVal = delta->e<double>(0);
+#elif defined(HAS_FLOAT32)
+  auto deltaVal = delta->e<float>(0);
+#else
+#error "No floating-point type available for adjust_hue operation"
+#endif
+
+  REQUIRE_TRUE(-1. <= deltaVal && deltaVal <= 1., 0,
                "ADJUST_HUE: parameter delta must be within [-1, 1] interval, but got %f instead", delta);
 
   helpers::adjustHue(block.launchContext(), input, delta, output, dimC);
 
   if (block.width() == 1) delete delta;
 
-  return sd::Status::OK;
+  return Status::OK;
 }
 
-DECLARE_TYPES(adjust_hue) { getOpDescriptor()->setAllowedInputTypes(sd::DataType::ANY)->setSameMode(true); }
+DECLARE_TYPES(adjust_hue) { getOpDescriptor()->setAllowedInputTypes(ANY)->setSameMode(true); }
 
 }  // namespace ops
 }  // namespace sd

@@ -24,18 +24,64 @@
 #include <ops/declarable/helpers/batched_gemm.h>
 #include <system/op_boilerplate.h>
 #include <types/float16.h>
+#include <indexing/NDIndexUtils.h>
+#include <ops/declarable/CustomOperations.h>
 
+#if NOT_EXCLUDED(OP_batched_gemm)
 namespace sd {
 namespace ops {
 namespace helpers {
 
+
+void bgemm(NDArray *a,  NDArray *b,  NDArray *c,   NDArray *alphas,   NDArray *betas,
+           int transA, int transB, int M, int N, int K,  int lda,  int ldb,  int ldc,
+           NDArray *all) {
+  NDArray *allIndex = nullptr;
+  if(all != nullptr)
+    allIndex = all;
+  else {
+    NDArray *allLocal = NDIndexUtils::createAll();
+    allIndex = allLocal;
+  }
+
+  int batchSize = a->sizeAt(0);
+  std::vector<NDArray *>inputs;
+  std::vector<NDArray *> bInputs;
+  std::vector<NDArray *> outputs;
+
+  ops::create_view createView;
+
+  //divide by 2: queries and keys
+  for(int i = 0; i < batchSize; i++) {
+    auto point = NDIndexUtils::createPoint(i);
+    auto aSlice = createView.evaluate({a,point,allIndex,allIndex},{},{});
+    auto bSlice = createView.evaluate({b,point,allIndex,allIndex},{},{});
+    auto outSlice = createView.evaluate({c,point,allIndex,allIndex},{},{});
+    inputs.push_back(aSlice.at(0));
+    bInputs.push_back(bSlice.at(0));
+    outputs.push_back(outSlice.at(0));
+    delete point;
+  }
+
+  delete allIndex;
+
+
+
+  bgemm(inputs, bInputs,outputs,alphas,betas,transA,transB,M,N,K,lda,ldb,ldc);
+
+}
+
 template <typename T>
-static void bgemm_(const std::vector<NDArray *> &vA, const std::vector<NDArray *> &vB, std::vector<NDArray *> &vC,
-                   const NDArray *alphas, const NDArray *betas, int transA, int transB, int M, int N, int K,
-                   const int lda, const int ldb, const int ldc) {
+static void bgemm_( std::vector<NDArray *> &vA,  std::vector<NDArray *> &vB, std::vector<NDArray *> &vC,
+                    NDArray *alphas,  NDArray *betas, int transA, int transB, int M, int N, int K,
+                    int lda,  int ldb,  int ldc) {
   int batchSize = vA.size();
 
-  if (BlasHelper::getInstance().hasBatchedGEMM<T>()) {
+
+  
+  // Use batched BLAS only when: 1) batched GEMM is available AND 2) BLAS is enabled
+  // Previously used || which incorrectly entered BLAS path when BLAS was disabled
+  if (BlasHelper::getInstance().hasBatchedGEMM<T>() && Environment::getInstance().isEnableBlas()) {
     auto arr = vA.at(0);
     CBLAS_TRANSPOSE *tA, *tB;
     int *tM, *tN, *tK, *tldA, *tldB, *tldC, *tsize;
@@ -61,16 +107,22 @@ static void bgemm_(const std::vector<NDArray *> &vA, const std::vector<NDArray *
     shape::fill(tldC, ldc, batchSize);
     shape::fill(tsize, 1, batchSize);
 
-    std::vector<T *> buffersA(batchSize);
-    std::vector<T *> buffersB(batchSize);
-    std::vector<T *> buffersC(batchSize);
+    std::vector<T *> buffersA;
+    std::vector<T *> buffersB;
+    std::vector<T *> buffersC;
+
+
 
     for (int e = 0; e < batchSize; e++) {
-      buffersA[e] = reinterpret_cast<T *>(vA[e]->buffer());
-      buffersB[e] = reinterpret_cast<T *>(vB[e]->buffer());
-      buffersC[e] = reinterpret_cast<T *>(vC[e]->buffer());
+      buffersA.push_back(reinterpret_cast<T *>(vA[e]->buffer()));
+      buffersB.push_back(reinterpret_cast<T *>(vB[e]->buffer()));
+      buffersC.push_back(reinterpret_cast<T *>(vC[e]->buffer()));
     }
 
+    // Acquire BLAS lock to prevent OpenBLAS TLS corruption and race conditions
+    auto blasLock = BlasHelper::getInstance().lockBlas();
+
+    // Inside BLAS block, only check type - BLAS enablement was already verified in outer condition
     if (std::is_same<T, double>::value) {
       BlasHelper::getInstance().dgemmBatched()(CblasColMajor, tA, tB, tM, tN, tK, (double *)alphas->buffer(),
                                                (double **)buffersA.data(), tldA, (double **)buffersB.data(), tldB,
@@ -81,6 +133,8 @@ static void bgemm_(const std::vector<NDArray *> &vA, const std::vector<NDArray *
           CblasColMajor, tA, tB, tM, tN, tK, (float *)alphas->buffer(), (float **)buffersA.data(), tldA,
           (float **)buffersB.data(), tldB, (float *)betas->buffer(), (float **)buffersC.data(), tldC, vA.size(), tsize);
     }
+
+
 
     // release temporary arrays
     RELEASE(tA, arr->getContext()->getWorkspace());
@@ -93,27 +147,30 @@ static void bgemm_(const std::vector<NDArray *> &vA, const std::vector<NDArray *
     RELEASE(tldC, arr->getContext()->getWorkspace());
     RELEASE(tsize, arr->getContext()->getWorkspace());
   } else {
+
     CBLAS_TRANSPOSE tA = (CBLAS_TRANSPOSE)transA;
     CBLAS_TRANSPOSE tB = (CBLAS_TRANSPOSE)transB;
-
     int vaSize = vA.size();
-
     auto func = PRAGMA_THREADS_FOR {
       for (auto p = start; p < stop; p++) {
         auto A = reinterpret_cast<T *>(vA.at(p)->buffer());
         auto B = reinterpret_cast<T *>(vB.at(p)->buffer());
         auto C = reinterpret_cast<T *>(vC.at(p)->buffer());
-        auto alpha = alphas->e<T>(p);
-        auto beta = betas->e<T>(p);
-        for (int m = 0; m < M; ++m) {
-          for (int n = 0; n < N; ++n) {
-            T c_mnp = 0;
-
+        // Handle scalar, single-element, or empty arrays (use defaults for empty)
+        auto alpha = (alphas->isScalar() || alphas->lengthOf() <= 1)
+                     ? (alphas->lengthOf() > 0 ? alphas->e<T>(0) : static_cast<T>(1))
+                     : alphas->e<T>(p);
+        auto beta = (betas->isScalar() || betas->lengthOf() <= 1)
+                    ? (betas->lengthOf() > 0 ? betas->e<T>(0) : static_cast<T>(0))
+                    : betas->e<T>(p);
+        for (int m = 0; m < M; m++) {
+          for (int n = 0; n < N; n++) {
+            T c_mnp = static_cast<T>(0);
             PRAGMA_OMP_SIMD
-            for (int k = 0; k < K; ++k)
+            for (int k = 0; k < K; k++) {
               c_mnp += A[tA == CblasNoTrans ? (m + k * lda) : (m * lda + k)] *
                        B[tB == CblasNoTrans ? (k + n * ldb) : (k * ldb + n)];
-
+            }
             C[m + n * ldc] = alpha * c_mnp + beta * C[m + n * ldc];
           }
         }
@@ -121,23 +178,25 @@ static void bgemm_(const std::vector<NDArray *> &vA, const std::vector<NDArray *
     };
 
     samediff::Threads::parallel_tad(func, 0, vaSize);
+
   }
 }
 
-void bgemm(const std::vector<NDArray *> &vA, const std::vector<NDArray *> &vB, std::vector<NDArray *> &vC,
-           const NDArray *alphas, const NDArray *betas, int transA, int transB, int M, int N, int K, const int lda,
-           const int ldb, const int ldc) {
+void bgemm( std::vector<NDArray *> &vA,  std::vector<NDArray *> &vB, std::vector<NDArray *> &vC,
+            NDArray *alphas,  NDArray *betas, int transA, int transB, int M, int N, int K,  int lda,
+            int ldb,  int ldc) {
   auto xType = vA.at(0)->dataType();
   BUILD_SINGLE_SELECTOR(xType, bgemm_, (vA, vB, vC, alphas, betas, transA, transB, M, N, K, lda, ldb, ldc),
                         SD_FLOAT_TYPES);
 }
 
-BUILD_SINGLE_TEMPLATE(template void bgemm_,
-                      (const std::vector<NDArray *> &vA, const std::vector<NDArray *> &vB, std::vector<NDArray *> &vC,
-                       const NDArray *alphas, const NDArray *betas, int transA, int transB, int M, int N, int K,
-                       const int lda, const int ldb, const int ldc),
+BUILD_SINGLE_TEMPLATE( void bgemm_,
+                      ( std::vector<NDArray *> &vA,  std::vector<NDArray *> &vB, std::vector<NDArray *> &vC,
+                          NDArray *alphas,  NDArray *betas, int transA, int transB, int M, int N, int K,
+                          int lda,  int ldb,  int ldc),
                       SD_FLOAT_TYPES);
 
 }  // namespace helpers
 }  // namespace ops
 }  // namespace sd
+#endif

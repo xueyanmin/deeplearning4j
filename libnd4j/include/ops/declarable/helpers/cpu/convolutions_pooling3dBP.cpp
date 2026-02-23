@@ -21,15 +21,16 @@
 //
 #include <execution/Threads.h>
 #include <ops/declarable/helpers/convolutions.h>
+#include <stdexcept>
 
 namespace sd {
 namespace ops {
 
 //////////////////////////////////////////////////////////////////////////
 template <typename T>
-static void pooling3dBP_(sd::graph::Context& block, const NDArray& input, const NDArray& gradO, NDArray& gradI,
-                         const int kD, const int kH, const int kW, const int sD, const int sH, const int sW,
-                         const int pD, const int pH, const int pW, const int dD, const int dH, const int dW,
+static void pooling3dBP_(sd::graph::Context& block, NDArray& input, NDArray& gradO, NDArray& gradI,
+                         const LongType kD, const LongType kH, const LongType kW, const LongType sD, const LongType sH, const LongType sW,
+                         const LongType pD, const LongType pH, const LongType pW, const LongType dD, const LongType dH, const LongType dW,
                          const int poolingMode, const int extraParam0) {
   // input [bS, iC, iD, iH, iW]
   // gradI [bS, iC, iD, iH, iW] -> gradI is output in this function
@@ -265,7 +266,7 @@ static void pooling3dBP_(sd::graph::Context& block, const NDArray& input, const 
                   for (sd::LongType kd = dstart; kd < dend; kd += iStep2)
                     for (sd::LongType kh = hstart; kh < hend; kh += iStep3)
                       for (sd::LongType kw = wstart; kw < wend; kw += iStep4)
-                        sum += sd::math::sd_pow<T, T, T>(sd::math::sd_abs<T>(pIn[kd + kh + kw]), extraParam0);
+                        sum += sd::math::sd_pow<T, T, T>(sd::math::sd_abs<T,T>(pIn[kd + kh + kw]), static_cast<T>(extraParam0));
 
                   valO *= sd::math::sd_pow<T, T, T>(sum, ((T)1.f - extraParam0) / extraParam0);
 
@@ -274,14 +275,14 @@ static void pooling3dBP_(sd::graph::Context& block, const NDArray& input, const 
                       for (sd::LongType kw = wstart; kw < wend; kw += iStep4)
                         pgI[kd + kh + kw] +=
                             valO *
-                            sd::math::sd_pow<T, T, T>(sd::math::sd_abs<T>(pIn[kd + kh + kw]), extraParam0 - (T)1.f) *
+                            sd::math::sd_pow<T, T, T>(sd::math::sd_abs<T,T>(pIn[kd + kh + kw]), extraParam0 - (T)1.f) *
                             sd::math::sd_sgn<T, T>(pIn[kd + kh + kw]);
                 } else {
                   for (sd::LongType kd = dstart; kd < dend; kd += dD)
                     for (sd::LongType kh = hstart; kh < hend; kh += dH)
                       for (sd::LongType kw = wstart; kw < wend; kw += dW)
                         sum += sd::math::sd_pow<T, T, T>(
-                            sd::math::sd_abs<T>(pIn[kd * iStride2 + kh * iStride3 + kw * iStride4]), extraParam0);
+                            sd::math::sd_abs<T,T>(pIn[kd * iStride2 + kh * iStride3 + kw * iStride4]), static_cast<T>(extraParam0));
 
                   valO *= sd::math::sd_pow<T, T, T>(sum, ((T)1.f - extraParam0) / extraParam0);
 
@@ -290,7 +291,7 @@ static void pooling3dBP_(sd::graph::Context& block, const NDArray& input, const 
                       for (sd::LongType kw = wstart; kw < wend; kw += dW) {
                         const auto inVal = pIn[kD * iStride2 + kh * iStride3 + kw * iStride4];
                         pgI[kd * gIStride2 + kh * gIStride3 + kw * gIStride4] +=
-                            valO * sd::math::sd_pow<T, T, T>(sd::math::sd_abs<T>(inVal), extraParam0 - 1.f) *
+                            valO * sd::math::sd_pow<T, T, T>(sd::math::sd_abs<T,T>(inVal), static_cast<T>(extraParam0) - 1.f) *
                             sd::math::sd_sgn<T, T>(inVal);
                       }
                 }
@@ -303,18 +304,18 @@ static void pooling3dBP_(sd::graph::Context& block, const NDArray& input, const 
 
     samediff::Threads::parallel_for(func, 0, bS, 1, 0, iC, 1);
   } else {
-    sd_printf(
-        "ConvolutionUtils::pooling3dBP: pooling mode argument can take three values only: 0, 1, 2, but got %i instead "
-        "!\n",
+    char errorMsg[512];
+    snprintf(errorMsg, sizeof(errorMsg),
+        "ConvolutionUtils::pooling3dBP: pooling mode argument can take three values only: 0, 1, 2, but got %i instead!",
         poolingMode);
-    throw "";
+    THROW_EXCEPTION(errorMsg);
   }
 }
 
-void ConvolutionUtils::pooling3dBP(sd::graph::Context& block, const NDArray& input, const NDArray& gradO,
-                                   NDArray& gradI, const int kD, const int kH, const int kW, const int sD, const int sH,
-                                   const int sW, const int pD, const int pH, const int pW, const int dD, const int dH,
-                                   const int dW, const int poolingMode, const int extraParam0) {
+void ConvolutionUtils::pooling3dBP(sd::graph::Context& block, NDArray& input, NDArray& gradO,
+                                   NDArray& gradI, const LongType kD, const LongType kH, const LongType kW, const LongType sD, const LongType sH,
+                                   const LongType sW, const LongType pD, const LongType pH, const LongType pW, const LongType dD, const LongType dH,
+                                   const LongType dW, const int poolingMode, const int extraParam0) {
   BUILD_SINGLE_SELECTOR(
       input.dataType(), pooling3dBP_,
       (block, input, gradO, gradI, kD, kH, kW, sD, sH, sW, pD, pH, pW, dD, dH, dW, poolingMode, extraParam0),

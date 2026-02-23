@@ -23,7 +23,7 @@ package org.deeplearning4j.nn.modelimport.keras.layers;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ArrayUtils;
-import org.deeplearning4j.common.config.DL4JClassLoading;
+import org.deeplearning4j.config.DL4JClassLoading;
 import org.deeplearning4j.nn.conf.NeuralNetConfiguration;
 import org.deeplearning4j.nn.gradient.Gradient;
 import org.deeplearning4j.nn.layers.AbstractLayer;
@@ -37,7 +37,6 @@ import org.tensorflow.framework.AttrValue;
 import org.tensorflow.framework.GraphDef;
 import org.tensorflow.framework.NodeDef;
 import com.google.gson.Gson;
-import org.nd4j.shade.protobuf.Message;
 import org.nd4j.shade.protobuf.TextFormat;
 
 import java.util.*;
@@ -148,7 +147,7 @@ public class TFOpLayerImpl extends AbstractLayer<TFOpLayer> {
     }
 
     @Override
-    public INDArray activate(boolean training, LayerWorkspaceMgr workspaceMgr){
+    public INDArray activate(boolean training, LayerWorkspaceMgr workspaceMgr) {
         return runGraph(input);
     }
 

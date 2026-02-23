@@ -30,7 +30,6 @@ import org.nd4j.autodiff.samediff.SameDiff;
 import org.nd4j.autodiff.samediff.VariableType;
 import org.nd4j.autodiff.samediff.internal.SameDiffOp;
 import org.nd4j.autodiff.samediff.internal.Variable;
-import org.nd4j.autodiff.validation.listeners.NonInplaceValidationListener;
 import org.nd4j.common.base.Preconditions;
 import org.nd4j.linalg.api.buffer.DataType;
 import org.nd4j.linalg.api.iter.NdIndexIterator;
@@ -94,12 +93,12 @@ public class GradCheckUtil {
         }
 
         //Validation sanity checks:
-        if(!skipValidation){
+        if(!skipValidation) {
             validateInternalState(sd, true);
         }
 
         //Check data type:
-        if(Nd4j.dataType() != DataType.DOUBLE){
+        if(Nd4j.dataType() != DataType.DOUBLE) {
             throw new IllegalStateException("Data type must be set to double");
         }
 
@@ -111,8 +110,8 @@ public class GradCheckUtil {
         }
 
         //Check that all non-Array type SDVariables have arrays associated with them
-        for(Variable v : sd.getVariables().values()){
-            if(v.getVariable().getVariableType() == VariableType.ARRAY) {
+        for(Variable v : sd.getVariables().values()) {
+            if(v.getVariable().getVariableType() == VariableType.ARRAY || v.getVariable().getVariableType() == VariableType.PLACEHOLDER) {
                 //OK if variable is not available for this, it'll be created during forward pass
                 continue;
             }
@@ -132,49 +131,25 @@ public class GradCheckUtil {
         //Collect variables to get gradients for - we want placeholders AND variables
         Set<String> varsNeedingGrads = new HashSet<>();
         for(Variable v : sd.getVariables().values()) {
-            if(v.getVariable().dataType().isFPType() && (v.getVariable().getVariableType() == VariableType.VARIABLE || v.getVariable().getVariableType() == VariableType.PLACEHOLDER)){
-                SDVariable g = v.getVariable().getGradient();
+            if(v.getVariable().dataType().isFPType() && (v.getVariable().getVariableType() == VariableType.VARIABLE || v.getVariable().getVariableType() == VariableType.PLACEHOLDER)) {
+                SDVariable g = sd.getGradForVariable(v.getName());
                 Preconditions.checkNotNull(g, "No gradient variable found for variable %s", v.getVariable());
                 varsNeedingGrads.add(v.getName());
             }
         }
 
-        //Add non-inplace validation listener, to check that non-inplace ops don't modify their inputs
-        List<Listener> listenersBefore = new ArrayList<>(sd.getListeners());
-        int listenerIdx = -1;
-        if(listenersBefore.isEmpty()) {
-            sd.addListeners(new NonInplaceValidationListener());
-            listenerIdx = 0;
-        } else {
-            boolean found = false;
-            int i = 0;
-            for(Listener l : listenersBefore) {
-                if(l instanceof NonInplaceValidationListener) {
-                    found = true;
-                    listenerIdx = i;
-                    break;
-                }
-                i++;
-            }
-            if(!found) {
-                sd.addListeners(new NonInplaceValidationListener());
-                listenerIdx = i;
-            }
-        }
 
 
         Map<String,INDArray> gm = sd.calculateGradients(placeholderValues, varsNeedingGrads);
 
-        //Remove listener, to reduce overhead
-        sd.getListeners().remove(listenerIdx);
 
         Map<String,INDArray> grad = new HashMap<>();
-        for(SDVariable v : sd.variables()){
+        for(SDVariable v : sd.variables()) {
             if (fnOutputs.contains(v.name())) {
                 //This is not an input to the graph
                 continue;
             }
-            if(!v.hasGradient()){
+            if(!v.hasGradient()) {
                 //Skip non-fp variables, or variables that don't impact loss function value
                 continue;
             }
@@ -183,13 +158,13 @@ public class GradCheckUtil {
                 throw new IllegalStateException("Null gradient variable for \"" + v.name() + "\"");
             }
             INDArray ga = gm.get(v.name());
-            if(ga == null){
+            if(ga == null) {
                 throw new IllegalStateException("Null gradient array encountered for variable: " + v.name());
             }
-            if(!Arrays.equals(v.getArr().shape(), ga.shape())){
+            if(!Arrays.equals(v.getArr().shape(), ga.shape())) {
                 throw new IllegalStateException("Gradient shape does not match variable shape for variable \"" +
-                    v.name() + "\": shape " + Arrays.toString(v.getArr().shape()) + " vs. gradient shape " +
-                    Arrays.toString(ga.shape()));
+                        v.name() + "\": shape " + Arrays.toString(v.getArr().shape()) + " vs. gradient shape " +
+                        Arrays.toString(ga.shape()));
             }
             grad.put(v.name(), ga.dup());
         }
@@ -217,7 +192,7 @@ public class GradCheckUtil {
             String name = s.name();
             INDArray a = s.getArr();
             long n = a.length();
-            if(print){
+            if(print) {
                 log.info("Starting test for variable \"{}\" with {} values", s.name(), n);
             }
 
@@ -226,7 +201,7 @@ public class GradCheckUtil {
                 //Subset case
                 long[] shape = a.shape();
                 List<long[]> l = new ArrayList<>();
-                if(subset == Subset.RANDOM){
+                if(subset == Subset.RANDOM) {
                     Set<Integer> set = new HashSet<>();
                     while(set.size() < maxPerParam){
                         int next = r.nextInt((int)a.length());
@@ -257,7 +232,7 @@ public class GradCheckUtil {
 
             INDArray varMask = (gradCheckMask == null ? null : gradCheckMask.get(s.name()));
 
-            if(varMask != null){
+            if(varMask != null) {
                 Preconditions.checkState(a.equalShapes(varMask), "Variable \"%s\": Gradient check mask and array shapes must be equal: got %s vs. mask shape %s", s.name(), a.shape(), varMask.shape());
                 Preconditions.checkState(varMask.dataType() == DataType.BOOL, "Variable \"%s\": Gradient check mask must be BOOLEAN datatype, got %s", s.name(), varMask.dataType());
             }
@@ -271,7 +246,7 @@ public class GradCheckUtil {
                 }
 
                 boolean maskValue = (varMask == null || (varMask.getDouble(idx) != 0));
-                if(!maskValue){
+                if(!maskValue) {
                     //Skip this specific entry (masked out)
                     continue;
                 }
@@ -281,20 +256,20 @@ public class GradCheckUtil {
                 a.putScalar(idx, orig + eps);
                 double scorePlus = 0.0;
                 Map<String,INDArray> m = sd.output(placeholderValues, lossFnVariables);//.get(outName).sumNumber().doubleValue();
-                for(INDArray arr : m.values()){
+                for(INDArray arr : m.values()) {
                     scorePlus += arr.sumNumber().doubleValue();
                 }
                 a.putScalar(idx, orig-eps);
                 m = sd.output(placeholderValues, lossFnVariables);
                 double scoreMinus = 0.0;
-                for(INDArray arr : m.values()){
+                for(INDArray arr : m.values()) {
                     scoreMinus += arr.sumNumber().doubleValue();
                 }
                 a.putScalar(idx, orig);
 
                 double numericalGrad = (scorePlus - scoreMinus) / (2 * eps);
                 INDArray aGrad = grad.get(s.name());
-                if(aGrad == null){
+                if(aGrad == null) {
                     log.warn("No gradient array for variable \"{}\" was found, skipping variable...", s.name());
                     continue;
                 }
@@ -311,7 +286,7 @@ public class GradCheckUtil {
 
 
                 double relError;
-                if(numericalGrad == 0.0 || analyticGrad == 0.0){
+                if(numericalGrad == 0.0 || analyticGrad == 0.0) {
                     relError = 0.0;
                 } else {
                     relError = Math.abs(analyticGrad - numericalGrad) / (Math.abs(Math.abs(analyticGrad) + Math.abs(numericalGrad)));

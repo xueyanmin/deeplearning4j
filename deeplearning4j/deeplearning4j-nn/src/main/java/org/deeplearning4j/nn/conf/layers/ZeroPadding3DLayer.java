@@ -20,7 +20,13 @@
 
 package org.deeplearning4j.nn.conf.layers;
 
-import lombok.*;
+import lombok.AccessLevel;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 import org.deeplearning4j.nn.api.ParamInitializer;
 import org.deeplearning4j.nn.conf.InputPreProcessor;
 import org.deeplearning4j.nn.conf.NeuralNetConfiguration;
@@ -120,7 +126,7 @@ public class ZeroPadding3DLayer extends NoParamLayer {
          * [padLeftD, padRightD, padLeftH, padRightH, padLeftW, padRightW]
          */
         @Setter(AccessLevel.NONE)
-        private int[] padding = new int[] {0, 0, 0, 0, 0, 0};
+        private int[] padding = {0, 0, 0, 0, 0, 0};
 
         /**
          * [padLeftD, padRightD, padLeftH, padRightH, padLeftW, padRightW]
@@ -142,7 +148,7 @@ public class ZeroPadding3DLayer extends NoParamLayer {
          *
          * @param padDepth padding used for both depth boundaries
          * @param padHeight padding used for both height boundaries
-         * @param padWidth padding used for both width boudaries
+         * @param padWidth padding used for both width boundaries
          */
         public Builder(int padDepth, int padHeight, int padWidth) {
             this(padDepth, padDepth, padHeight, padHeight, padWidth, padWidth);

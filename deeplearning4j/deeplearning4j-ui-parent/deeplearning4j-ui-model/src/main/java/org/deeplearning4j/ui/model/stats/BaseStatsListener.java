@@ -23,7 +23,7 @@ package org.deeplearning4j.ui.model.stats;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.IOUtils;
 import org.bytedeco.javacpp.Pointer;
-import org.deeplearning4j.common.config.DL4JClassLoading;
+import org.deeplearning4j.config.DL4JClassLoading;
 import org.deeplearning4j.core.storage.StatsStorageRouter;
 import org.deeplearning4j.core.storage.StorageMetaData;
 import org.deeplearning4j.core.storage.listener.RoutingIterationListener;
@@ -52,7 +52,6 @@ import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
 import java.lang.management.OperatingSystemMXBean;
 import java.lang.management.RuntimeMXBean;
-import java.lang.reflect.Constructor;
 import java.util.*;
 
 @Slf4j
@@ -375,7 +374,7 @@ public abstract class BaseStatsListener implements RoutingIterationListener {
             //GPU
             long[] gpuCurrentBytes = null;
             long[] gpuMaxBytes = null;
-            NativeOps nativeOps = NativeOpsHolder.getInstance().getDeviceNativeOps();
+            NativeOps nativeOps =Nd4j.getNativeOps();
             int nDevices = nativeOps.getAvailableDevices();
             if (nDevices > 0) {
                 gpuCurrentBytes = new long[nDevices];
@@ -620,7 +619,7 @@ public abstract class BaseStatsListener implements RoutingIterationListener {
 
         if (initConfig.collectHardwareInfo()) {
             int availableProcessors = Runtime.getRuntime().availableProcessors();
-            NativeOps nativeOps = NativeOpsHolder.getInstance().getDeviceNativeOps();
+            NativeOps nativeOps =Nd4j.getNativeOps();
             int nDevices = nativeOps.getAvailableDevices();
 
             long[] deviceTotalMem = null;

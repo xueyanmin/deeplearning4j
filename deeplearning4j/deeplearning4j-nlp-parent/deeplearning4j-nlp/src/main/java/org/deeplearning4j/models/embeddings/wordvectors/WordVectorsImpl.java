@@ -33,11 +33,7 @@ import org.deeplearning4j.models.sequencevectors.sequence.SequenceElement;
 import org.deeplearning4j.models.word2vec.wordstore.VocabCache;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.factory.Nd4j;
-import org.nd4j.linalg.heartbeat.Heartbeat;
-import org.nd4j.linalg.heartbeat.reports.Environment;
-import org.nd4j.linalg.heartbeat.reports.Event;
-import org.nd4j.linalg.heartbeat.reports.Task;
-import org.nd4j.linalg.heartbeat.utils.EnvironmentUtils;
+
 
 import java.util.*;
 
@@ -55,24 +51,57 @@ public class WordVectorsImpl<T extends SequenceElement> implements WordVectors {
     @Getter
     protected transient ModelUtils<T> modelUtils = new BasicModelUtils<>();
     private boolean initDone = false;
-
+    @Getter
+    @Setter
     protected int numIterations = 1;
+    @Getter
+    @Setter
     protected int numEpochs = 1;
+    @Getter
+    @Setter
     protected double negative = 0;
+    @Getter
+    @Setter
     protected double sampling = 0;
     protected AtomicDouble learningRate = new AtomicDouble(0.025);
+    @Getter
+    @Setter
     protected double minLearningRate = 0.01;
     @Getter
+    @Setter
     protected int window = 5;
+    @Getter
+    @Setter
     protected int batchSize;
+    @Getter
+    @Setter
     protected int learningRateDecayWords;
+    @Getter
+    @Setter
     protected boolean resetModel;
     protected boolean useAdeGrad;
-    protected int workers = 1; //Runtime.getRuntime().availableProcessors();
+    @Getter
+    @Setter
+    protected int workers = 1;
+
+    @Getter
+    @Setter
+    protected int vectorCalcThreads = 1;
+
+    @Getter
+    @Setter
     protected boolean trainSequenceVectors = false;
+    @Getter
+    @Setter
     protected boolean trainElementsVectors = true;
+    @Getter
+    @Setter
     protected long seed;
+    @Getter
+    @Setter
     protected boolean useUnknown = false;
+    @Getter
+    @Setter
     protected int[] variableWindows;
 
 
@@ -316,25 +345,6 @@ public class WordVectorsImpl<T extends SequenceElement> implements WordVectors {
         this.vocab = vocab;
     }
 
-    protected void update() {
-        update(EnvironmentUtils.buildEnvironment(), Event.STANDALONE);
-    }
-
-    protected void update(Environment env, Event event) {
-        if (!initDone) {
-            initDone = true;
-
-            Heartbeat heartbeat = Heartbeat.getInstance();
-            Task task = new Task();
-            task.setNumFeatures(layerSize);
-            if (vocab != null)
-                task.setNumSamples(vocab.numWords());
-            task.setNetworkType(Task.NetworkType.DenseNetwork);
-            task.setArchitectureType(Task.ArchitectureType.WORDVECTORS);
-
-            heartbeat.reportEvent(event, env, task);
-        }
-    }
 
     @Override
     public void loadWeightsInto(INDArray array) {

@@ -25,7 +25,7 @@
 #include <ops/declarable/helpers/transforms.h>
 
 #include <numeric>
-
+#include <system/selective_rendering.h>
 namespace sd {
 namespace ops {
 namespace helpers {
@@ -37,42 +37,58 @@ static void gatherND_(NDArray& input, NDArray& indices, NDArray& output) {
   const Y* y = reinterpret_cast<Y*>(indices.buffer());
   X* z = reinterpret_cast<X*>(output.buffer());
 
-  const int xRank = input.rankOf();
-  const int yRank = indices.rankOf();
-  const int zRank = output.rankOf();
-  const int maxRank = sd::math::sd_max<int>(yRank, sd::math::sd_max<int>(xRank, zRank));
+  const sd::LongType xRank = input.rankOf();
+  const sd::LongType yRank = indices.rankOf();
+  const sd::LongType zRank = output.rankOf();
+  const sd::LongType maxRank = sd::math::sd_max<sd::LongType>(yRank, sd::math::sd_max<sd::LongType>(xRank, zRank));
 
   const sd::LongType zLen = output.lengthOf();
 
-  const sd::Unsigned yLastDim = indices.sizeAt(-1);
+  const sd::LongType yLastDim = indices.sizeAt(-1);
 
   const int diff = zRank - xRank;
   const bool bEqual = yLastDim == xRank;
 
+  sd::LongType outputRank = output.rankOf();
+  sd::LongType* outputShape = shape::shapeOf(output.shapeInfo());
+  sd::LongType* outputStride = shape::stride(output.shapeInfo());
+  sd::LongType indicesRank = indices.rankOf();
+  sd::LongType* indicesShape = shape::shapeOf(indices.shapeInfo());
+  sd::LongType* indicesStride = shape::stride(indices.shapeInfo());
+
+  sd::LongType inputRank = input.rankOf();
+  sd::LongType* inputShape = shape::shapeOf(input.shapeInfo());
+  sd::LongType* inputStride = shape::stride(input.shapeInfo());
+
   auto func = PRAGMA_THREADS_FOR {
-    int xCoords[SD_MAX_RANK], zCoords[SD_MAX_RANK], temp;
+    sd::LongType xCoords[SD_MAX_RANK], zCoords[SD_MAX_RANK], temp;
 
-    for (auto i = start; i < stop; i++) {
-      shape::index2coordsCPU(start, i, output.shapeInfo(), zCoords);
+    for (sd::LongType i = start; i < stop; i++) {
+      INDEX2COORDS(i, outputRank, outputShape, zCoords);
 
-      const auto zOffset = shape::getOffset(output.shapeInfo(), zCoords);
+      sd::LongType zOffset;
+      COORDS2INDEX(outputRank, outputStride, zCoords, zOffset);
 
       temp = zCoords[yRank - 1];
       zCoords[yRank - 1] = 0;
-      const auto yOffset = shape::getOffset(indices.shapeInfo(), zCoords);
+
+      sd::LongType yOffset;
+      COORDS2INDEX(indicesRank, indicesStride, zCoords, yOffset);
+
       zCoords[yRank - 1] = temp;
 
       if (bEqual)
-        memcpy(xCoords, zCoords, zRank * sizeof(int));
+        memcpy(xCoords, zCoords, zRank * sizeof(sd::LongType));
       else if (diff >= 0)
-        memcpy(xCoords, zCoords + diff, xRank * sizeof(int));
+        memcpy(xCoords, zCoords + diff, xRank * sizeof(sd::LongType));
       else
-        memcpy(xCoords - diff, zCoords, zRank * sizeof(int));
+        memcpy(xCoords - diff, zCoords, zRank * sizeof(sd::LongType));
 
-      for (sd::Unsigned j = 0; j < yLastDim; ++j)
-        xCoords[j] = y[yOffset + j * indices.stridesOf()[yRank - 1]];  // last stride
+      for (sd::LongType j = 0; j < yLastDim; ++j)
+        xCoords[j] = y[yOffset + j * indicesStride[yRank - 1]];  // last stride
 
-      const auto xOffset = shape::getOffset(input.shapeInfo(), xCoords);
+      sd::LongType xOffset;
+      COORDS2INDEX(inputRank, inputStride, xCoords, xOffset);
 
       z[zOffset] = x[xOffset];
     }
@@ -83,13 +99,15 @@ static void gatherND_(NDArray& input, NDArray& indices, NDArray& output) {
 
 ////////////////////////////////////////////////////////////////////////
 void gatherND(sd::LaunchContext* context, NDArray& input, NDArray& indices, NDArray& output) {
+  auto inputDType = input.dataType();
+  auto indicesDType = indices.dataType();
   BUILD_DOUBLE_SELECTOR(input.dataType(), indices.dataType(), gatherND_, (input, indices, output), SD_COMMON_TYPES,
                         SD_INDEXING_TYPES);
 }
 
 ////////////////////////////////////////////////////////////////////////
 template <typename T>
-static void gather_(NDArray* input, const NDArray* indices, NDArray* output, const std::vector<int>& intArgs) {
+static void gather_(NDArray* input, NDArray* indices, NDArray* output, const std::vector<int>& intArgs) {
   int axis = intArgs.size() > 0 ? intArgs[0] : 0;
   const int inputRank = input->rankOf();
   if (axis < 0) axis += inputRank;
@@ -99,7 +117,7 @@ static void gather_(NDArray* input, const NDArray* indices, NDArray* output, con
   if (indices != nullptr) {
     for (sd::LongType i = 0; i < indices->lengthOf(); ++i)
       if (indices->e<sd::LongType>(i) >= input->sizeAt(axis))
-        throw std::runtime_error(
+        THROW_EXCEPTION(
             "helpers::gather function: indices array contains wrong elements, each element must be smaller than "
             "corresponding dimension of input array !");
 
@@ -110,14 +128,17 @@ static void gather_(NDArray* input, const NDArray* indices, NDArray* output, con
         // we want to get a scalar
         auto idx = indices->e<sd::LongType>(0);
         auto scalarNDArray = input->e(idx);
-        output->assign(scalarNDArray);
+        output->assign(&scalarNDArray);
       } else {
-        auto dimensions = ShapeUtils::evalDimsToExclude(input->rankOf(), {axis});
-        auto tadPack = sd::ConstantTadHelper::getInstance().tadForDimensions(input->shapeInfo(), dimensions);
+        // tadForDimensions expects the dimensions to create TADs along,
+        // NOT the dimensions to exclude
+        std::vector<sd::LongType> axesVec = {axis};
+        // Pass the axis directly - TadCalculator will handle the exclusion internally
+        auto tadPack = sd::ConstantTadHelper::getInstance().tadForDimensions(input->shapeInfo(), &axesVec);
 
         auto tadArr = NDArray(reinterpret_cast<void*>(reinterpret_cast<T*>(input->buffer()) +
-                                                      tadPack.primaryOffsets()[indices->e<sd::LongType>(0)]),
-                              tadPack.primaryShapeInfo(), output->getContext());
+                                                      tadPack->primaryOffsets()[indices->e<sd::LongType>(0)]),
+                              tadPack->primaryShapeInfo(), output->getContext(), 0, 0);
         output->assign(&tadArr);
       }
     } else if (input->rankOf() == 1 && indices->isVector()) {
@@ -128,15 +149,17 @@ static void gather_(NDArray* input, const NDArray* indices, NDArray* output, con
 
       samediff::Threads::parallel_for(func, 0, indices->lengthOf());
     } else {
-      std::vector<int> dimsOut(indices->rankOf());
+      std::vector<sd::LongType> dimsOut(indices->rankOf());
       std::iota(dimsOut.begin(), dimsOut.end(), axis);  // fill with axis, axis+1, ... indices->rankOf()-1
       const sd::LongType numOfSubArrs = ShapeUtils::getNumOfSubArrs(output->shapeInfo(), dimsOut);
 
       auto func = PRAGMA_THREADS_FOR {
         for (auto i = start; i < stop; i++) {
-          NDArray subArrOut = (*output)(i, dimsOut);
-          NDArray subArrIn = (*input)(indices->e<sd::LongType>(i), {axis});
-          subArrOut.assign(subArrIn);
+          NDArray *subArrOut = (*output)(i, dimsOut);
+          NDArray *subArrIn = (*input)(indices->e<sd::LongType>(i), {axis});
+          subArrOut->assign(subArrIn);
+          delete subArrOut;
+          delete subArrIn;
         }
       };
 
@@ -145,20 +168,24 @@ static void gather_(NDArray* input, const NDArray* indices, NDArray* output, con
   } else {
     for (int i = 1; i < numOfIntArgs; ++i)
       if (intArgs[i] >= input->sizeAt(axis))
-        throw std::runtime_error(
+        THROW_EXCEPTION(
             "helpers::gather function: some of input indexes is larger than corresponding shape of input array !");
 
     // we only allow scalar/vector case here
     if (numOfIntArgs == 2) {  // scalar case
-      output->assign((*input)(intArgs[1], {axis}));
+      NDArray *view = (*input)(intArgs[1], {axis});
+      output->assign(view);
+      delete view;
     } else {  // vector case
       const sd::LongType numOfSubArrs = ShapeUtils::getNumOfSubArrs(output->shapeInfo(), {axis});
 
       auto func = PRAGMA_THREADS_FOR {
         for (auto i = start; i < stop; i++) {
-          NDArray subArrOut = (*output)(i, {axis});
-          NDArray subArrIn = (*input)(intArgs[i + 1], {axis});
-          subArrOut.assign(subArrIn);
+          NDArray *subArrOut = (*output)(i, {axis});
+          NDArray *subArrIn = (*input)(intArgs[i + 1], {axis});
+          subArrOut->assign(subArrIn);
+          delete subArrIn;
+          delete subArrOut;
         }
       };
 
@@ -167,7 +194,7 @@ static void gather_(NDArray* input, const NDArray* indices, NDArray* output, con
   }
 }
 
-void gather(NDArray* input, const NDArray* indices, NDArray* output, const std::vector<int>& intArgs) {
+void gather(NDArray* input, NDArray* indices, NDArray* output, const std::vector<int>& intArgs) {
   BUILD_SINGLE_SELECTOR(input->dataType(), gather_, (input, indices, output, intArgs), SD_COMMON_TYPES);
 }
 

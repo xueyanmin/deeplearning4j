@@ -23,7 +23,6 @@ package org.nd4j.linalg.api.ops.random.impl;
 import org.nd4j.autodiff.samediff.SDVariable;
 import org.nd4j.autodiff.samediff.SameDiff;
 import org.nd4j.common.base.Preconditions;
-import org.nd4j.imports.graphmapper.tf.TFGraphMapper;
 import org.nd4j.linalg.api.buffer.DataType;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.api.ops.DynamicCustomOp;
@@ -101,14 +100,30 @@ public class Range extends DynamicCustomOp {
     }
 
 
+    @Override
+    public void configureFromArguments() {
+        if(!iArguments.isEmpty()) {
+            this.from = iArguments.get(0).doubleValue();
+            this.to = iArguments.get(1).doubleValue();
+            this.delta = iArguments.get(2).doubleValue();
+        }
+
+        if(!tArguments.isEmpty()) {
+            this.from = tArguments.get(0).doubleValue();
+            this.to = tArguments.get(1).doubleValue();
+            this.delta = tArguments.get(2).doubleValue();
+        }
+    }
+
+    @Override
+    public void setPropertiesForFunction(Map<String, Object> properties) {
+        super.setPropertiesForFunction(properties);
+    }
 
     @Override
     public void initFromTensorFlow(NodeDef nodeDef, SameDiff initWith, Map<String, AttrValue> attributesForNode, GraphDef graph) {
-        super.initFromTensorFlow(nodeDef, initWith, attributesForNode, graph);
-        if(attributesForNode.containsKey("Tidx")){
-            dataType = TFGraphMapper.convertType(attributesForNode.get("Tidx").getType());
-        }
-        addDArgument(dataType);
+        throw new UnsupportedOperationException("Use the new Tensorflow Importer instead. This method is now removed.");
+
     }
 
     @Override
@@ -122,7 +137,7 @@ public class Range extends DynamicCustomOp {
     }
 
     @Override
-    public List<DataType> calculateOutputDataTypes(List<DataType> inputDataTypes){
+    public List<DataType> calculateOutputDataTypes(List<DataType> inputDataTypes) {
         Preconditions.checkState(inputDataTypes == null || inputDataTypes.isEmpty() || inputDataTypes.size() == 3,
                 "Expected no input datatypes (no args) or 3 input datatypes for %s, got %s", getClass(), inputDataTypes);
         return Collections.singletonList(dataType == null ? DEFAULT_DTYPE : dataType);

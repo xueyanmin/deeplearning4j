@@ -23,6 +23,7 @@ package org.nd4j.linalg.api.ops;
 import org.nd4j.autodiff.samediff.SDVariable;
 import org.nd4j.autodiff.samediff.SameDiff;
 import org.nd4j.common.base.Preconditions;
+import org.nd4j.linalg.api.buffer.DataBuffer;
 import org.nd4j.linalg.api.buffer.DataType;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.api.shape.LongShapeDescriptor;
@@ -34,23 +35,23 @@ import java.util.List;
 
 public abstract class BaseReduceFloatOp extends BaseReduceOp implements ReduceFloatOp {
 
-    public BaseReduceFloatOp(INDArray x, INDArray y, INDArray z, boolean keepDims, int... dimensions){
+    public BaseReduceFloatOp(INDArray x, INDArray y, INDArray z, boolean keepDims, long... dimensions){
         super(x, y, z, keepDims, dimensions);
     }
 
-    protected BaseReduceFloatOp(SameDiff sameDiff, SDVariable i_v, boolean keepDims, int[] dimensions) {
+    protected BaseReduceFloatOp(SameDiff sameDiff, SDVariable i_v, boolean keepDims, long[] dimensions) {
         super(sameDiff, i_v, dimensions, keepDims);
     }
 
-    protected BaseReduceFloatOp(SameDiff sameDiff, SDVariable i_v, SDVariable i_v2, int[] dimensions) {
+    protected BaseReduceFloatOp(SameDiff sameDiff, SDVariable i_v, SDVariable i_v2, long[] dimensions) {
         super(sameDiff, i_v, i_v2, dimensions);
     }
 
-    protected BaseReduceFloatOp(SameDiff sameDiff, SDVariable input, int[] dimensions, boolean keepDims) {
+    protected BaseReduceFloatOp(SameDiff sameDiff, SDVariable input, long[] dimensions, boolean keepDims) {
         super(sameDiff, input, dimensions, keepDims);
     }
 
-    protected BaseReduceFloatOp(SameDiff sameDiff, SDVariable input, int... dimensions) {
+    protected BaseReduceFloatOp(SameDiff sameDiff, SDVariable input, long... dimensions) {
         super(sameDiff, input, dimensions);
     }
 
@@ -76,27 +77,27 @@ public abstract class BaseReduceFloatOp extends BaseReduceOp implements ReduceFl
 
 
 
-    public BaseReduceFloatOp(INDArray input, INDArray output, boolean keepDims, int... dimensions){
+    public BaseReduceFloatOp(INDArray input, INDArray output, boolean keepDims, long... dimensions){
         super(input, null, output, dimensions);
         this.keepDims = keepDims;
         this.dimensions = dimensions;
     }
 
 
-    public BaseReduceFloatOp(INDArray x, INDArray y, INDArray z, int... dimensions) {
+    public BaseReduceFloatOp(INDArray x, INDArray y, INDArray z, long... dimensions) {
         super(x, y, z, dimensions);
     }
-    public BaseReduceFloatOp(INDArray x, INDArray z, int... dimensions) {
+    public BaseReduceFloatOp(INDArray x, INDArray z, long... dimensions) {
         super(x, null, z, dimensions);
     }
 
 
-    public BaseReduceFloatOp(INDArray x, boolean keepDims, int... dimensions) {
+    public BaseReduceFloatOp(INDArray x, boolean keepDims, long... dimensions) {
         super(x, keepDims, dimensions);
     }
 
 
-    public BaseReduceFloatOp(INDArray x, int... dimensions) {
+    public BaseReduceFloatOp(INDArray x, long... dimensions) {
         super(x, dimensions);
     }
 
@@ -132,8 +133,6 @@ public abstract class BaseReduceFloatOp extends BaseReduceOp implements ReduceFl
     public boolean validateDataTypes(OpContext oc) {
         INDArray x = oc != null ? oc.getInputArray(0) : x();
         INDArray y = oc != null ? oc.getInputArray(1) : y();
-        //note, we used to validate data types here ensuring x and y were the sam.
-        //dimensions are allowed to be second input for ops now so we can't enforce that anymore.
 
         INDArray z = oc != null ? oc.getOutputArray(0) : z();
         if (z != null)
@@ -143,12 +142,12 @@ public abstract class BaseReduceFloatOp extends BaseReduceOp implements ReduceFl
     }
 
     @Override
-    public List<LongShapeDescriptor> calculateOutputShape() {
+    public List<DataBuffer> calculateOutputShape() {
         return calculateOutputShape(null);
     }
 
     @Override
-    public List<LongShapeDescriptor> calculateOutputShape(OpContext oc) {
+    public List<DataBuffer> calculateOutputShape(OpContext oc) {
         INDArray x = oc != null ? oc.getInputArray(0) : x();
 
         if(x == null)
@@ -159,7 +158,7 @@ public abstract class BaseReduceFloatOp extends BaseReduceOp implements ReduceFl
         DataType retType = arg().dataType();
         if(!retType.isFPType())
             retType = Nd4j.defaultFloatingPointType();
-        return Collections.singletonList(LongShapeDescriptor.fromShape(reducedShape, retType));
+        return Collections.singletonList(Nd4j.createBuffer(LongShapeDescriptor.fromShape(reducedShape, retType).toShapeInfo()));
     }
 
     @Override

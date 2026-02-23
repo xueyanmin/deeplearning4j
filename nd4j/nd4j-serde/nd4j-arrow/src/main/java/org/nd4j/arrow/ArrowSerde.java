@@ -10,7 +10,7 @@
  *  *  information regarding copyright ownership.
  *  * Unless required by applicable law or agreed to in writing, software
  *  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- *  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ *  * WARRANTIES OR CO NDITIONS OF ANY KIND, either express or implied. See the
  *  * License for the specific language governing permissions and limitations
  *  * under the License.
  *  *
@@ -28,6 +28,7 @@ import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.exception.ND4JIllegalStateException;
 import org.nd4j.linalg.factory.Nd4j;
 import org.nd4j.common.util.ArrayUtil;
+import org.tensorflow.framework.RemoteFusedGraphExecuteInfo;
 
 public class ArrowSerde {
 
@@ -77,14 +78,13 @@ public class ArrowSerde {
         long[] strides = getArrowStrides(arr);
         int shapeOffset = createDims(bufferBuilder,arr);
         int stridesOffset = Tensor.createStridesVector(bufferBuilder,strides);
-
         Tensor.startTensor(bufferBuilder);
-
-        addTypeTypeRelativeToNDArray(bufferBuilder,arr);
         Tensor.addShape(bufferBuilder,shapeOffset);
         Tensor.addStrides(bufferBuilder,stridesOffset);
-
-        Tensor.addData(bufferBuilder,addDataForArr(bufferBuilder,arr));
+        int dataOffset = addDataForArr(bufferBuilder,arr);
+        Tensor.addData(bufferBuilder,dataOffset);
+        Tensor.addType(bufferBuilder,bufferBuilder.offset());
+        addTypeTypeRelativeToNDArray(bufferBuilder,arr);
         int endTensor = Tensor.endTensor(bufferBuilder);
         Tensor.finishTensorBuffer(bufferBuilder,endTensor);
         return Tensor.getRootAsTensor(bufferBuilder.dataBuffer());
@@ -102,8 +102,7 @@ public class ArrowSerde {
     public static int addDataForArr(FlatBufferBuilder bufferBuilder, INDArray arr) {
         DataBuffer toAdd = arr.isView() ? arr.dup().data() : arr.data();
         int offset = DataBufferStruct.createDataBufferStruct(bufferBuilder,toAdd);
-        int ret = Buffer.createBuffer(bufferBuilder,offset,toAdd.length() * toAdd.getElementSize());
-        return ret;
+        return Buffer.createBuffer(bufferBuilder,offset,toAdd.length() * toAdd.getElementSize());
 
     }
 

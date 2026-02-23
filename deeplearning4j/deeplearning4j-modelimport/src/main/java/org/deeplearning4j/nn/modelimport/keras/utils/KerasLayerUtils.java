@@ -21,20 +21,15 @@
 package org.deeplearning4j.nn.modelimport.keras.utils;
 
 import lombok.extern.slf4j.Slf4j;
-import org.deeplearning4j.nn.conf.graph.ElementWiseVertex;
-import org.deeplearning4j.nn.conf.layers.Layer;
-import org.deeplearning4j.nn.conf.layers.samediff.SameDiffLambdaLayer;
 import org.deeplearning4j.nn.modelimport.keras.KerasLayer;
 import org.deeplearning4j.nn.modelimport.keras.config.Keras2LayerConfiguration;
 import org.deeplearning4j.nn.modelimport.keras.config.KerasLayerConfiguration;
 import org.deeplearning4j.nn.modelimport.keras.exceptions.InvalidKerasConfigurationException;
 import org.deeplearning4j.nn.modelimport.keras.exceptions.UnsupportedKerasConfigurationException;
 import org.deeplearning4j.nn.modelimport.keras.layers.KerasInput;
-import org.deeplearning4j.nn.modelimport.keras.layers.KerasTFOpLayer;
-import org.deeplearning4j.nn.modelimport.keras.layers.advanced.activations.*;
+import org.deeplearning4j.nn.modelimport.keras.layers.attention.KerasAttentionLayer;
 import org.deeplearning4j.nn.modelimport.keras.layers.convolutional.*;
 import org.deeplearning4j.nn.modelimport.keras.layers.core.*;
-import org.deeplearning4j.nn.modelimport.keras.layers.embeddings.Keras2DEmbedding;
 import org.deeplearning4j.nn.modelimport.keras.layers.embeddings.KerasEmbedding;
 import org.deeplearning4j.nn.modelimport.keras.layers.local.KerasLocallyConnected1D;
 import org.deeplearning4j.nn.modelimport.keras.layers.noise.KerasAlphaDropout;
@@ -48,7 +43,10 @@ import org.deeplearning4j.nn.modelimport.keras.layers.pooling.KerasPooling3D;
 import org.deeplearning4j.nn.modelimport.keras.layers.recurrent.KerasLSTM;
 import org.deeplearning4j.nn.modelimport.keras.layers.recurrent.KerasSimpleRnn;
 import org.deeplearning4j.nn.modelimport.keras.layers.wrappers.KerasBidirectional;
-import org.nd4j.common.primitives.Counter;
+import org.deeplearning4j.nn.conf.graph.ElementWiseVertex;
+import org.deeplearning4j.nn.conf.layers.Layer;
+import org.deeplearning4j.nn.conf.layers.samediff.SameDiffLambdaLayer;
+import org.deeplearning4j.nn.modelimport.keras.layers.advanced.activations.*;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.common.primitives.Pair;
 
@@ -307,6 +305,8 @@ public class KerasLayerUtils {
             layer = new KerasCropping2D(layerConfig, enforceTrainingConfig);
         } else if (layerClassName.equals(conf.getLAYER_CLASS_NAME_CROPPING_1D())) {
             layer = new KerasCropping1D(layerConfig, enforceTrainingConfig);
+        } else if(layerClassName.equals(conf.getLAYER_CLASS_NAME_ATTENTION())) {
+            layer = new KerasAttentionLayer(layerConfig,enforceTrainingConfig);
         } else if (layerClassName.equals(conf.getLAYER_CLASS_NAME_LAMBDA())) {
             String lambdaLayerName = KerasLayerUtils.getLayerNameFromConfig(layerConfig, conf);
             if (!lambdaLayers.containsKey(lambdaLayerName) && !customLayers.containsKey(layerClassName)) {
@@ -330,7 +330,8 @@ public class KerasLayerUtils {
         } else if (conf instanceof Keras2LayerConfiguration) {
             Keras2LayerConfiguration k2conf = (Keras2LayerConfiguration) conf;
             if (layerClassName.equals(k2conf.getTENSORFLOW_OP_LAYER())) {
-                layer = new KerasTFOpLayer(layerConfig, enforceTrainingConfig);
+                //this was never really tested/worked better to remove/redo
+                throw new UnsupportedKerasConfigurationException("Tensorflow op layers are not supported yet.");
             }
         }
         if (layer == null) {

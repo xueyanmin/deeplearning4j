@@ -26,7 +26,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>org.nd4j</groupId>
+        <groupId>org.eclipse.deeplearning4j</groupId>
         <artifactId>nd4j-shade</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
@@ -36,6 +36,9 @@
     <properties>
         <skipTestResourceEnforcement>true</skipTestResourceEnforcement>
     </properties>
+
+
+
 
     <dependencies>
         <dependency>
@@ -51,6 +54,8 @@
             <version>${jackson.databind.version}</version>
             <optional>true</optional>
         </dependency>
+
+
         <dependency>
             <groupId>com.fasterxml.jackson.dataformat</groupId>
             <artifactId>jackson-dataformat-yaml</artifactId>
@@ -155,6 +160,8 @@
 
     <build>
         <plugins>
+
+
             <!--
             Use Maven Shade plugin to add a shaded version of the Jackson dependencies, that can be imported by
             including this module (org.nd4j.jackson) as a dependency.
@@ -190,6 +197,9 @@
                             <include>org.yaml*:*</include>
                             <include>org.codehaus*:*</include>
                         </includes>
+                        <excludes>
+                            <exclude>module-info.java</exclude>
+                        </excludes>
                     </artifactSet>
                     <relocations>
                         <!-- Jackson dependencies -->

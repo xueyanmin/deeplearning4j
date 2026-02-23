@@ -49,7 +49,6 @@ public interface Op {
         REDUCE3,
         GRID,
         META,
-        AGGREGATION,
         CUSTOM,
         GRADIENT,
         CONDITIONAL,
@@ -58,7 +57,8 @@ public interface Op {
         RETURN,
         RANDOM,
         SUMMARYSTATS,
-        LOGIC
+        LOGIC,
+        UDF
     }
 
     /**
@@ -77,7 +77,8 @@ public interface Op {
     Buffer extraArgsBuff();
 
     /**
-     * An op number
+     * An op number. The operation numbers can be found here:
+     * deeplearning4j/libnd4jinclude/loops/legacy_ops.h
      * @return
      */
     int opNum();

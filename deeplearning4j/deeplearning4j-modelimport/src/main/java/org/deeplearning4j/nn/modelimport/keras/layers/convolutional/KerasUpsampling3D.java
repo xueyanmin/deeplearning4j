@@ -20,13 +20,15 @@
 
 package org.deeplearning4j.nn.modelimport.keras.layers.convolutional;
 
+import org.deeplearning4j.nn.modelimport.keras.exceptions.InvalidKerasConfigurationException;
+import org.deeplearning4j.nn.modelimport.keras.exceptions.UnsupportedKerasConfigurationException;
 import org.deeplearning4j.nn.conf.inputs.InputType;
 import org.deeplearning4j.nn.conf.layers.Upsampling3D;
 import org.deeplearning4j.nn.modelimport.keras.KerasLayer;
-import org.deeplearning4j.nn.modelimport.keras.exceptions.InvalidKerasConfigurationException;
-import org.deeplearning4j.nn.modelimport.keras.exceptions.UnsupportedKerasConfigurationException;
 
 import java.util.Map;
+
+import static org.deeplearning4j.nn.modelimport.keras.layers.convolutional.KerasConvolutionUtils.getCNN3DDataFormatFromConfig;
 
 
 /**
@@ -66,6 +68,7 @@ public class KerasUpsampling3D extends KerasLayer {
         Upsampling3D.Builder builder = new Upsampling3D.Builder()
                 .name(this.layerName)
                 .dropOut(this.dropout)
+                .dataFormat(getCNN3DDataFormatFromConfig(layerConfig,conf))
                 .size(size[0]);
 
         this.layer = builder.build();

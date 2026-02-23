@@ -22,13 +22,13 @@
 
 #include <helpers/Loops.h>
 #include <ops/declarable/helpers/transforms.h>
-
+#if NOT_EXCLUDED(OP_invert_permutation)
 namespace sd {
 namespace ops {
 namespace helpers {
 
 ////////////////////////////////////////////////////////////////////////
-void invertPermutation(sd::LaunchContext* context, const NDArray& input, NDArray& output) {
+void invertPermutation(sd::LaunchContext* context, NDArray& input, NDArray& output) {
   std::set<int> uniqueElems;
   const int length = input.lengthOf();
 
@@ -36,10 +36,10 @@ void invertPermutation(sd::LaunchContext* context, const NDArray& input, NDArray
     int elem = input.e<int>(i);
 
     if (!uniqueElems.insert(elem).second)  // this operation forbids us to use #pragma omp
-      throw std::runtime_error("helpers::invertPermutation function: input array contains duplicates !");
+      THROW_EXCEPTION("helpers::invertPermutation function: input array contains duplicates !");
 
     if (elem < 0 || elem > length - 1)
-      throw std::runtime_error(
+      THROW_EXCEPTION(
           "helpers::invertPermutation function: element of input array is out of range (0, length-1) !");
 
     output.p<int>(elem, i);
@@ -49,3 +49,4 @@ void invertPermutation(sd::LaunchContext* context, const NDArray& input, NDArray
 }  // namespace helpers
 }  // namespace ops
 }  // namespace sd
+#endif

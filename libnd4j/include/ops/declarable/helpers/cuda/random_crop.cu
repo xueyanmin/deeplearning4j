@@ -20,27 +20,28 @@
 //  @author sgazeos@gmail.com
 //
 #include <ops/declarable/helpers/random_crop.h>
-//#include <NativeOps.h>
 #include <graph/Context.h>
 
 #include <memory>
 #include <vector>
+
+
+
 namespace sd {
 namespace ops {
 namespace helpers {
 
 template <typename T>
-static sd::Status _randomCropFunctor(graph::Context& context, NDArray* input, NDArray* shape, NDArray* output,
-                                     int seed) {
-  return sd::Status::OK;
+static Status _randomCropFunctor(graph::Context& context, NDArray* input, NDArray* shape, NDArray* output, int seed) {
+  return Status::OK;
 }
 
-sd::Status randomCropFunctor(graph::Context& context, NDArray* input, NDArray* shape, NDArray* output, int seed) {
+Status randomCropFunctor(graph::Context& context, NDArray* input, NDArray* shape, NDArray* output, int seed) {
   BUILD_SINGLE_SELECTOR(input->dataType(), return _randomCropFunctor, (context, input, shape, output, seed),
                         SD_FLOAT_TYPES);
 }
 
-BUILD_SINGLE_TEMPLATE(template sd::Status _randomCropFunctor,
+BUILD_SINGLE_TEMPLATE( sd::Status _randomCropFunctor,
                       (graph::Context & context, NDArray* input, NDArray* shape, NDArray* output, int seed),
                       SD_FLOAT_TYPES);
 

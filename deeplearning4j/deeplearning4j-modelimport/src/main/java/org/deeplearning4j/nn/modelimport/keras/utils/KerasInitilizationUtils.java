@@ -21,10 +21,10 @@
 package org.deeplearning4j.nn.modelimport.keras.utils;
 
 import lombok.extern.slf4j.Slf4j;
-import org.deeplearning4j.nn.conf.distribution.*;
 import org.deeplearning4j.nn.modelimport.keras.config.KerasLayerConfiguration;
 import org.deeplearning4j.nn.modelimport.keras.exceptions.InvalidKerasConfigurationException;
 import org.deeplearning4j.nn.modelimport.keras.exceptions.UnsupportedKerasConfigurationException;
+import org.deeplearning4j.nn.conf.distribution.*;
 import org.deeplearning4j.nn.weights.*;
 
 import java.util.HashMap;

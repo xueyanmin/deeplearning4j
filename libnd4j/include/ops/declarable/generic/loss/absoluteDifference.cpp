@@ -64,62 +64,85 @@ CUSTOM_OP_IMPL(absolute_difference_loss, 3, 1, false, 0, 1) {
   if (!weights->isScalar() && !weights->isSameShape(predictions))
     weightsBroad = new NDArray(weights->tileToShape(predictions->shapeInfo()));
 
-  NDArray E = (*predictions - *labels).transform(sd::transform::Abs);
-  E *= *weightsBroad;
+  NDArray* diff = (*predictions) - (*labels);
+  NDArray* E = diff->transform(transform::Abs);
+  delete diff;
+  
+  NDArray* EWeighted = (*E) * (*weightsBroad);
+  delete E;
 
   switch (reductionMode) {
     case 0:  // 0 - "none", un-reduced weighted losses with the same shape as labels.
-      output->assign(E);
+      output->assign(EWeighted);
       break;
 
     case 1: {  // 1 - "weighted_sum", output is scalar and equal to sum of all elements of E array
-      E.reduceNumber(reduce::Sum, *output);
+      auto* sumResult = EWeighted->reduceNumber(reduce::Sum);
+      output->assign(sumResult);
+      delete sumResult;
       break;
     }
     case 2: {  // 2 - "weighted_mean", output is scalar and equal to sum of all elements of E array divided by sum of
-               // all elements of weightsBroad array
-      NDArray sum;
-      if (weights->isScalar())
-        sum = (*weights) * E.lengthOf();
-      else
+      // all elements of weightsBroad array
+      NDArray* sum;
+      if (weights->isScalar()) {
+        sum = (*weights) * EWeighted->lengthOf();
+      } else {
         sum = weightsBroad->reduceNumber(reduce::Sum);
+      }
 
-      if (sum.e<double>(0) == 0.)
+      if (sum->e<double>(0) == 0.) {
         (*output) = 0.;
-      else
-        output->assign(E.reduceNumber(reduce::Sum) / sum);
+      } else {
+        NDArray* sumE = EWeighted->reduceNumber(reduce::Sum);
+        NDArray* result = (*sumE) / (*sum);
+        output->assign(result);
+        delete result;
+        delete sumE;
+      }
+      delete sum;
       break;
     }
     case 3: {  // 3 - "weighted_sum_by_nonzero_weights", output is scalar and equal to scalar sum of all elements of E
-               // array divided by number of non-zero weights
-      sd::LongType numOfNonZeroWeights = 0;
+      // array divided by number of non-zero weights
+      LongType numOfNonZeroWeights = 0;
       if (weights->isScalar()) {
-        if (weights->e<double>(0) != 0.) numOfNonZeroWeights = E.lengthOf();
+        if (weights->e<double>(0) != 0.) numOfNonZeroWeights = EWeighted->lengthOf();
       } else {
-        numOfNonZeroWeights = weightsBroad->reduceNumber(reduce::CountNonZero).e<sd::LongType>(0);
+        auto* countResult = weightsBroad->reduceNumber(reduce::CountNonZero);
+        numOfNonZeroWeights = countResult->e<LongType>(0);
+        delete countResult;
       }
 
-      if (numOfNonZeroWeights == 0)
+      if (numOfNonZeroWeights == 0) {
         (*output) = 0.;
-      else
-        output->assign(E.reduceNumber(reduce::Sum) / double(numOfNonZeroWeights));
+      } else {
+        NDArray* sumE = EWeighted->reduceNumber(reduce::Sum);
+        NDArray* result = (*sumE) / double(numOfNonZeroWeights);
+        output->assign(result);
+        delete result;
+        delete sumE;
+      }
       break;
     }
   }
 
+  delete EWeighted;
   if (weightsBroad != weights) delete weightsBroad;
 
-  return sd::Status::OK;
+  return Status::OK;
 }
 
 DECLARE_TYPES(absolute_difference_loss) {
-  getOpDescriptor()->setAllowedInputTypes(sd::DataType::ANY)->setAllowedOutputTypes({ALL_FLOATS});
+  getOpDescriptor()->setAllowedInputTypes(ANY)->setAllowedOutputTypes({ALL_FLOATS});
 }
 
 DECLARE_SHAPE_FN(absolute_difference_loss) {
   auto predictionsShapeInfo = inputShape->at(0);
   auto weightsShapeInfo = inputShape->at(1);
   auto labelsShapeInfo = inputShape->at(2);
+
+
 
   // labels and predictions must have the same shapes
   REQUIRE_TRUE(shape::shapeEquals(labelsShapeInfo, predictionsShapeInfo), 0,
@@ -139,14 +162,17 @@ DECLARE_SHAPE_FN(absolute_difference_loss) {
       "and labels = %s instead!",
       ShapeUtils::shapeAsString(weightsShapeInfo).c_str(), ShapeUtils::shapeAsString(labelsShapeInfo).c_str());
 
-  DataType outType = DataTypeUtils::pickFloatingType(ArrayOptions::dataType(predictionsShapeInfo));
-  sd::LongType const* outShapeInfo = nullptr;
 
-  if (INT_ARG(0) != 0)  // in this case output is scalar
+  DataType outType = DataTypeUtils::pickFloatingType(ArrayOptions::dataType(predictionsShapeInfo));
+  LongType * outShapeInfo = nullptr;
+
+  if (INT_ARG(0) != 0) {  // in this case output is scalar
     outShapeInfo = ConstantShapeHelper::getInstance().scalarShapeInfo(outType);
-  else  // in this case output has the same shape as labels and predictions
-    outShapeInfo = ConstantShapeHelper::getInstance().createShapeInfo(ShapeDescriptor(
-        outType, shape::order(labelsShapeInfo), shape::shapeOf(labelsShapeInfo), shape::rank(labelsShapeInfo)));
+  } else {  // in this case output has the same shape as labels and predictions
+    outShapeInfo = ConstantShapeHelper::getInstance().bufferForShapeInfo(outType, shape::order(labelsShapeInfo),
+                                                                         shape::rank(labelsShapeInfo),
+                                                                         shape::shapeOf(labelsShapeInfo))->primary();
+  }
 
   return SHAPELIST(outShapeInfo);
 }
@@ -192,64 +218,102 @@ CUSTOM_OP_IMPL(absolute_difference_loss_grad, 3, 3, false, 0, 1) {
   if (!weights->isScalar() && !weights->isSameShape(predictions))
     weightsBroad = new NDArray(weights->tileToShape(predictions->shapeInfo()));
 
-  NDArray E = *predictions - *labels;
+  NDArray* E = (*predictions) - (*labels);
 
   // dE_i/dp_i = sign(p_i - y_i)
-  E.applyTransform(sd::transform::Sign, *dLdp);  // dE/dp
+  E->applyTransform(transform::Sign, dLdp);  // dE/dp
   // dE_i/dy_i = -sign(p_i - y_i)
 
-  E.applyTransform(sd::transform::Abs, E);
+  E->applyTransform(transform::Abs, E);
 
   switch (reductionMode) {
     case 1: {  // 1 - "none" and "weighted_sum", output is scalar and equal to sum of all elements of E array
 
-      *dLdp *= *weightsBroad;
+      NDArray* dLdpWeighted = (*dLdp) * (*weightsBroad);
+      dLdp->assign(dLdpWeighted);
+      delete dLdpWeighted;
 
-      if (weights->isScalar())
-        dLdw->assign(E.reduceNumber(reduce::Sum));
+      if (weights->isScalar()) {
+        auto* sumE = E->reduceNumber(reduce::Sum);
+        dLdw->assign(sumE);
+        delete sumE;
+      }
       else if (weights != weightsBroad) {
-        std::vector<int> axesToReduceAlong =
+        std::vector<LongType> axesToReduceAlong =
             ShapeUtils::evalBroadcastBackwardAxis(weights->shapeInfo(), weightsBroad->shapeInfo());
-        E.reduceAlongDimension(reduce::Sum, *dLdw, axesToReduceAlong, true);
+        E->reduceAlongDimension(reduce::Sum, dLdw, &axesToReduceAlong, true);
       } else
         dLdw->assign(E);
       break;
     }
     case 2: {  // 2 - "weighted_mean", output is scalar and equal to sum of all elements of E array divided by sum of
-               // all elements of weightsBroad array
+      // all elements of weightsBroad array
 
-      NDArray sum;
-      if (weights->isScalar())
-        sum = (*weights) * E.lengthOf();
-      else
+      NDArray* sum;
+      if (weights->isScalar()) {
+        sum = (*weights) * E->lengthOf();
+      } else {
         sum = weightsBroad->reduceNumber(reduce::Sum);
+      }
 
-      if (sum.e<double>(0) == 0.) {
+      if (sum->e<double>(0) == 0.) {
         *dLdp = 0.;
         *dLdw = 0.;
       } else {
-        *dLdp *= *weightsBroad / sum;
+        NDArray* dLdpWeighted = (*dLdp) * (*weightsBroad);
+        NDArray* dLdpResult = (*dLdpWeighted) / (*sum);
+        dLdp->assign(dLdpResult);
+        delete dLdpResult;
+        delete dLdpWeighted;
 
-        if (weights->isScalar())
+        if (weights->isScalar()) {
           *dLdw = 0.;
-        else if (weights != weightsBroad) {
-          std::vector<int> axesToReduceAlong =
+        } else if (weights != weightsBroad) {
+          std::vector<LongType> axesToReduceAlong =
               ShapeUtils::evalBroadcastBackwardAxis(weights->shapeInfo(), weightsBroad->shapeInfo());
-          ((E * sum - (E * *weightsBroad).reduceNumber(reduce::Sum)) / (sum * sum))
-              .reduceAlongDimension(reduce::Sum, *dLdw, axesToReduceAlong, true);
-        } else
-          dLdw->assign((E * sum - (E * *weightsBroad).reduceNumber(reduce::Sum)) / (sum * sum));
+          NDArray* EWeighted = (*E) * (*weightsBroad);
+          NDArray* EWeightedSum = EWeighted->reduceNumber(reduce::Sum);
+          delete EWeighted;
+          NDArray* ESum = (*E) * (*sum);
+          NDArray* numerator = (*ESum) - (*EWeightedSum);
+          delete ESum;
+          delete EWeightedSum;
+          NDArray* sumSquared = (*sum) * (*sum);
+          NDArray* gradTemp = (*numerator) / (*sumSquared);
+          delete numerator;
+          delete sumSquared;
+          gradTemp->reduceAlongDimension(reduce::Sum, dLdw, &axesToReduceAlong, true);
+          delete gradTemp;
+        } else {
+          NDArray* EWeighted = (*E) * (*weightsBroad);
+          NDArray* EWeightedSum = EWeighted->reduceNumber(reduce::Sum);
+          delete EWeighted;
+          NDArray* ESum = (*E) * (*sum);
+          NDArray* numerator = (*ESum) - (*EWeightedSum);
+          delete ESum;
+          delete EWeightedSum;
+          NDArray* sumSquared = (*sum) * (*sum);
+          NDArray* gradTemp = (*numerator) / (*sumSquared);
+          delete numerator;
+          delete sumSquared;
+          dLdw->assign(gradTemp);
+          delete gradTemp;
+        }
       }
+      delete sum;
       break;
     }
     case 3: {  // 3 - "weighted_sum_by_nonzero_weights", output is scalar and equal to scalar sum of all elements of E
-               // array divided by number of non-zero weights
+      // array divided by number of non-zero weights
 
-      sd::LongType numOfNonZeroWeights = 0;
+      LongType numOfNonZeroWeights = 0;
       if (weights->isScalar()) {
-        if (weights->e<double>(0) != 0.) numOfNonZeroWeights = E.lengthOf();
-      } else
-        numOfNonZeroWeights = weightsBroad->reduceNumber(reduce::CountNonZero).e<sd::LongType>(0);
+        if (weights->e<double>(0) != 0.) numOfNonZeroWeights = E->lengthOf();
+      } else {
+        auto* countResult = weightsBroad->reduceNumber(reduce::CountNonZero);
+        numOfNonZeroWeights = countResult->e<LongType>(0);
+        delete countResult;
+      }
 
       if (numOfNonZeroWeights == 0) {
         *dLdp = 0.;
@@ -258,32 +322,49 @@ CUSTOM_OP_IMPL(absolute_difference_loss_grad, 3, 3, false, 0, 1) {
         auto numOfNonZeroWeightsScalar =
             NDArrayFactory::create(dLdw->dataType(), numOfNonZeroWeights, block.launchContext());
 
-        if (weights->isScalar())
-          dLdw->assign(E.reduceNumber(reduce::Sum) / double(numOfNonZeroWeights));
-        else if (weights != weightsBroad) {
-          std::vector<int> axesToReduceAlong =
+        if (weights->isScalar()) {
+          auto* sumE = E->reduceNumber(reduce::Sum);
+          auto* result = (*sumE) / double(numOfNonZeroWeights);
+          dLdw->assign(result);
+          delete result;
+          delete sumE;
+        } else if (weights != weightsBroad) {
+          std::vector<LongType> axesToReduceAlong =
               ShapeUtils::evalBroadcastBackwardAxis(weights->shapeInfo(), weightsBroad->shapeInfo());
-          E.reduceAlongDimension(reduce::Sum, *dLdw, axesToReduceAlong, true);
-          *dLdw /= numOfNonZeroWeightsScalar;
-        } else
-          dLdw->assign(E / numOfNonZeroWeightsScalar);
+          E->reduceAlongDimension(reduce::Sum, dLdw, &axesToReduceAlong, true);
+          NDArray* dLdwResult = (*dLdw) / (*numOfNonZeroWeightsScalar);
+          dLdw->assign(dLdwResult);
+          delete dLdwResult;
+        } else {
+          auto* result = (*E) / (*numOfNonZeroWeightsScalar);
+          dLdw->assign(result);
+          delete result;
+        }
 
-        NDArray temp = *weightsBroad / numOfNonZeroWeightsScalar;
-        *dLdp *= temp;
+        NDArray* temp = (*weightsBroad) / (*numOfNonZeroWeightsScalar);
+        NDArray* dLdpResult = (*dLdp) * (*temp);
+        dLdp->assign(dLdpResult);
+        delete dLdpResult;
+        delete temp;
+
+        delete numOfNonZeroWeightsScalar;
       }
+
       break;
     }
   }
+  
+  NDArray neg = -*dLdp;
+  dLdl->assign(&neg);
 
-  dLdl->assign(-*dLdp);
-
+  delete E;
   if (weightsBroad != weights) delete weightsBroad;
 
-  return sd::Status::OK;
+  return Status::OK;
 }
 
 DECLARE_TYPES(absolute_difference_loss_grad) {
-  getOpDescriptor()->setAllowedInputTypes(sd::DataType::ANY)->setAllowedOutputTypes({ALL_FLOATS});
+  getOpDescriptor()->setAllowedInputTypes(ANY)->setAllowedOutputTypes({ALL_FLOATS});
 }
 
 DECLARE_SHAPE_FN(absolute_difference_loss_grad) {

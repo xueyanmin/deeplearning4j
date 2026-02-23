@@ -23,7 +23,7 @@
 #include <execution/Threads.h>
 #include <ops/declarable/helpers/gammaMathFunc.h>
 #include <ops/declarable/helpers/zeta.h>
-
+#if NOT_EXCLUDED(OP_polygamma)
 namespace sd {
 namespace ops {
 namespace helpers {
@@ -32,7 +32,7 @@ namespace helpers {
 // calculate factorial
 template <typename T>
 static SD_INLINE T getFactorial(const int n) {
-  if (n < 0) throw std::runtime_error("factorial is not defined for negative number !");
+  if (n < 0) THROW_EXCEPTION("factorial is not defined for negative number !");
 
   if (n == 0 || n == 1) return (T)1.f;
 
@@ -48,22 +48,15 @@ static SD_INLINE T getFactorial(const int n) {
 // (-1)^{n+1} * n! * zeta(n+1, x)
 template <typename T>
 static SD_INLINE T polyGammaScalar(sd::LaunchContext* context, const int n, const T x) {
-  // if (n < 0)
-  //     throw("polyGamma function: n must be >= 0 !");
-
-  // if (x <= (T)0.)
-  //     throw("polyGamma function: x must be > 0 !");
-
   int sign = (n + 1) % 2 ? -1 : 1;
-  // T factorial = (T)std::tgamma(n + 1);
-
-  return sign * getFactorial<T>(n) * zetaScalar<T>((T)(n + 1), x);
+  T zeta = zetaScalar<T>(T(n + 1), x);
+  return T(sign) * getFactorial<T>(n) * zeta;
 }
 
 //////////////////////////////////////////////////////////////////////////
 // calculate polygamma function for arrays
 template <typename T>
-static void polyGamma_(sd::LaunchContext* context, const NDArray& n, const NDArray& x, NDArray& output) {
+static void polyGamma_(sd::LaunchContext* context, NDArray& n, NDArray& x, NDArray& output) {
   auto func = PRAGMA_THREADS_FOR {
     for (auto i = start; i < stop; i++) {
       const T order = n.e<T>(i);
@@ -79,14 +72,15 @@ static void polyGamma_(sd::LaunchContext* context, const NDArray& n, const NDArr
   samediff::Threads::parallel_for(func, 0, x.lengthOf());
 }
 
-void polyGamma(sd::LaunchContext* context, const NDArray& n, const NDArray& x, NDArray& output) {
+void polyGamma(sd::LaunchContext* context, NDArray& n, NDArray& x, NDArray& output) {
   BUILD_SINGLE_SELECTOR(x.dataType(), polyGamma_, (context, n, x, output), SD_FLOAT_TYPES);
 }
 
-BUILD_SINGLE_TEMPLATE(template void polyGamma_,
-                      (sd::LaunchContext * context, const NDArray& n, const NDArray& x, NDArray& output),
+BUILD_SINGLE_TEMPLATE( void polyGamma_,
+                      (sd::LaunchContext * context, NDArray& n, NDArray& x, NDArray& output),
                       SD_FLOAT_TYPES);
 
 }  // namespace helpers
 }  // namespace ops
 }  // namespace sd
+#endif

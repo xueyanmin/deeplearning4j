@@ -43,7 +43,7 @@ using namespace sd::graph;
 namespace sd {
 namespace ops {
 
-SD_LIB_EXPORT sd::Status conditionHelper(const char* file, int line, int condition, int argNumber, const char* format,
+SD_LIB_EXPORT ErrorResult conditionHelper(const char* file, int line, int condition, int argNumber, const char* format,
                                          ...);
 
 template <typename T>
@@ -90,7 +90,7 @@ class SD_LIB_EXPORT DeclarableOp {
   bool allocateResult(Context& block, sd::LongType* shape);
 
   /**
-   * This method overwrites existen NDArray or NDArrayList in VariableSpace
+   * This method overwrites existing NDArray or NDArrayList in VariableSpace
    *
    * PLEASE NOTE: This method is dangerous.
    *
@@ -156,15 +156,7 @@ class SD_LIB_EXPORT DeclarableOp {
    */
   sd::LongType getOpHash();
 
-  /**
-   * This method sets arguments for op
-   */
-  //            void setArguments();
 
-  /**
-   * This method returns pointer to results
-   */
-  //            void getResults();
 
   /**
    * This method executes given Op
@@ -228,6 +220,8 @@ class SD_LIB_EXPORT DeclarableOp {
 
   // this method checks if number of available arguments matches op expectations
   sd::Status validateArguments(Context& block);
+  void overwriteResult(Context& block, int outputIdx, NDArray* array, bool remove);
+  void traceExecIfNeeded(Context& block);
 };
 }  // namespace ops
 }  // namespace sd

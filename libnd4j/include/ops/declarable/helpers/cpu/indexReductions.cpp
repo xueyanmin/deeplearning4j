@@ -19,42 +19,51 @@
 // @author AbdelRauf
 //
 #include <ops/declarable/helpers/reductions.h>
-
+#include <system/selective_rendering.h>
 namespace sd {
 namespace ops {
 namespace helpers {
 //////////////////////////////////////////////////////////////////////////
 template <typename X, typename Z>
-void argMax_(const NDArray& input, NDArray& output, const std::vector<int>& dimensions);
+void argMax_(NDArray& input, NDArray& output, const std::vector<LongType>& dimensions);
 
 template <typename X, typename Z>
-void argMin_(const NDArray& input, NDArray& output, const std::vector<int>& dimensions);
+void argMin_(NDArray& input, NDArray& output, const std::vector<LongType>& dimensions);
 
 template <typename X, typename Z>
-void argAbsMax_(const NDArray& input, NDArray& output, const std::vector<int>& dimensions);
+void argAbsMax_(NDArray& input, NDArray& output, const std::vector<LongType>& dimensions);
 
 template <typename X, typename Z>
-void argAbsMin_(const NDArray& input, NDArray& output, const std::vector<int>& dimensions);
+void argAbsMin_(NDArray& input, NDArray& output, const std::vector<LongType>& dimensions);
 
 //////////////////////////////////////////////////////////////////////////
-void argMax(const NDArray& input, NDArray& output, const std::vector<int>& dimensions) {
+void argMax(NDArray& input, NDArray& output, const std::vector<LongType>& dimensions) {
+auto inputDType = input.dataType();
+auto outputDType = output.dataType();
   BUILD_DOUBLE_SELECTOR(input.dataType(), output.dataType(), argMax_, (input, output, dimensions), SD_COMMON_TYPES,
                         SD_INDEXING_TYPES);
 }
 
-void argMin(const NDArray& input, NDArray& output, const std::vector<int>& dimensions) {
+void argMin(NDArray& input, NDArray& output, const std::vector<LongType>& dimensions) {
+  auto inputDType = input.dataType();
+  auto outputDType = output.dataType();
   BUILD_DOUBLE_SELECTOR(input.dataType(), output.dataType(), argMin_, (input, output, dimensions), SD_COMMON_TYPES,
                         SD_INDEXING_TYPES);
 }
 
-void argAbsMax(const NDArray& input, NDArray& output, const std::vector<int>& dimensions) {
+void argAbsMax(NDArray& input, NDArray& output, const std::vector<LongType>& dimensions) {
+  auto inputDType = input.dataType();
+  auto outputDType = output.dataType();
   BUILD_DOUBLE_SELECTOR(input.dataType(), output.dataType(), argAbsMax_, (input, output, dimensions), SD_COMMON_TYPES,
                         SD_INDEXING_TYPES);
 }
 
-void argAbsMin(const NDArray& input, NDArray& output, const std::vector<int>& dimensions) {
+void argAbsMin(NDArray& input, NDArray& output, const std::vector<LongType>& dimensions) {
+  auto inputDType = input.dataType();
+  auto outputDType = output.dataType();
   BUILD_DOUBLE_SELECTOR(input.dataType(), output.dataType(), argAbsMin_, (input, output, dimensions), SD_COMMON_TYPES,
                         SD_INDEXING_TYPES);
+
 }
 }  // namespace helpers
 }  // namespace ops

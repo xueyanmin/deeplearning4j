@@ -21,15 +21,14 @@
 package org.deeplearning4j.nn.modelimport.keras.layers.pooling;
 
 import lombok.extern.slf4j.Slf4j;
-import org.deeplearning4j.nn.conf.inputs.InputType;
-import org.deeplearning4j.nn.conf.layers.Subsampling3DLayer;
 import org.deeplearning4j.nn.modelimport.keras.KerasLayer;
 import org.deeplearning4j.nn.modelimport.keras.exceptions.InvalidKerasConfigurationException;
 import org.deeplearning4j.nn.modelimport.keras.exceptions.UnsupportedKerasConfigurationException;
+import org.deeplearning4j.nn.modelimport.keras.layers.convolutional.KerasConvolutionUtils;
+import org.deeplearning4j.nn.conf.inputs.InputType;
+import org.deeplearning4j.nn.conf.layers.Subsampling3DLayer;
 
 import java.util.Map;
-
-import static org.deeplearning4j.nn.modelimport.keras.layers.convolutional.KerasConvolutionUtils.*;
 
 /**
  * Imports a Keras 3D Pooling layer as a DL4J Subsampling3D layer.
@@ -65,10 +64,11 @@ public class KerasPooling3D extends KerasLayer {
         Subsampling3DLayer.Builder builder = new Subsampling3DLayer.Builder(
                 KerasPoolingUtils.mapPoolingType(this.className, conf)).name(this.layerName)
                 .dropOut(this.dropout)
-                .convolutionMode(getConvolutionModeFromConfig(layerConfig, conf))
-                .kernelSize(getKernelSizeFromConfig(layerConfig, 3, conf, kerasMajorVersion))
-                .stride(getStrideFromConfig(layerConfig, 3, conf));
-        int[] padding = getPaddingFromBorderModeConfig(layerConfig, 3, conf, kerasMajorVersion);
+                .dataFormat(KerasConvolutionUtils.getCNN3DDataFormatFromConfig(layerConfig,conf))
+                .convolutionMode(KerasConvolutionUtils.getConvolutionModeFromConfig(layerConfig, conf))
+                .kernelSize(KerasConvolutionUtils.getKernelSizeFromConfig(layerConfig, 3, conf, kerasMajorVersion))
+                .stride(KerasConvolutionUtils.getStrideFromConfig(layerConfig, 3, conf));
+        int[] padding = KerasConvolutionUtils.getPaddingFromBorderModeConfig(layerConfig, 3, conf, kerasMajorVersion);
         if (padding != null)
             builder.padding(padding);
         this.layer = builder.build();

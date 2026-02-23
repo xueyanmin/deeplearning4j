@@ -29,16 +29,16 @@ template <typename X>
 template <typename OpType>
 void ReductionSameLoops<X>::innerloopReduce(sd::memory::Workspace *workspace, const X *x,
                                             const sd::LongType *xShapeInfo, X *z, const sd::LongType *zShapeInfo,
-                                            const int *dims, X *extraParams) {
+                                            const LongType *dims, X *extraParams) {
 #ifndef SD_LOOPS_INLINED
   ReductionLoops<X, X, X>::template loopReduce<OpType>(workspace, x, xShapeInfo, z, zShapeInfo, dims, extraParams);
 #endif
 }
 
 template <typename X>
-void ReductionSameLoops<X>::wrapper(const int opNum, sd::memory::Workspace *workspace, const X *vx,
+void ReductionSameLoops<X>::wrapper(int opNum, sd::memory::Workspace *workspace, const X *vx,
                                     const sd::LongType *xShapeInfo, X *z, const sd::LongType *zShapeInfo,
-                                    const int *dims, X *vextraParams) {
+                                    const LongType *dims, X *vextraParams) {
 #ifndef SD_LOOPS_INLINED
   auto x = reinterpret_cast<X *>(vx);
   auto z = reinterpret_cast<X *>(vz);
@@ -49,5 +49,7 @@ void ReductionSameLoops<X>::wrapper(const int opNum, sd::memory::Workspace *work
 #endif
 }
 
-BUILD_SINGLE_TEMPLATE(template class ReductionSameLoops, , SD_COMMON_TYPES);
+// NOTE: Template instantiations are handled by TemplateProcessing.cmake
+// Removed BUILD_SINGLE_TEMPLATE to avoid duplicate instantiations
+
 }  // namespace sd

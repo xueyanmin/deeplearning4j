@@ -41,7 +41,7 @@ DECLARE_CUSTOM_OP(clipbyavgnorm_bp, -1, 1, false, -1, 0);
 #endif
 
 #if NOT_EXCLUDED(OP_cumsum)
-DECLARE_CONFIGURABLE_OP(cumsum, 1, 1, true, 0, 2);
+DECLARE_CONFIGURABLE_OP(cumsum, 1, 1, true, 0, -2);
 #endif
 
 #if NOT_EXCLUDED(OP_cumprod)
@@ -92,7 +92,7 @@ DECLARE_CUSTOM_OP(mergeavg_bp, 2, 1, false, 0, 0);
 #endif
 
 #if NOT_EXCLUDED(OP_scatter_update)
-DECLARE_CONFIGURABLE_OP(scatter_update, 2, 1, true, 0, -1);
+DECLARE_CONFIGURABLE_OP(scatter_update, -2, 1, true, 0, -2);
 #endif
 
 #if NOT_EXCLUDED(OP_Floor)
@@ -173,15 +173,15 @@ DECLARE_CUSTOM_OP(tri, -2, 1, false, 0, 1);
 
 #if NOT_EXCLUDED(OP_triu)
 DECLARE_CUSTOM_OP(triu, 1, 1, false, 0, 0);
-
 DECLARE_CUSTOM_OP(triu_bp, 2, 1, false, 0, 0);
 #endif
+
 #if NOT_EXCLUDED(OP_mirror_pad)
 DECLARE_CUSTOM_OP(mirror_pad, 2, 1, false, 0, 1);
 #endif
 
 #if NOT_EXCLUDED(OP_cumsum)
-DECLARE_CUSTOM_OP(cumsum_bp, 2, -1, false, 0, 2);
+DECLARE_CUSTOM_OP(cumsum_bp, 2, -1, false, 0, -2);
 #endif
 
 #if NOT_EXCLUDED(OP_cumprod)

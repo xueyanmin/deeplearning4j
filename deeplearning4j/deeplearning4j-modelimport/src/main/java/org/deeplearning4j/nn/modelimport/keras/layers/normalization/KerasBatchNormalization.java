@@ -23,13 +23,13 @@ package org.deeplearning4j.nn.modelimport.keras.layers.normalization;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.extern.slf4j.Slf4j;
+import org.deeplearning4j.nn.modelimport.keras.exceptions.InvalidKerasConfigurationException;
+import org.deeplearning4j.nn.modelimport.keras.exceptions.UnsupportedKerasConfigurationException;
 import org.deeplearning4j.nn.api.layers.LayerConstraint;
 import org.deeplearning4j.nn.conf.CNN2DFormat;
 import org.deeplearning4j.nn.conf.inputs.InputType;
 import org.deeplearning4j.nn.conf.layers.BatchNormalization;
 import org.deeplearning4j.nn.modelimport.keras.KerasLayer;
-import org.deeplearning4j.nn.modelimport.keras.exceptions.InvalidKerasConfigurationException;
-import org.deeplearning4j.nn.modelimport.keras.exceptions.UnsupportedKerasConfigurationException;
 import org.deeplearning4j.nn.modelimport.keras.utils.KerasConstraintUtils;
 import org.deeplearning4j.nn.modelimport.keras.utils.KerasLayerUtils;
 import org.deeplearning4j.nn.params.BatchNormalizationParamInitializer;
@@ -130,6 +130,12 @@ public class KerasBatchNormalization extends KerasLayer {
             if(dimOrderFromConfig == DimOrder.NONE || dimOrderFromConfig == DimOrder.TENSORFLOW)
                 cnn2DFormat = CNN2DFormat.NHWC;
 
+        } else if(!previousLayers.isEmpty()) {
+           KerasLayer prevLayer = previousLayers.values().stream().findFirst().get();
+           if(prevLayer.getDimOrder() != null) {
+               this.dimOrder = prevLayer.getDimOrder();
+               cnn2DFormat = CNN2DFormat.NHWC;
+           }
         }
 
         this.scale = getScaleParameter(layerConfig);

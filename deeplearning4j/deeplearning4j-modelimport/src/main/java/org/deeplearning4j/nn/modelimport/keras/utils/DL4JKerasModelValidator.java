@@ -21,9 +21,9 @@
 package org.deeplearning4j.nn.modelimport.keras.utils;
 
 import lombok.NonNull;
-import org.deeplearning4j.nn.graph.ComputationGraph;
 import org.deeplearning4j.nn.modelimport.keras.Hdf5Archive;
 import org.deeplearning4j.nn.modelimport.keras.config.KerasModelConfiguration;
+import org.deeplearning4j.nn.graph.ComputationGraph;
 import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
 import org.nd4j.common.validation.Nd4jCommonValidator;
 import org.nd4j.common.validation.ValidationResult;

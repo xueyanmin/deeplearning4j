@@ -24,8 +24,10 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.NonNull;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
+
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.compress.compressors.gzip.GzipUtils;
 import org.apache.commons.io.FileUtils;
@@ -33,8 +35,9 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.LineIterator;
 import org.apache.commons.io.output.CloseShieldOutputStream;
 import org.apache.commons.lang3.StringUtils;
-import org.deeplearning4j.common.config.DL4JClassLoading;
-import org.deeplearning4j.common.util.DL4JFileUtils;
+import org.bytedeco.javacpp.Pointer;
+import org.deeplearning4j.config.DL4JClassLoading;
+import org.deeplearning4j.common.util.ND4JFileUtils;
 import org.deeplearning4j.exception.DL4JInvalidInputException;
 import org.deeplearning4j.models.embeddings.WeightLookupTable;
 import org.deeplearning4j.models.embeddings.inmemory.InMemoryLookupTable;
@@ -63,6 +66,10 @@ import org.deeplearning4j.text.tokenization.tokenizerfactory.TokenizerFactory;
 import org.nd4j.common.primitives.Pair;
 import org.nd4j.common.util.OneTimeLogger;
 import org.nd4j.compression.impl.NoOp;
+import org.nd4j.linalg.api.buffer.DataBuffer;
+import org.nd4j.linalg.api.buffer.DataType;
+import org.nd4j.linalg.api.memory.MemoryWorkspace;
+import org.nd4j.linalg.api.memory.conf.WorkspaceConfiguration;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.exception.ND4JIllegalStateException;
 import org.nd4j.linalg.factory.Nd4j;
@@ -110,71 +117,133 @@ public class WordVectorSerializer {
     private static final int MAX_SIZE = 50;
     private static final String WHITESPACE_REPLACEMENT = "_Az92_";
 
+    /**
+     * Maximum total decompressed size allowed when loading ZIP files (default: 2GB for word vectors).
+     * This limit protects against zip bomb attacks.
+     * Can be overridden via system property "dl4j.wordvec.maxZipSize" (in bytes).
+     */
+    public static final long DEFAULT_MAX_TOTAL_UNCOMPRESSED_SIZE = 2L * 1024L * 1024L * 1024L; // 2GB
+
+    /**
+     * Maximum allowed compression ratio (uncompressed/compressed size).
+     * Default is 100:1. Can be overridden via system property "dl4j.wordvec.maxCompressionRatio".
+     */
+    public static final double DEFAULT_MAX_COMPRESSION_RATIO = 100.0;
+
+    /**
+     * Maximum number of entries allowed in a word vector ZIP file.
+     * Can be overridden via system property "dl4j.wordvec.maxZipEntries".
+     */
+    public static final int DEFAULT_MAX_ZIP_ENTRIES = 50;
+
+    private static long maxTotalUncompressedSize = getConfiguredMaxSize();
+    private static double maxCompressionRatio = getConfiguredMaxRatio();
+    private static int maxZipEntries = getConfiguredMaxEntries();
+
+    private static long getConfiguredMaxSize() {
+        String prop = System.getProperty("dl4j.wordvec.maxZipSize");
+        if (prop != null) {
+            try {
+                return Long.parseLong(prop);
+            } catch (NumberFormatException e) {
+                log.warn("Invalid value for dl4j.wordvec.maxZipSize: {}, using default", prop);
+            }
+        }
+        return DEFAULT_MAX_TOTAL_UNCOMPRESSED_SIZE;
+    }
+
+    private static double getConfiguredMaxRatio() {
+        String prop = System.getProperty("dl4j.wordvec.maxCompressionRatio");
+        if (prop != null) {
+            try {
+                return Double.parseDouble(prop);
+            } catch (NumberFormatException e) {
+                log.warn("Invalid value for dl4j.wordvec.maxCompressionRatio: {}, using default", prop);
+            }
+        }
+        return DEFAULT_MAX_COMPRESSION_RATIO;
+    }
+
+    private static int getConfiguredMaxEntries() {
+        String prop = System.getProperty("dl4j.wordvec.maxZipEntries");
+        if (prop != null) {
+            try {
+                return Integer.parseInt(prop);
+            } catch (NumberFormatException e) {
+                log.warn("Invalid value for dl4j.wordvec.maxZipEntries: {}, using default", prop);
+            }
+        }
+        return DEFAULT_MAX_ZIP_ENTRIES;
+    }
+
+    /**
+     * Set the maximum total uncompressed size allowed when loading word vector ZIP files.
+     * @param maxSize Maximum size in bytes (must be positive)
+     */
+    public static void setMaxTotalUncompressedSize(long maxSize) {
+        if (maxSize <= 0) throw new IllegalArgumentException("Max size must be positive, got " + maxSize);
+        maxTotalUncompressedSize = maxSize;
+    }
+
+    /**
+     * Set the maximum compression ratio allowed for ZIP entries.
+     * @param maxRatio Maximum ratio (must be >= 1.0)
+     */
+    public static void setMaxCompressionRatio(double maxRatio) {
+        if (maxRatio < 1.0) throw new IllegalArgumentException("Max ratio must be >= 1.0, got " + maxRatio);
+        maxCompressionRatio = maxRatio;
+    }
+
+    /**
+     * Set the maximum number of entries allowed in word vector ZIP files.
+     * @param maxEntries Maximum entries (must be positive)
+     */
+    public static void setMaxZipEntries(int maxEntries) {
+        if (maxEntries <= 0) throw new IllegalArgumentException("Max entries must be positive, got " + maxEntries);
+        maxZipEntries = maxEntries;
+    }
+
+    /**
+     * Read a ZIP entry with size limit protection.
+     * This method reads data incrementally and tracks actual bytes read.
+     */
+    private static byte[] readZipEntryWithLimit(ZipInputStream zis, String entryName,
+            long remainingAllowed) throws IOException {
+        java.io.ByteArrayOutputStream bout = new java.io.ByteArrayOutputStream();
+        byte[] buffer = new byte[8192];
+        long totalRead = 0;
+        int bytesRead;
+
+        while ((bytesRead = zis.read(buffer)) != -1) {
+            totalRead += bytesRead;
+
+            if (totalRead > remainingAllowed) {
+                throw new IOException("Potential zip bomb detected while reading entry '" + entryName + "'. " +
+                        "Entry exceeded remaining size allowance of " + remainingAllowed + " bytes. " +
+                        "If this is a legitimate file, increase the limit using " +
+                        "WordVectorSerializer.setMaxTotalUncompressedSize() or system property 'dl4j.wordvec.maxZipSize'");
+            }
+
+            if (totalRead > Integer.MAX_VALUE - 8) {
+                throw new IOException("Entry '" + entryName + "' exceeds maximum supported size (2GB)");
+            }
+
+            bout.write(buffer, 0, bytesRead);
+        }
+
+        return bout.toByteArray();
+    }
+
     private WordVectorSerializer() {
     }
 
     /**
-     * @param modelFile
-     * @return
-     * @throws FileNotFoundException
-     * @throws IOException
-     * @throws NumberFormatException
-     */
-    /*private static Word2Vec readTextModel(File modelFile) throws IOException, NumberFormatException {
-        InMemoryLookupTable lookupTable;
-        VocabCache cache;
-        INDArray syn0;
-        Word2Vec ret = new Word2Vec();
-        try (BufferedReader reader =
-                     new BufferedReader(new InputStreamReader(GzipUtils.isCompressedFilename(modelFile.getName())
-                             ? new GZIPInputStream(new FileInputStream(modelFile))
-                             : new FileInputStream(modelFile), "UTF-8"))) {
-            String line = reader.readLine();
-            String[] initial = line.split(" ");
-            int words = Integer.parseInt(initial[0]);
-            int layerSize = Integer.parseInt(initial[1]);
-            syn0 = Nd4j.create(words, layerSize);
-
-            cache = new InMemoryLookupCache(false);
-
-            int currLine = 0;
-            while ((line = reader.readLine()) != null) {
-                String[] split = line.split(" ");
-                Preconditions.checkState(split.length == layerSize + 1, "Expected %s values, got %s", layerSize + 1, split.length);
-                String word = split[0].replaceAll(WHITESPACE_REPLACEMENT, " ");
-
-                float[] vector = new float[split.length - 1];
-                for (int i = 1; i < split.length; i++) {
-                    vector[i - 1] = Float.parseFloat(split[i]);
-                }
-
-                syn0.putRow(currLine, Nd4j.create(vector));
-
-                cache.addWordToIndex(cache.numWords(), word);
-                cache.addToken(new VocabWord(1, word));
-                cache.putVocabWord(word);
-
-                currLine++;
-            }
-
-            lookupTable = (InMemoryLookupTable) new InMemoryLookupTable.Builder().cache(cache).vectorLength(layerSize)
-                    .build();
-            lookupTable.setSyn0(syn0);
-
-            ret.setVocab(cache);
-            ret.setLookupTable(lookupTable);
-        }
-        return ret;
-    }*/
-
-    /**
      * Read a binary word2vec from input stream.
      *
-     * @param inputStream  input stream to read
+     * @param inputStream input stream to read
      * @param linebreaks  if true, the reader expects each word/vector to be in a separate line, terminated
-     *      by a line break
+     *                    by a line break
      * @param normalize
-     *
      * @return a {@link Word2Vec model}
      * @throws NumberFormatException
      * @throws IOException
@@ -262,6 +331,7 @@ public class WordVectorSerializer {
                 .learningRate(0.025)
                 .windowSize(5)
                 .workers(1)
+                .vectorCalcThreads(1)
                 .build();
 
         ret.setVocab(cache);
@@ -338,10 +408,148 @@ public class WordVectorSerializer {
                     if (i < vec.length() - 1)
                         builder.append(" ");
                 }
-                writer.println(builder.toString());
+                writer.println(builder);
             }
         }
     }
+
+
+    /**
+     * This method writes word vectors to the given OutputStream.
+     * Please note: this method doesn't load whole vocab/lookupTable into memory, so it's able to process large vocabularies served over network.
+     *
+     * @param stream
+     * @param <T>
+     * @throws IOException
+     */
+    public static <T extends SequenceElement> WeightLookupTable<T> readWordVectorsBinary(
+            InputStream stream) throws IOException {
+        InMemoryLookupTable.Builder<T> tableBuilder = new InMemoryLookupTable.Builder<>();
+        InMemoryLookupTable<T> lookupTable;
+        try (DataInputStream writer = new DataInputStream(stream)) {
+            int numWords = writer.readInt();
+            int layerSize = writer.readInt();
+            long totalNumberOfDocs = writer.readLong();
+            AbstractCache<T> vocabCache = new AbstractCache.Builder<T>().build();
+            tableBuilder.vectorLength(layerSize)
+                    .useAdaGrad(false);
+
+            lookupTable = tableBuilder.build();
+            // saving vocab content
+            for (int x = 0; x < numWords; x++) {
+                String label = writer.readUTF();
+                boolean isLabel = writer.readBoolean();
+                int codeLength = writer.readInt();
+                List<Byte> codes = new ArrayList<>();
+                for(int i = 0; i < codeLength; i++) {
+                    codes.add((byte) writer.readInt());
+                }
+
+                int pointsLength = writer.readInt();
+                int[] points = new int[pointsLength];
+                for(int i = 0; i < pointsLength; i++) {
+                    points[i] = writer.readInt();
+                }
+
+
+                VocabWord vocabWord = new VocabWord();
+                vocabWord.setWord(label);
+                vocabWord.setVocabId((long) x);
+                vocabWord.setIndex(x);
+                vocabWord.setPoints(points);
+                vocabWord.setLabel(isLabel);
+                vocabWord.setCodeLength((short) codeLength);
+                vocabWord.setCodes(codes);
+                long sequencesCount = writer.readLong();
+                double elementFrequency = writer.readDouble();
+                vocabWord.setSequencesCount(sequencesCount);
+                vocabWord.setElementFrequency((long) elementFrequency);
+
+
+                INDArray vec = Nd4j.createNpyFromInputStream(writer);
+
+                vocabCache.addToken((T) vocabWord);
+
+            }
+        }
+
+        return null;
+    }
+
+
+
+    /**
+     * This method writes word vectors to the given OutputStream.
+     * Please note: this method doesn't load whole vocab/lookupTable into memory, so it's able to process large vocabularies served over network.
+     *
+     * @param lookupTable
+     * @param stream
+     * @param <T>
+     * @throws IOException
+     */
+    public static <T extends SequenceElement> void writeLookupTableBinary(InMemoryLookupTable<T> lookupTable,
+                                                                          OutputStream stream) throws IOException {
+        val vocabCache = lookupTable.getVocabCache();
+
+        DataOutputStream writer = new DataOutputStream(stream);
+
+        // saving header as "NUM_WORDS VECTOR_SIZE NUM_DOCS"
+        val str = vocabCache.numWords() + " " + lookupTable.layerSize() + " " + vocabCache.totalNumberOfDocs();
+
+        writer.writeInt(vocabCache.numWords());
+        writer.writeInt(lookupTable.layerSize());
+        writer.writeLong(vocabCache.totalNumberOfDocs());
+        log.debug("Saving header: {}", str);
+
+
+        // saving vocab content
+        val num = vocabCache.numWords();
+        for (int x = 0; x < num; x++) {
+            T element = vocabCache.elementAtIndex(x);
+            val l = element.getLabel();
+            writer.writeUTF(l);
+            writer.writeBoolean(element.isLabel());
+            writer.writeInt(element.getCodeLength());
+            for(int i = 0; i < element.getCodeLength(); i++) {
+                writer.writeInt(element.getCodes().get(i));
+            }
+
+            writer.writeInt(element.getPoints().size());
+            for(int i = 0; i < element.getPoints().size(); i++) {
+                writer.writeInt(element.getPoints().get(i));
+            }
+
+            writer.writeLong(element.getSequencesCount());
+            writer.writeDouble(element.getElementFrequency());
+
+        }
+
+        writer.writeBoolean(lookupTable.getSyn0() != null);
+
+        if(lookupTable.getSyn0() != null) {
+            //get length first so we can read later
+            DataBuffer numpyPointer = Nd4j.convertToNumpy(lookupTable.getSyn0());
+            writer.writeLong(numpyPointer.length());
+            long written = Nd4j.writeAsNumpy(numpyPointer.pointer(),stream,false);
+        }
+
+        writer.writeBoolean(lookupTable.getSyn1() != null);
+        if(lookupTable.getSyn1() != null) {
+            DataBuffer numpyPointer = Nd4j.convertToNumpy(lookupTable.getSyn1());
+            writer.writeLong(numpyPointer.capacity());
+            long written = Nd4j.writeAsNumpy(numpyPointer.pointer(),stream,false);
+        }
+
+        writer.writeBoolean(lookupTable.getSyn1Neg() != null);
+        if(lookupTable.getSyn1Neg() != null) {
+            DataBuffer numpyPointer = Nd4j.convertToNumpy(lookupTable.getSyn1Neg());
+            writer.writeLong(numpyPointer.capacity());
+            long written = Nd4j.writeAsNumpy(numpyPointer.pointer(),stream,false);
+        }
+
+    }
+
+
 
 
     /**
@@ -373,6 +581,8 @@ public class WordVectorSerializer {
         }
     }
 
+
+
     /**
      * This method saves ParagraphVectors model into compressed zip file
      *
@@ -386,6 +596,211 @@ public class WordVectorSerializer {
             throw new RuntimeException(e);
         }
     }
+
+    /**
+     * This method saves ParagraphVectors model into compressed zip file located at path
+     *
+     * @param path
+     */
+    public static void writeParagraphVectorsBinary(ParagraphVectors vectors, String path) {
+        writeParagraphVectorsBinary(vectors, new File(path));
+    }
+
+
+
+    /**
+     * This method restores Word2Vec model previously saved with writeWord2VecModel
+     * <p>
+     * PLEASE NOTE: This method loads FULL model, so don't use it if you're only going to use weights.
+     *
+     * @param file
+     * @return
+     */
+    public static <T extends SequenceElement> SequenceVectors<T>  readSequenceVectorsBinary(File file) throws IOException {
+        int originalFreq = Nd4j.getMemoryManager().getOccasionalGcFrequency();
+        boolean originalPeriodic = Nd4j.getMemoryManager().isPeriodicGcActive();
+
+        if (originalPeriodic)
+            Nd4j.getMemoryManager().togglePeriodicGc(false);
+
+        Nd4j.getMemoryManager().setOccasionalGcFrequency(50000);
+
+        try {
+            AbstractCache<VocabWord> vocabCache = new AbstractCache<>();
+
+            try (DataInputStream reader = new DataInputStream(new FileInputStream(file))) {
+                String json = reader.readUTF();
+                VectorsConfiguration vectorsConfiguration = VectorsConfiguration.fromJson(json);
+
+                // saving header as "NUM_WORDS VECTOR_SIZE NUM_DOCS"
+
+                int numWords = reader.readInt();
+                int layerSize = reader.readInt();
+                long numDocs = reader.readLong();
+
+                // saving vocab content
+                for (int x = 0; x < numWords; x++) {
+                    VocabWord vocabWord = new VocabWord();
+                    String word = reader.readUTF();
+                    boolean isLabel = reader.readBoolean();
+                    int codeLength = reader.readInt();
+                    List<Byte> codes = new ArrayList<>();
+                    for(int i = 0; i < codeLength; i++) {
+                        codes.add((byte) reader.readInt());
+                    }
+
+                    vocabWord.setCodes(codes);
+
+                    int numPoints = reader.readInt();
+                    List<Integer> points = new ArrayList<>();
+                    for(int i = 0; i < numPoints; i++) {
+                        points.add(reader.readInt());
+                    }
+
+                    vocabWord.setPoints(points);
+
+                    long sequencesCount = reader.readLong();
+                    double elementFrequency = reader.readDouble();
+                    vocabWord.setSequencesCount(sequencesCount);
+                    vocabWord.setElementFrequency((long) elementFrequency);
+                    vocabWord.setWord(word);
+                    vocabWord.setCodeLength((short) codes.size());
+                    vocabCache.addToken(vocabWord);
+                    vocabWord.setLabel(isLabel);
+                    vocabWord.setIndex(x);
+                    vocabCache.addWordToIndex(x,vocabWord.getWord());
+                }
+
+                vocabCache.setTotalDocCount(numDocs);
+                boolean hasSyn0 = reader.readBoolean();
+                INDArray syn0 = null;
+                if(hasSyn0) {
+                    long syn0Length = reader.readLong();
+                    syn0 = Nd4j.createNpyFromInputStream(reader,syn0Length);
+                }
+
+                boolean hasSyn1 = reader.readBoolean();
+                INDArray syn1 = null;
+                if(hasSyn1) {
+                    long syn1Length = reader.readLong();
+                    syn1 = Nd4j.createNpyFromInputStream(reader,syn1Length);
+                }
+
+                boolean hasSyn1Neg = reader.readBoolean();
+                INDArray syn1Neg = null;
+                if(hasSyn1Neg) {
+                    long syn1NegLong = reader.readLong();
+                    syn1Neg = Nd4j.createNpyFromInputStream(reader,syn1NegLong);
+                }
+
+                vocabCache.setMinWordFrequency(vectorsConfiguration.getMinWordFrequency());
+                vocabCache.setStopWords(new ArrayList<>(vectorsConfiguration.getStopList()));
+                vocabCache.setScavengerThreshold(vectorsConfiguration.getScavengerActivationThreshold());
+                vocabCache.setRetentionDelay(vectorsConfiguration.getScavengerRetentionDelay());
+
+                InMemoryLookupTable<T> inMemoryLookupTable = new InMemoryLookupTable<>();
+                inMemoryLookupTable.setSyn0(syn0);
+                inMemoryLookupTable.setVectorLength(layerSize);
+                inMemoryLookupTable.setSyn1(syn1);
+                inMemoryLookupTable.setSyn1Neg(syn1Neg);
+                inMemoryLookupTable.setVocab(vocabCache);
+                SequenceVectors<T> sequenceVectors = new SequenceVectors.Builder<T>(vectorsConfiguration)
+                        .lookupTable(inMemoryLookupTable)
+                        .configuration(vectorsConfiguration)
+                        .useHierarchicSoftmax(vectorsConfiguration.isUseHierarchicSoftmax())
+                        .epochs(vectorsConfiguration.getEpochs())
+                        .iterations(vectorsConfiguration.getIterations())
+                        .layerSize(vectorsConfiguration.getLayersSize())
+                        .batchSize(vectorsConfiguration.getBatchSize())
+                        .learningRate(vectorsConfiguration.getLearningRate())
+                        .windowSize(vectorsConfiguration.getWindow())
+                        .minLearningRate(vectorsConfiguration.getMinLearningRate())
+                        .minWordFrequency(vectorsConfiguration.getMinWordFrequency())
+                        .stopWords(new ArrayList<>(vectorsConfiguration.getStopList()))
+                        .negativeSample(vectorsConfiguration.getNegative())
+                        .trainElementsRepresentation(vectorsConfiguration.isTrainElementsVectors())
+                        .trainSequencesRepresentation(vectorsConfiguration.isTrainSequenceVectors())
+                        .usePreciseMode(vectorsConfiguration.isPreciseMode())
+                        .useUnknown(vectorsConfiguration.isUseUnknown())
+                        .sequenceLearningAlgorithm(vectorsConfiguration.getSequenceLearningAlgorithm())
+                        .elementsLearningAlgorithm(vectorsConfiguration.getElementsLearningAlgorithm())
+                        .vocabCache((VocabCache<T>) vocabCache)
+                        .batchSize(vectorsConfiguration.getBatchSize())
+                        .windowSize(vectorsConfiguration.getWindow())
+                        .build();
+                return sequenceVectors;
+            }
+
+
+        } finally {
+            if (originalPeriodic)
+                Nd4j.getMemoryManager().togglePeriodicGc(true);
+
+            Nd4j.getMemoryManager().setOccasionalGcFrequency(originalFreq);
+
+        }
+    }
+
+    /**
+     * This method saves ParagraphVectors model into compressed zip file
+     *
+     * @param file
+     */
+    public static void writeParagraphVectorsBinary(ParagraphVectors vectors, File file) {
+        try (FileOutputStream fos = new FileOutputStream(file)) {
+            writeParagraphVectorsBinary(vectors, fos);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+
+    /**
+     * This method restores ParagraphVectors model previously saved with writeParagraphVectors()
+     *
+     * @return
+     */
+    public static ParagraphVectors readParagraphVectorsBinary(File file) throws IOException {
+        SequenceVectors<VocabWord> w2v = readSequenceVectorsBinary(file);
+
+        // and "convert" it to ParaVec model + optionally trying to restore labels information
+        ParagraphVectors vectors = new ParagraphVectors.Builder(w2v.getConfiguration())
+                .vocabCache(w2v.getVocab())
+                .lookupTable(w2v.lookupTable())
+                .sequenceLearningAlgorithm(w2v.getConfiguration().getSequenceLearningAlgorithm())
+                .elementsLearningAlgorithm(w2v.getConfiguration().getElementsLearningAlgorithm())
+                .resetModel(false)
+                .build();
+
+        vectors.extractLabels();
+
+        return vectors;
+    }
+
+    /**
+     * This method saves ParagraphVectors model into compressed zip file and sends it to output stream
+     */
+    public static void writeSequenceVectorsBinary(SequenceVectors<VocabWord> vectors, OutputStream stream) throws IOException {
+
+        try (DataOutputStream bufferedOutputStream = new DataOutputStream(stream)) {
+            String encoded = vectors.getConfiguration().toJson();
+            bufferedOutputStream.writeUTF(encoded);
+            InMemoryLookupTable<VocabWord> weightLookupTable = (InMemoryLookupTable<VocabWord>) vectors.lookupTable();
+            writeLookupTableBinary(weightLookupTable, bufferedOutputStream);
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
+
+    }
+
+    /**
+     * This method saves ParagraphVectors model into compressed zip file and sends it to output stream
+     */
+    public static void writeParagraphVectorsBinary(ParagraphVectors vectors, OutputStream stream) throws IOException {
+        writeSequenceVectorsBinary(vectors,stream);
+
+    }
+
 
     /**
      * This method saves ParagraphVectors model into compressed zip file located at path
@@ -428,12 +843,12 @@ public class WordVectorSerializer {
         zipfile.putNextEntry(syn0);
 
         // writing out syn0
-        File tempFileSyn0 = DL4JFileUtils.createTempFile("word2vec", "0");
-        File tempFileSyn1 = DL4JFileUtils.createTempFile("word2vec", "1");
-        File tempFileSyn1Neg = DL4JFileUtils.createTempFile("word2vec", "n");
-        File tempFileCodes = DL4JFileUtils.createTempFile("word2vec", "h");
-        File tempFileHuffman = DL4JFileUtils.createTempFile("word2vec", "h");
-        File tempFileFreqs = DL4JFileUtils.createTempFile("word2vec", "f");
+        File tempFileSyn0 = ND4JFileUtils.createTempFile("word2vec", "0");
+        File tempFileSyn1 = ND4JFileUtils.createTempFile("word2vec", "1");
+        File tempFileSyn1Neg = ND4JFileUtils.createTempFile("word2vec", "n");
+        File tempFileCodes = ND4JFileUtils.createTempFile("word2vec", "h");
+        File tempFileHuffman = ND4JFileUtils.createTempFile("word2vec", "h");
+        File tempFileFreqs = ND4JFileUtils.createTempFile("word2vec", "f");
         tempFileSyn0.deleteOnExit();
         tempFileSyn1.deleteOnExit();
         tempFileSyn1Neg.deleteOnExit();
@@ -570,11 +985,11 @@ public class WordVectorSerializer {
         zipfile.putNextEntry(syn0);
 
         // writing out syn0
-        File tempFileSyn0 = DL4JFileUtils.createTempFile("paravec", "0");
-        File tempFileSyn1 = DL4JFileUtils.createTempFile("paravec", "1");
-        File tempFileCodes = DL4JFileUtils.createTempFile("paravec", "h");
-        File tempFileHuffman = DL4JFileUtils.createTempFile("paravec", "h");
-        File tempFileFreqs = DL4JFileUtils.createTempFile("paravec", "h");
+        File tempFileSyn0 = ND4JFileUtils.createTempFile("paravec", "0");
+        File tempFileSyn1 = ND4JFileUtils.createTempFile("paravec", "1");
+        File tempFileCodes = ND4JFileUtils.createTempFile("paravec", "h");
+        File tempFileHuffman = ND4JFileUtils.createTempFile("paravec", "h");
+        File tempFileFreqs = ND4JFileUtils.createTempFile("paravec", "h");
         tempFileSyn0.deleteOnExit();
         tempFileSyn1.deleteOnExit();
         tempFileCodes.deleteOnExit();
@@ -702,36 +1117,39 @@ public class WordVectorSerializer {
      *
      * @return
      */
-    public static ParagraphVectors readParagraphVectors(File file) throws IOException {
-        Word2Vec w2v = readWord2Vec(file);
+    public static  ParagraphVectors readParagraphVectors(File file) throws IOException {
+      try(MemoryWorkspace workspace = Nd4j.getWorkspaceManager().createNewWorkspace()) {
+          Word2Vec w2v = readWord2Vec(file);
 
-        // and "convert" it to ParaVec model + optionally trying to restore labels information
-        ParagraphVectors vectors = new ParagraphVectors.Builder(w2v.getConfiguration())
-                .vocabCache(w2v.getVocab())
-                .lookupTable(w2v.getLookupTable())
-                .resetModel(false)
-                .build();
+          // and "convert" it to ParaVec model + optionally trying to restore labels information
+          ParagraphVectors vectors = new ParagraphVectors.Builder(w2v.getConfiguration())
+                  .vocabCache(w2v.getVocab())
+                  .lookupTable(w2v.getLookupTable())
+                  .resetModel(false)
+                  .build();
 
-        try (ZipFile zipFile = new ZipFile(file)) {
-            // now we try to restore labels information
-            ZipEntry labels = zipFile.getEntry("labels.txt");
-            if (labels != null) {
-                InputStream stream = zipFile.getInputStream(labels);
-                try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        VocabWord word = vectors.getVocab().tokenFor(ReadHelper.decodeB64(line.trim()));
-                        if (word != null) {
-                            word.markAsLabel(true);
-                        }
-                    }
-                }
-            }
-        }
+          try (ZipFile zipFile = new ZipFile(file)) {
+              // now we try to restore labels information
+              ZipEntry labels = zipFile.getEntry("labels.txt");
+              if (labels != null) {
+                  InputStream stream = zipFile.getInputStream(labels);
+                  try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
+                      String line;
+                      while ((line = reader.readLine()) != null) {
+                          VocabWord word = vectors.getVocab().tokenFor(ReadHelper.decodeB64(line.trim()));
+                          if (word != null) {
+                              word.markAsLabel(true);
+                          }
+                      }
+                  }
+              }
+          }
 
-        vectors.extractLabels();
+          vectors.extractLabels();
 
-        return vectors;
+          return vectors;
+      }
+
     }
 
     /**
@@ -744,12 +1162,12 @@ public class WordVectorSerializer {
      * @deprecated Use {@link #readWord2Vec(File, boolean)}
      */
     @Deprecated
-    public static Word2Vec readWord2Vec(File file) throws IOException {
-        File tmpFileSyn0 = DL4JFileUtils.createTempFile("word2vec", "0");
-        File tmpFileSyn1 = DL4JFileUtils.createTempFile("word2vec", "1");
-        File tmpFileC = DL4JFileUtils.createTempFile("word2vec", "c");
-        File tmpFileH = DL4JFileUtils.createTempFile("word2vec", "h");
-        File tmpFileF = DL4JFileUtils.createTempFile("word2vec", "f");
+    public static  Word2Vec readWord2Vec(File file) throws IOException {
+        File tmpFileSyn0 = ND4JFileUtils.createTempFile("word2vec", "0");
+        File tmpFileSyn1 = ND4JFileUtils.createTempFile("word2vec", "1");
+        File tmpFileC = ND4JFileUtils.createTempFile("word2vec", "c");
+        File tmpFileH = ND4JFileUtils.createTempFile("word2vec", "h");
+        File tmpFileF = ND4JFileUtils.createTempFile("word2vec", "f");
 
         tmpFileSyn0.deleteOnExit();
         tmpFileSyn1.deleteOnExit();
@@ -834,7 +1252,8 @@ public class WordVectorSerializer {
                         for (int i = 0; i < split.length; i++) {
                             array[i] = Double.parseDouble(split[i]);
                         }
-                        rows.add(Nd4j.create(array, new long[]{array.length},
+
+                        rows.add(Nd4j.create(array, new long[]{1,array.length},
                                 ((InMemoryLookupTable) w2v.getLookupTable()).getSyn0().dataType()));
                     }
 
@@ -869,7 +1288,7 @@ public class WordVectorSerializer {
      * @return
      */
     public static ParagraphVectors readParagraphVectors(InputStream stream) throws IOException {
-        File tmpFile = DL4JFileUtils.createTempFile("restore", "paravec");
+        File tmpFile = ND4JFileUtils.createTempFile("restore", "paravec");
         try {
             FileUtils.copyInputStreamToFile(stream, tmpFile);
             return readParagraphVectors(tmpFile);
@@ -908,8 +1327,14 @@ public class WordVectorSerializer {
             for (int i = 0; i < split.length; i++) {
                 array[i] = Double.parseDouble(split[i]);
             }
-            rows.add(Nd4j.create(array, new long[]{array.length}, lookupTable.getSyn0().dataType()));
+
+            DataBuffer typedBufferDetached = Nd4j.createTypedBufferDetached(array, lookupTable.getSyn0().dataType());
+
+            INDArray arr = Nd4j.create(typedBufferDetached, new long[]{array.length}).detach();
+            arr.setCloseable(false);
+            rows.add(arr);
         }
+
         reader.close();
 
         // it's possible to have full model without syn1
@@ -927,6 +1352,7 @@ public class WordVectorSerializer {
             for (int i = 1; i < split.length; i++) {
                 points.add(Integer.parseInt(split[i]));
             }
+
             word.setPoints(points);
         }
         reader.close();
@@ -1087,7 +1513,7 @@ public class WordVectorSerializer {
     public static void writeWordVectors(ParagraphVectors vectors, OutputStream stream) {
         try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(stream, StandardCharsets.UTF_8))) {
             /*
-            This method acts similary to w2v csv serialization, except of additional tag for labels
+            This method acts similarly to w2v csv serialization, except of additional tag for labels
              */
 
             VocabCache<VocabWord> vocabCache = vectors.getVocab();
@@ -1200,7 +1626,7 @@ public class WordVectorSerializer {
             Line 0 - VectorsConfiguration JSON string
             Line 1 - expTable
             Line 2 - table
-        
+
             All following lines are vocab/weight lookup table saved line by line as VocabularyWord JSON representation
          */
 
@@ -1587,6 +2013,7 @@ public class WordVectorSerializer {
      * @param inputStream  input stream
      * @return a {@link Pair} holding the lookup table and the vocab cache.
      */
+    @SneakyThrows
     public static Pair<InMemoryLookupTable, VocabCache> loadTxt(@NonNull InputStream inputStream) {
         AbstractCache<VocabWord> cache = new AbstractCache<>();
         LineIterator lines = null;
@@ -2004,13 +2431,43 @@ public class WordVectorSerializer {
 
         INDArray syn0 = null, syn1 = null, syn1neg = null;
 
+        long totalBytesRead = 0;
+        int entryCount = 0;
+
         try (ZipInputStream zipfile = new ZipInputStream(new BufferedInputStream(stream))) {
 
             ZipEntry entry = null;
             while ((entry = zipfile.getNextEntry()) != null) {
 
+                // Check entry count limit
+                entryCount++;
+                if (entryCount > maxZipEntries) {
+                    throw new IOException("Potential zip bomb detected: too many entries. " +
+                            "Found " + entryCount + " entries, maximum allowed is " + maxZipEntries + ". " +
+                            "If this is a legitimate file, increase the limit using " +
+                            "WordVectorSerializer.setMaxZipEntries() or system property 'dl4j.wordvec.maxZipEntries'");
+                }
+
                 String name = entry.getName();
-                byte[] bytes = IOUtils.toByteArray(zipfile);
+
+                // Check compression ratio if sizes are known
+                long compressedSize = entry.getCompressedSize();
+                long uncompressedSize = entry.getSize();
+                if (compressedSize > 0 && uncompressedSize > 0) {
+                    double ratio = (double) uncompressedSize / compressedSize;
+                    if (ratio > maxCompressionRatio) {
+                        throw new IOException("Potential zip bomb detected: suspicious compression ratio. " +
+                                "Entry '" + name + "' has ratio " + String.format("%.1f", ratio) +
+                                ":1 (compressed: " + compressedSize + " bytes, uncompressed: " + uncompressedSize + " bytes). " +
+                                "Maximum allowed ratio is " + String.format("%.1f", maxCompressionRatio) + ":1. " +
+                                "If this is a legitimate file, increase the limit using " +
+                                "WordVectorSerializer.setMaxCompressionRatio() or system property 'dl4j.wordvec.maxCompressionRatio'");
+                    }
+                }
+
+                // Read with size limit protection
+                byte[] bytes = readZipEntryWithLimit(zipfile, name, maxTotalUncompressedSize - totalBytesRead);
+                totalBytesRead += bytes.length;
 
                 if (name.equals(CONFIG_ENTRY)) {
                     String content = new String(bytes, "UTF-8");
@@ -2034,6 +2491,9 @@ public class WordVectorSerializer {
             }
 
         }
+
+        log.debug("Successfully loaded SequenceVectors ZIP data: {} entries, {} total bytes", entryCount, totalBytesRead);
+
         InMemoryLookupTable<T> lookupTable = new InMemoryLookupTable<>();
         lookupTable.setSyn0(syn0);
         lookupTable.setSyn1(syn1);
@@ -2477,9 +2937,9 @@ public class WordVectorSerializer {
 
         log.debug("Trying simplified model restoration...");
 
-        File tmpFileSyn0 = DL4JFileUtils.createTempFile("word2vec", "syn");
+        File tmpFileSyn0 = ND4JFileUtils.createTempFile("word2vec", "syn");
         tmpFileSyn0.deleteOnExit();
-        File tmpFileConfig = DL4JFileUtils.createTempFile("word2vec", "config");
+        File tmpFileConfig = ND4JFileUtils.createTempFile("word2vec", "config");
         tmpFileConfig.deleteOnExit();
         // we don't need full model, so we go directly to syn0 file
 
@@ -2576,7 +3036,8 @@ public class WordVectorSerializer {
         }
 
         lookupTable = new InMemoryLookupTable.Builder<VocabWord>().cache(vocabCache)
-                .vectorLength(syn0.columns()).useHierarchicSoftmax(false).useAdaGrad(false).build();
+                .vectorLength(syn0.columns()).useHierarchicSoftmax(false)
+                .useAdaGrad(false).build();
 
         lookupTable.setSyn0(syn0);
 
@@ -2609,7 +3070,7 @@ public class WordVectorSerializer {
 
             String tokenPreProcessorClassName = configuration.getTokenPreProcessor();
             if (StringUtils.isNotEmpty(tokenPreProcessorClassName)) {
-                Object preProcessor = DL4JClassLoading.createNewInstance(tokenizerFactoryClassName);
+                Object preProcessor = DL4JClassLoading.createNewInstance(tokenPreProcessorClassName);
                 if(preProcessor instanceof TokenPreProcess) {
                     TokenPreProcess tokenPreProcess = (TokenPreProcess) preProcessor;
                     factory.setTokenPreProcessor(tokenPreProcess);
@@ -2638,7 +3099,7 @@ public class WordVectorSerializer {
      */
     public static WordVectors loadStaticModel(InputStream inputStream) throws IOException {
 
-        File tmpFile = DL4JFileUtils.createTempFile("word2vec"+System.currentTimeMillis(), ".tmp");
+        File tmpFile = ND4JFileUtils.createTempFile("word2vec"+System.currentTimeMillis(), ".tmp");
         FileUtils.copyInputStreamToFile(inputStream, tmpFile);
         try {
             return loadStaticModel(tmpFile);
@@ -2683,7 +3144,7 @@ public class WordVectorSerializer {
         // if zip - that's dl4j format
         try {
             log.debug("Trying DL4j format...");
-            File tmpFileSyn0 = DL4JFileUtils.createTempFile("word2vec", "syn");
+            File tmpFileSyn0 = ND4JFileUtils.createTempFile("word2vec", "syn");
             tmpFileSyn0.deleteOnExit();
 
             ZipFile zipFile = new ZipFile(file);
@@ -2947,8 +3408,8 @@ public class WordVectorSerializer {
      * @param weightLookupTable WeightLookupTable
      * @param file File
      */
-    public static <T extends SequenceElement>  void writeLookupTable(WeightLookupTable<T> weightLookupTable,
-                                                                     @NonNull File file) throws IOException {
+    public static <T extends SequenceElement>  void writeLookupTableBinary(WeightLookupTable<T> weightLookupTable,
+                                                                           @NonNull File file) throws IOException {
         try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file),
                 StandardCharsets.UTF_8))) {
             int numWords = weightLookupTable.getVocabCache().numWords();

@@ -22,21 +22,23 @@
 
 #include <helpers/Loops.h>
 #include <ops/declarable/helpers/transforms.h>
-
+#if NOT_EXCLUDED(OP_triu)
 namespace sd {
 namespace ops {
 namespace helpers {
 
 //////////////////////////////////////////////////////////////////////////
 template <typename T>
-static void triuBP_(sd::LaunchContext* context, const NDArray& input, const NDArray& gradO, NDArray& gradI,
+static void triuBP_(sd::LaunchContext* context, NDArray& input, NDArray& gradO, NDArray& gradI,
                     const int diagonal) {
   if(gradO.isScalar()) {
     auto firstElement = gradO.e(0);
-    gradI.assign(firstElement);
+    gradI.assign(&firstElement);
   } else {
     auto dOdI = NDArray(&gradO);  // dO/dI
-    const_cast<NDArray&>(input).fillAsTriangular<T>(0, diagonal, dOdI.sizeAt(-1), dOdI, 'b');
+    char direction = diagonal <= 0  || diagonal > 0 ? 'l': 'u';
+
+    const_cast<NDArray&>(input).fillAsTriangular<T>(0, diagonal, diagonal, dOdI, direction,false);
     int dLen = dOdI.lengthOf();
 
     auto func = PRAGMA_THREADS_FOR {
@@ -46,14 +48,15 @@ static void triuBP_(sd::LaunchContext* context, const NDArray& input, const NDAr
     };
     samediff::Threads::parallel_for(func, 0, dLen);
 
-    // FIXME: !!!
-    gradI.assign(dOdI * gradO);  // chain rule: dLoss/dI = dO/dI * dLoss/dO
+    NDArray *ref = dOdI * gradO;
+    gradI.assign(ref);  // chain rule: dLoss/dI = dO/dI * dLoss/dO
+    delete ref;
   }
 
 
 }
 
-void triuBP(sd::LaunchContext* context, const NDArray& input, const NDArray& gradO, NDArray& gradI,
+void triuBP(sd::LaunchContext* context, NDArray& input, NDArray& gradO, NDArray& gradI,
             const int diagonal) {
   BUILD_SINGLE_SELECTOR(gradO.dataType(), triuBP_, (context, input, gradO, gradI, diagonal), SD_COMMON_TYPES);
 }
@@ -61,3 +64,4 @@ void triuBP(sd::LaunchContext* context, const NDArray& input, const NDArray& gra
 }  // namespace helpers
 }  // namespace ops
 }  // namespace sd
+#endif

@@ -31,15 +31,14 @@ CUSTOM_OP_IMPL(tri, -2, 1, false, 0, 1) {
   auto output = OUTPUT_VARIABLE(0);
 
   const int diag = block.numI() > 2 ? INT_ARG(2) : 0;
-
-  BUILD_SINGLE_SELECTOR(output->dataType(), output->fillAsTriangular, (1., diag, diag, *output, 'l'),
+  char direction = diag <= 0  || diag == 0 || diag > 0 ? 'l': 'u';
+  BUILD_SINGLE_SELECTOR(output->dataType(), output->fillAsTriangular,
+                        (1., diag, diag, *output, direction),
                         SD_COMMON_TYPES);  // fill with unities lower triangular block of matrix
 
 
-  // output->setValueInDiagMatrix(1., diag,   'l');
-  // output->setValueInDiagMatrix(0., diag+1, 'u');
 
-  return sd::Status::OK;
+  return Status::OK;
 }
 
 DECLARE_TYPES(tri) { getOpDescriptor()->setAllowedOutputTypes(0, {ALL_FLOATS, ALL_INTS}); }
@@ -48,7 +47,7 @@ DECLARE_SHAPE_FN(tri) {
   const int rows = INT_ARG(0);
   const int cols = block.numI() > 1 ? INT_ARG(1) : rows;
 
-  auto dtype = block.numD() ? D_ARG(0) : DataType::FLOAT32;
+  auto dtype = block.numD() ? D_ARG(0) : FLOAT32;
 
   return SHAPELIST(ConstantShapeHelper::getInstance().createShapeInfo(dtype, 'c', {rows, cols}));
 }

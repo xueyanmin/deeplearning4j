@@ -32,21 +32,23 @@ namespace helpers {
 
 //////////////////////////////////////////////////////////////////////////
 template <typename T>
-static void sqrtmQuasiTrianDiag(const NDArray& matrixT, NDArray& sqrtT) {
+static void sqrtmQuasiTrianDiag(NDArray& matrixT, NDArray& sqrtT) {
   const int rows = matrixT.sizeAt(0);
 
   for (int i = 0; i < rows; i++) {
     if (i == rows - 1 || matrixT.t<T>(i + 1, i) == (T)0) {
       const auto elemT = matrixT.t<T>(i, i);
       if (elemT < (T)0)
-        throw std::runtime_error(
+        THROW_EXCEPTION(
             "ops::helpers::Sqrtm::sqrtmQuasiTrianDiag: can't take sqrt of negative diagonal element of T matrix !");
       sqrtT.r<T>(i, i) = math::sd_sqrt<T, T>(elemT);
     } else {
-      EigenValsAndVecs<T> es(matrixT({i, i + 2, i, i + 2}, true));  // es._Vecs {2,2,2}, es._Vals{2,2}
+      NDArray *esViewPtr = matrixT({i, i + 2, i, i + 2}, true);
+      EigenValsAndVecs<T> es(*esViewPtr);  // es._Vecs {2,2,2}, es._Vals{2,2}
+      delete esViewPtr;
 
-      const NDArray& vecs = es._Vecs;
-      const NDArray& vals = es._Vals;
+       NDArray& vecs = es._Vecs;
+       NDArray& vals = es._Vals;
 
       const T& vecsReal00 = vecs.t<T>(0, 0, 0);
       const T& vecsImag00 = vecs.t<T>(0, 0, 1);
@@ -136,8 +138,9 @@ static void sqrtmQuasiTrianDiag(const NDArray& matrixT, NDArray& sqrtT) {
 //////////////////////////////////////////////////////////////////////////
 // all matrices are {2,2} here
 template <typename T>
-static void sqrtmQuasiTrianAuxEq(const NDArray& A, const NDArray& B, const NDArray& C, NDArray& X) {
-  NDArray tempMatrix(A.ordering(), {4, 4}, A.dataType(), A.getContext());
+static void sqrtmQuasiTrianAuxEq(NDArray& A, NDArray& B, NDArray& C, NDArray& X) {
+  std::vector<LongType> tempShape = {4,4};
+  NDArray tempMatrix(A.ordering(),tempShape, A.dataType(), A.getContext());
 
   tempMatrix.r<T>(0, 0) = A.t<T>(0, 0) + B.t<T>(0, 0);
   tempMatrix.r<T>(1, 1) = A.t<T>(0, 0) + B.t<T>(1, 1);
@@ -156,7 +159,8 @@ static void sqrtmQuasiTrianAuxEq(const NDArray& A, const NDArray& B, const NDArr
   tempMatrix.r<T>(2, 1) = (T)0;
   tempMatrix.r<T>(3, 0) = (T)0;
 
-  NDArray result(A.ordering(), {4, 1}, A.dataType(), A.getContext());
+  std::vector<LongType> resultShape = {4,1};
+  NDArray result(A.ordering(), resultShape, A.dataType(), A.getContext());
   result.r<T>(0, 0) = C.t<T>(0, 0);
   result.r<T>(1, 0) = C.t<T>(0, 1);
   result.r<T>(2, 0) = C.t<T>(1, 0);
@@ -172,7 +176,7 @@ static void sqrtmQuasiTrianAuxEq(const NDArray& A, const NDArray& B, const NDArr
 
 //////////////////////////////////////////////////////////////////////////
 template <typename T>
-static void sqrtmQuasiTrianOffDiag(const NDArray& matrixT, NDArray& sqrtT) {
+static void sqrtmQuasiTrianOffDiag(NDArray& matrixT, NDArray& sqrtT) {
   const int rows = matrixT.sizeAt(0);
 
   for (int j = 1; j < rows; j++) {
@@ -185,47 +189,107 @@ static void sqrtmQuasiTrianOffDiag(const NDArray& matrixT, NDArray& sqrtT) {
       const bool jBlockIs2x2 = (j < rows - 1) && (matrixT.t<T>(j + 1, j) != (T)0);
 
       if (iBlockIs2x2 && jBlockIs2x2) {
-        NDArray A = sqrtT({i, i + 2, i, i + 2}, true);
-        NDArray B = sqrtT({j, j + 2, j, j + 2}, true);
-        NDArray X = matrixT({i, i + 2, j, j + 2}, true);  //.dup();
+        NDArray *APtr = sqrtT({i, i + 2, i, i + 2}, true);
+        NDArray A = *APtr;
+        delete APtr;
+        
+        NDArray *BPtr = sqrtT({j, j + 2, j, j + 2}, true);
+        NDArray B = *BPtr;
+        delete BPtr;
+        
+        NDArray *XPtr = matrixT({i, i + 2, j, j + 2}, true);
+        NDArray X = *XPtr;
+        delete XPtr;
 
-        if (j - i > 2) X -= mmul(sqrtT({i, i + 2, i + 2, j}, true), sqrtT({i + 2, j, j, j + 2}, true));
+        if (j - i > 2) {
+          NDArray *leftPtr = sqrtT({i, i + 2, i + 2, j}, true);
+          NDArray *rightPtr = sqrtT({i + 2, j, j, j + 2}, true);
+          auto mul = mmul(*leftPtr, *rightPtr);
+          X -= *mul;
+          delete leftPtr;
+          delete rightPtr;
+          delete mul;
+        }
 
         sqrtmQuasiTrianAuxEq<T>(A, B, X, X);
 
         sqrtT.syncToDevice();
-        sqrtT({i, i + 2, j, j + 2}, true).assign(X);
+        NDArray *assignPtr = sqrtT({i, i + 2, j, j + 2}, true);
+        assignPtr->assign(&X);
+        delete assignPtr;
       } else if (iBlockIs2x2 && !jBlockIs2x2) {
-        NDArray rhs = matrixT({i, i + 2, j, j + 1}, true);  //.dup();
+        NDArray *rhsPtr = matrixT({i, i + 2, j, j + 1}, true);
+        NDArray rhs = *rhsPtr;
+        delete rhsPtr;
 
-        if (j - i > 2) rhs -= mmul(sqrtT({i, i + 2, i + 2, j}, true), sqrtT({i + 2, j, j, j + 1}, true));
+        if (j - i > 2) {
+          NDArray *leftPtr = sqrtT({i, i + 2, i + 2, j}, true);
+          NDArray *rightPtr = sqrtT({i + 2, j, j, j + 1}, true);
+          auto mul = mmul(*leftPtr, *rightPtr);
+          rhs -= *mul;
+          delete leftPtr;
+          delete rightPtr;
+          delete mul;
+        }
 
-        NDArray A(matrixT.ordering(), {2, 2}, matrixT.dataType(), matrixT.getContext());
+        std::vector<LongType> aShape = {2,2};
+        NDArray A(matrixT.ordering(), aShape, matrixT.dataType(), matrixT.getContext());
         A.r<T>(0, 0) = A.r<T>(1, 1) = sqrtT.t<T>(j, j);
         A.r<T>(0, 1) = A.r<T>(1, 0) = T(0);
-        A += sqrtT({i, i + 2, i, i + 2}, true);
+        
+        NDArray *addPtr = sqrtT({i, i + 2, i, i + 2}, true);
+        A += *addPtr;
+        delete addPtr;
 
         FullPivLU<T>::solve(A, rhs, rhs);
 
         // sqrtT.syncToDevice();
-        sqrtT({i, i + 2, j, j + 1}, true).assign(rhs);
+        NDArray *assignPtr = sqrtT({i, i + 2, j, j + 1}, true);
+        assignPtr->assign(&rhs);
+        delete assignPtr;
       } else if (!iBlockIs2x2 && jBlockIs2x2) {
-        NDArray rhs = matrixT({i, i + 1, j, j + 2}, true);  //.dup();
+        NDArray *rhsPtr = matrixT({i, i + 1, j, j + 2}, true);
+        NDArray rhs = *rhsPtr;
+        delete rhsPtr;
 
-        if (j - i > 1) rhs -= mmul(sqrtT({i, i + 1, i + 1, j}, true), sqrtT({i + 1, j, j, j + 2}, true));
+        if (j - i > 1) {
+          NDArray *leftPtr = sqrtT({i, i + 1, i + 1, j}, true);
+          NDArray *rightPtr = sqrtT({i + 1, j, j, j + 2}, true);
+          auto mul =  mmul(*leftPtr, *rightPtr);
+          rhs -= *mul;
+          delete leftPtr;
+          delete rightPtr;
+          delete mul;
+        }
 
-        NDArray A(matrixT.ordering(), {2, 2}, matrixT.dataType(), matrixT.getContext());
+        std::vector<LongType> aShape = {2,2};
+        NDArray A(matrixT.ordering(),aShape, matrixT.dataType(), matrixT.getContext());
         A.r<T>(0, 0) = A.r<T>(1, 1) = sqrtT.t<T>(i, i);
         A.r<T>(0, 1) = A.r<T>(1, 0) = T(0);
-        A += sqrtT({j, j + 2, j, j + 2}, true).transpose();
+        
+        NDArray *addPtr = sqrtT({j, j + 2, j, j + 2}, true);
+        NDArray *add = addPtr->transpose();
+        delete addPtr;
+        A += *add;
+        delete add;
 
-        NDArray rhsT = rhs.transpose();
-        FullPivLU<T>::solve(A, rhsT, rhsT);
+        NDArray *rhsT = rhs.transpose();
+        FullPivLU<T>::solve(A, *rhsT, *rhsT);
 
         // sqrtT.syncToDevice();
-        sqrtT({i, i + 1, j, j + 2}, true).assign(rhs);
+        NDArray *assignPtr = sqrtT({i, i + 1, j, j + 2}, true);
+        assignPtr->assign(&rhs);
+        delete assignPtr;
+        delete rhsT;
       } else if (!iBlockIs2x2 && !jBlockIs2x2) {
-        T temp = mmul(sqrtT({i, i + 1, i + 1, j}), sqrtT({i + 1, j, j, j + 1})).t<T>(0);  // dot
+        NDArray *leftPtr = sqrtT({i, i + 1, i + 1, j});
+        NDArray *rightPtr = sqrtT({i + 1, j, j, j + 1});
+        auto mul = mmul(*leftPtr, *rightPtr);
+        T temp = mul->t<T>(0);  // dot
+        delete leftPtr;
+        delete rightPtr;
+        delete mul;
+        
         sqrtT.r<T>(i, j) = (matrixT.t<T>(i, j) - temp) / (sqrtT.t<T>(i, i) + sqrtT.t<T>(j, j));
       }
     }
@@ -234,34 +298,37 @@ static void sqrtmQuasiTrianOffDiag(const NDArray& matrixT, NDArray& sqrtT) {
 
 //////////////////////////////////////////////////////////////////////////
 template <typename T>
-void Sqrtm<T>::calc(const NDArray& in, NDArray& out) {
+void Sqrtm<T>::calc(NDArray& in, NDArray& out) {
   if (in.rankOf() != 2 || in.sizeAt(0) != in.sizeAt(1))
-    throw std::runtime_error("ops::helpers::Sqrtm::calc: input matrix must have rank 2 and be square !");
+    THROW_EXCEPTION("ops::helpers::Sqrtm::calc: input matrix must have rank 2 and be square !");
   if (!out.isSameShape(in))
-    throw std::runtime_error("ops::helpers::Sqrtm::calc: output matrix must have the same shape as input one!");
+    THROW_EXCEPTION("ops::helpers::Sqrtm::calc: output matrix must have the same shape as input one!");
 
   if (in.lengthOf() == 1) {
     out.r<T>(0) = math::sd_sqrt<T, T>(in.t<T>(0));
     return;
   }
 
-  ops::helpers::Schur<T> schur(in);
+  Schur<T> schur(in);
 
-  const NDArray& t1 = schur.t;
-  const NDArray& t2 = schur.u;
 
-  NDArray sqrtT = in.ulike();
+  NDArray *inULike = in.ulike();
+  NDArray sqrtT = *inULike;
   sqrtT.nullify();
 
-  sqrtmQuasiTrianDiag<T>(schur.t, sqrtT);
-  sqrtmQuasiTrianOffDiag<T>(schur.t, sqrtT);
+  sqrtmQuasiTrianDiag<T>(*schur.t, sqrtT);
+  sqrtmQuasiTrianOffDiag<T>(*schur.t, sqrtT);
 
+  NDArray *second = schur.u->transpose();
   // out = U * sqrtT * U^T;
-  NDArray temp = mmul(sqrtT, schur.u.transpose());
-  MmulHelper::mmul(&schur.u, &temp, &out);
+  NDArray *temp = mmul(sqrtT, *second);
+  MmulHelper::mmul(schur.u, temp, &out);
+  delete inULike;
+  delete second;
+  delete temp;
 }
 
-BUILD_SINGLE_TEMPLATE(template class Sqrtm, , SD_FLOAT_TYPES);
+BUILD_SINGLE_TEMPLATE( class Sqrtm, , SD_FLOAT_TYPES);
 
 }  // namespace helpers
 }  // namespace ops

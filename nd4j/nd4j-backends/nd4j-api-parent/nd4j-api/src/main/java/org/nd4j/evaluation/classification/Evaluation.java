@@ -20,8 +20,13 @@
 
 package org.nd4j.evaluation.classification;
 
-import lombok.*;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NonNull;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import lombok.val;
+
 import org.nd4j.common.base.Preconditions;
 import org.nd4j.evaluation.BaseEvaluation;
 import org.nd4j.evaluation.EvaluationAveraging;
@@ -459,9 +464,9 @@ public class Evaluation extends BaseEvaluation<Evaluation> {
                 guessIndex = Nd4j.argMax(predictions2d.mulRowVector(costArray.castTo(predictions2d.dataType())), 1);
             } else {
                 //Standard case: argmax
-                guessIndex = Nd4j.argMax(predictions2d, 1);
+                guessIndex = Nd4j.argMax(predictions2d.castTo(DataType.INT64), 1);
             }
-            INDArray realOutcomeIndex = Nd4j.argMax(labels2d, 1);
+            INDArray realOutcomeIndex = Nd4j.argMax(labels2d.castTo(DataType.INT64), 1);
             val nExamples = guessIndex.length();
 
             for (int i = 0; i < nExamples; i++) {

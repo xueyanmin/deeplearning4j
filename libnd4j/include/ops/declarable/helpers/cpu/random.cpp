@@ -20,14 +20,12 @@
 //  @author sgazeos@gmail.com
 //
 #include <ops/declarable/helpers/random.h>
-//#include <vector>
 #include <memory>
-//#include <graph/Context.h>
 #include <execution/Threads.h>
 #include <helpers/ConstantTadHelper.h>
 #include <helpers/RandomLauncher.h>
 #include <helpers/ShapeUtils.h>
-
+#if NOT_EXCLUDED(OP_random)
 namespace sd {
 namespace ops {
 namespace helpers {
@@ -43,13 +41,13 @@ namespace helpers {
 template <typename T>
 T gammaLess(graph::RandomGenerator& rng, T const alpha, T const beta) {
   auto d = T(1.0334f) - T(0.0766f) * math::p_exp(T(2.2942f) * alpha);
-  auto a = math::p_pow(T(2.f), alpha) * math::p_pow(T(1.f) - math::p_exp(-d * T(0.5f)), alpha);
+  auto a = math::p_pow(T(2.f), alpha) * math::p_pow<T>(T(1.f) - math::p_exp(-d * T(0.5f)), alpha);
   auto b = alpha * math::p_pow(d, alpha - T(1.f)) * exp(-d);
   auto c = a + b;
   T rawX;
-  static auto index = 0LL;
+  static sd::LongType index = 0;
   const T underAlpha = T(1.f) / alpha;
-  const T powerAlpha = math::p_pow(T(2.f), alpha - T(1.f));
+  const T powerAlpha = math::p_pow<T>(T(2.f), alpha - T(1.f));
 
   for (;;) {
     auto u = rng.relativeT<T>(index++, T(0.f), T(1.f));
@@ -59,14 +57,14 @@ T gammaLess(graph::RandomGenerator& rng, T const alpha, T const beta) {
     else
       rawX = -math::p_log(c * (T(1.f) - u) / (alpha * math::p_pow(d, alpha - T(1.f))));
 
-    T v = rng.relativeT(index++, 0.f, 1.f);
+    T v = static_cast<T>(rng.relativeT(index++, 0.f, 1.f));
     if (rawX <= d) {
       auto testVal = (math::p_pow(rawX, alpha - 1.f) * math::p_exp(-T(0.5f) * rawX)) /
                      (powerAlpha * math::p_pow(T(1.f) - math::p_exp(-T(0.5f) * rawX), alpha - T(1.f)));
       if (testVal < v) continue;
       break;
     } else {
-      if (v <= math::p_pow(d / rawX, T(1.f) - alpha)) break;
+      if (v <= math::p_pow<T>(d / rawX, T(1.f) - alpha)) break;
       continue;
     }
   }
@@ -86,7 +84,7 @@ template <typename T>
 T gammaGreat(graph::RandomGenerator& rng, T const alpha, T const beta) {
   auto decreasedAlpha = alpha - T(1.f / 3.f);
   auto c = T(1.) / math::p_sqrt(T(9.f) * decreasedAlpha);
-  static auto index = 0LL;
+  static sd::LongType index = 0;
   T x;
   auto normalDistributed = [](graph::RandomGenerator& rng, sd::LongType& index) {
     auto v1 = rng.relativeT(index++, T(0.f), T(1.f));
@@ -95,19 +93,16 @@ T gammaGreat(graph::RandomGenerator& rng, T const alpha, T const beta) {
     return math::p_cos(T(2.f * 3.141592f) * v2) * math::p_sqrt(T(-2.f) * math::p_log(v1));
   };
 
-  //        const T underAlpha = T(1.f) / alpha;
-  //        const T powerAlpha = math::p_pow(T(2.f), alpha - T(1.f));
-
   float normalizedVar;
   for (;;) {
     do {
-      x = normalDistributed(rng, index);  // printf("X = %f\n", x);
+      x = normalDistributed(rng, index);
       normalizedVar = T(1.f) + c * x;
     } while (normalizedVar < T(0.f));
     normalizedVar = normalizedVar * normalizedVar * normalizedVar;  // v * v * v;
 
-    auto u = rng.relativeT<T>(index++, T(0.f), T(1.f));     // printf("UNI = %f\n", u);
-    if (u < T(1.f) - T(.0331f) * (x * x) * (x * x)) break;  // return (d * v / b);
+    auto u = rng.relativeT<T>(index++, T(0.f), T(1.f));
+    if (u < T(1.f) - T(.0331f) * (x * x) * (x * x)) break;
     if (log(u) < 0.5f * x * x + decreasedAlpha * (1. - normalizedVar + math::p_log(normalizedVar))) break;
   }
   return (decreasedAlpha * normalizedVar / beta);
@@ -118,8 +113,8 @@ void fillRandomGamma_(LaunchContext* context, graph::RandomGenerator& rng, NDArr
                       NDArray* output) {
   auto broadcasted = alpha->shapeInfo();
   if (beta != nullptr) {
-    const sd::LongType* broadcastedShape = nullptr;
-    ShapeUtils::evalBroadcastShapeInfo(*alpha, *beta, true, broadcastedShape, context->getWorkspace());
+     sd::LongType* broadcastedShape = nullptr;
+    ShapeUtils::evalBroadcastShapeInfo(alpha->shapeInfo(), beta->shapeInfo(), true, broadcastedShape, context->getWorkspace());
     broadcasted = broadcastedShape;
   }
 
@@ -132,8 +127,8 @@ void fillRandomGamma_(LaunchContext* context, graph::RandomGenerator& rng, NDArr
     NDArray alphaBroadcasted(broadcasted, alpha->dataType(), false, context);
     NDArray betaBroadcasted(broadcasted, beta->dataType(), false, context);
 
-    copyAlpha = new NDArray(alphaBroadcasted.applyTrueBroadcast(BroadcastOpsTuple::Assign(), *alpha));
-    copyBeta = new NDArray(betaBroadcasted.applyTrueBroadcast(BroadcastOpsTuple::Assign(), *beta));
+    copyAlpha = alphaBroadcasted.applyTrueBroadcast(BroadcastOpsTuple::Assign(), alpha);
+    copyBeta = betaBroadcasted.applyTrueBroadcast(BroadcastOpsTuple::Assign(), beta);
   }
   bool directOutput = output->ews() == 1 && output->ordering() == 'c';
   T* outputBuf = output->dataBuffer()->primaryAsT<T>();
@@ -156,7 +151,6 @@ void fillRandomGamma_(LaunchContext* context, graph::RandomGenerator& rng, NDArr
   if (beta != nullptr) {
     delete copyAlpha;
     delete copyBeta;
-    // delete broadcasted;
   }
 }
 
@@ -164,7 +158,7 @@ void fillRandomGamma(LaunchContext* context, graph::RandomGenerator& rng, NDArra
                      NDArray* output) {
   BUILD_SINGLE_SELECTOR(output->dataType(), fillRandomGamma_, (context, rng, alpha, beta, output), SD_FLOAT_NATIVE);
 }
-BUILD_SINGLE_TEMPLATE(template void fillRandomGamma_,
+BUILD_SINGLE_TEMPLATE( void fillRandomGamma_,
                       (LaunchContext * context, graph::RandomGenerator& rng, NDArray* alpha, NDArray* beta,
                        NDArray* output),
                       SD_FLOAT_NATIVE);
@@ -191,14 +185,14 @@ void fillRandomPoisson_(LaunchContext* context, graph::RandomGenerator& rng, NDA
   PRAGMA_OMP_PARALLEL_FOR
   for (sd::LongType k = 0; k < shift; k++) {
     auto pos = k * step;
-    auto u = rng.relativeT<T>(k, 0., 1.);
+    auto u = rng.relativeT<T>(k, static_cast<T>(0.), static_cast<T>(1.));
     for (sd::LongType e = 0; e < step; e++) {
       auto p = math::sd_exp<T, T>(-lambda->t<T>(e));
       auto s = p;
       auto x = Z(0.f);
       while (u > s) {
         x += 1.f;
-        p *= directLa ? lambdaBuf[e] / x : lambda->t<T>(e) / x;
+        p *= static_cast<T>(directLa ? lambdaBuf[e] / x : lambda->t<T>(e) / x);
         s += p;
       }
       if (directOut)
@@ -214,7 +208,7 @@ void fillRandomPoisson(LaunchContext* context, graph::RandomGenerator& rng, NDAr
                         SD_FLOAT_TYPES, SD_FLOAT_TYPES);
 }
 
-BUILD_DOUBLE_TEMPLATE(template void fillRandomPoisson_,
+BUILD_DOUBLE_TEMPLATE( void fillRandomPoisson_,
                       (LaunchContext * context, graph::RandomGenerator& rng, NDArray* lambda, NDArray* output),
                       SD_FLOAT_TYPES, SD_FLOAT_TYPES);
 
@@ -250,7 +244,7 @@ void fillRandomMultiNomial_(LaunchContext* context, graph::RandomGenerator& rng,
   Tz* z = output.bufferAsT<Tz>();
 
   Tx minVal = DataTypeUtils::min_positive<Tx>();
-  Tx maxVal = 1.0;
+  Tx maxVal = static_cast<Tx>(1.0);
 
   auto dimA = (0 == dimC) ? 1 : 0;
   const sd::LongType batchValue = output.sizeAt(dimC);
@@ -300,3 +294,4 @@ void fillRandomMultiNomial(LaunchContext* context, graph::RandomGenerator& rng, 
 }  // namespace helpers
 }  // namespace ops
 }  // namespace sd
+#endif

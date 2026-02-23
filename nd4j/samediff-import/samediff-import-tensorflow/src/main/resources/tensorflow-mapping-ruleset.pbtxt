@@ -1573,10 +1573,10 @@ mappings {
   rule {
     ruleName: "valuemapping"
     functionName: "valuemapping"
-    outputIntName: "dataType"
     inputDataTypeName: "T"
+    outputDataTypeName: "dtype"
     inputToOutput {
-      key: "dataType"
+      key: "dtype"
       value: "T"
     }
     ruleType: "attribute"
@@ -1631,6 +1631,7 @@ mappings {
   rule {
     ruleName: "listnumbertolistnumber"
     functionName: "listnumbertolistnumber"
+    inputIntName: "squeeze_dims"
     outputIntName: "_a"
     inputToOutput {
       key: "_a"
@@ -1949,17 +1950,6 @@ mappings {
     ruleType: "attribute"
     inputFrameworkOpName: "Sum"
   }
-  rule {
-    ruleName: "ndarraytointattributevalue"
-    functionName: "ndarraytointattributevalue"
-    outputIntName: "dimensions"
-    inputToOutput {
-      key: "dimensions"
-      value: "reduction_indices"
-    }
-    ruleType: "attribute"
-    inputFrameworkOpName: "Sum"
-  }
 }
 mappings {
   frameworkName: "tensorflow"
@@ -2079,17 +2069,6 @@ mappings {
     inputToOutput {
       key: "keepDims"
       value: "keep_dims"
-    }
-    ruleType: "attribute"
-    inputFrameworkOpName: "Min"
-  }
-  rule {
-    ruleName: "ndarraytointattributevalue"
-    functionName: "ndarraytointattributevalue"
-    outputIntName: "dimensions"
-    inputToOutput {
-      key: "dimensions"
-      value: "reduction_indices"
     }
     ruleType: "attribute"
     inputFrameworkOpName: "Min"
@@ -2327,17 +2306,6 @@ mappings {
     ruleType: "attribute"
     inputFrameworkOpName: "Split"
   }
-  rule {
-    ruleName: "ndarraytointattributevalue"
-    functionName: "ndarraytointattributevalue"
-    outputIntName: "dimensions"
-    inputToOutput {
-      key: "dimensions"
-      value: "split_dim"
-    }
-    ruleType: "attribute"
-    inputFrameworkOpName: "Split"
-  }
 }
 mappings {
   frameworkName: "tensorflow"
@@ -2375,10 +2343,10 @@ mappings {
   rule {
     ruleName: "valuemapping"
     functionName: "valuemapping"
-    outputIntName: "fullUV"
     inputBooleanName: "compute_uv"
     inputBooleanName: "full_matrices"
     outputBooleanName: "computeUv"
+    outputBooleanName: "fullUV"
     inputToOutput {
       key: "computeUv"
       value: "compute_uv"
@@ -2394,9 +2362,9 @@ mappings {
     ruleName: "invertbooleannumber"
     functionName: "invertbooleannumber"
     outputIntName: "calcUV"
-    outputIntName: "fullUV"
     inputBooleanName: "compute_uv"
     inputBooleanName: "full_matrices"
+    outputBooleanName: "fullUV"
     inputToOutput {
       key: "calcUV"
       value: "compute_uv"
@@ -4245,6 +4213,7 @@ mappings {
     ruleName: "listattributevaluelookuptoindex"
     functionName: "listattributevaluelookuptoindex"
     inputIntName: "index"
+    inputIntName: "ksize"
     outputIntName: "kH"
     inputToOutput {
       key: "kH"
@@ -4266,6 +4235,7 @@ mappings {
     ruleName: "listattributevaluelookuptoindex"
     functionName: "listattributevaluelookuptoindex"
     inputIntName: "index"
+    inputIntName: "ksize"
     outputIntName: "kW"
     inputToOutput {
       key: "kW"
@@ -4287,6 +4257,7 @@ mappings {
     ruleName: "listattributevaluelookuptoindex"
     functionName: "listattributevaluelookuptoindex"
     inputIntName: "index"
+    inputIntName: "ksize"
     outputIntName: "kD"
     inputToOutput {
       key: "kD"
@@ -4307,6 +4278,7 @@ mappings {
     ruleName: "listattributevaluelookuptoindex"
     functionName: "listattributevaluelookuptoindex"
     inputIntName: "index"
+    inputIntName: "strides"
     outputIntName: "sH"
     inputToOutput {
       key: "sH"
@@ -4328,6 +4300,7 @@ mappings {
     ruleName: "listattributevaluelookuptoindex"
     functionName: "listattributevaluelookuptoindex"
     inputIntName: "index"
+    inputIntName: "strides"
     outputIntName: "sW"
     inputToOutput {
       key: "sW"
@@ -4349,6 +4322,7 @@ mappings {
     ruleName: "listattributevaluelookuptoindex"
     functionName: "listattributevaluelookuptoindex"
     inputIntName: "index"
+    inputIntName: "strides"
     outputIntName: "sD"
     inputToOutput {
       key: "sD"
@@ -4376,6 +4350,35 @@ mappings {
     functionName: "passthrough"
     ruleType: "tensor"
     inputFrameworkOpName: "TensorArrayWriteV3"
+  }
+}
+mappings {
+  frameworkName: "tensorflow"
+  opName: "select"
+  inputFrameworkOpName: "SelectV2"
+  rule {
+    ruleName: "ndarraymapping"
+    functionName: "ndarraymapping"
+    inputTensorName: "condition"
+    inputTensorName: "t"
+    inputTensorName: "e"
+    outputTensorName: "cond"
+    outputTensorName: "input"
+    outputTensorName: "y"
+    inputToOutput {
+      key: "cond"
+      value: "condition"
+    }
+    inputToOutput {
+      key: "input"
+      value: "t"
+    }
+    inputToOutput {
+      key: "y"
+      value: "e"
+    }
+    ruleType: "tensor"
+    inputFrameworkOpName: "SelectV2"
   }
 }
 mappings {
@@ -4564,6 +4567,7 @@ mappings {
     ruleName: "listattributevaluelookuptoindex"
     functionName: "listattributevaluelookuptoindex"
     inputIntName: "index"
+    inputIntName: "strides"
     outputIntName: "sD"
     inputToOutput {
       key: "sD"
@@ -4585,6 +4589,7 @@ mappings {
     ruleName: "listattributevaluelookuptoindex"
     functionName: "listattributevaluelookuptoindex"
     inputIntName: "index"
+    inputIntName: "strides"
     outputIntName: "sH"
     inputToOutput {
       key: "sH"
@@ -4606,6 +4611,7 @@ mappings {
     ruleName: "listattributevaluelookuptoindex"
     functionName: "listattributevaluelookuptoindex"
     inputIntName: "index"
+    inputIntName: "strides"
     outputIntName: "sW"
     inputToOutput {
       key: "sW"
@@ -4672,6 +4678,7 @@ mappings {
     ruleName: "listattributevaluelookuptoindex"
     functionName: "listattributevaluelookuptoindex"
     inputIntName: "index"
+    inputIntName: "dilations"
     outputIntName: "dH"
     inputToOutput {
       key: "dH"
@@ -4693,6 +4700,7 @@ mappings {
     ruleName: "listattributevaluelookuptoindex"
     functionName: "listattributevaluelookuptoindex"
     inputIntName: "index"
+    inputIntName: "dilations"
     outputIntName: "dW"
     inputToOutput {
       key: "dW"
@@ -4714,6 +4722,7 @@ mappings {
     ruleName: "listattributevaluelookuptoindex"
     functionName: "listattributevaluelookuptoindex"
     inputIntName: "index"
+    inputIntName: "dilations"
     outputIntName: "dD"
     inputToOutput {
       key: "dD"
@@ -5161,6 +5170,7 @@ mappings {
     ruleName: "convertinputstringtondarray"
     functionName: "convertinputstringtondarray"
     inputStringAttrName: "message"
+    inputTensorName: "message"
     inputToOutput {
       key: "message"
       value: "message"
@@ -5302,7 +5312,7 @@ mappings {
     functionName: "stringequals"
     inputStringAttrName: "padding"
     inputStringAttrName: "padding"
-    outputIntName: "isSameMode"
+    outputBooleanName: "isSameMode"
     inputToOutput {
       key: "isSameMode"
       value: "padding"
@@ -5321,6 +5331,7 @@ mappings {
   rule {
     ruleName: "listnumbertolistnumber"
     functionName: "listnumbertolistnumber"
+    inputIntName: "rates"
     outputIntName: "rates"
     inputToOutput {
       key: "rates"
@@ -5332,6 +5343,7 @@ mappings {
   rule {
     ruleName: "listnumbertolistnumber"
     functionName: "listnumbertolistnumber"
+    inputIntName: "strides"
     outputIntName: "strides"
     inputToOutput {
       key: "strides"
@@ -5513,6 +5525,7 @@ mappings {
     ruleName: "listattributevaluelookuptoindex"
     functionName: "listattributevaluelookuptoindex"
     inputIntName: "index"
+    inputIntName: "ksize"
     outputIntName: "kH"
     inputToOutput {
       key: "kH"
@@ -5534,6 +5547,7 @@ mappings {
     ruleName: "listattributevaluelookuptoindex"
     functionName: "listattributevaluelookuptoindex"
     inputIntName: "index"
+    inputIntName: "ksize"
     outputIntName: "kW"
     inputToOutput {
       key: "kW"
@@ -5555,6 +5569,7 @@ mappings {
     ruleName: "listattributevaluelookuptoindex"
     functionName: "listattributevaluelookuptoindex"
     inputIntName: "index"
+    inputIntName: "ksize"
     outputIntName: "kD"
     inputToOutput {
       key: "kD"
@@ -5575,6 +5590,7 @@ mappings {
     ruleName: "listattributevaluelookuptoindex"
     functionName: "listattributevaluelookuptoindex"
     inputIntName: "index"
+    inputIntName: "strides"
     outputIntName: "sH"
     inputToOutput {
       key: "sH"
@@ -5596,6 +5612,7 @@ mappings {
     ruleName: "listattributevaluelookuptoindex"
     functionName: "listattributevaluelookuptoindex"
     inputIntName: "index"
+    inputIntName: "strides"
     outputIntName: "sW"
     inputToOutput {
       key: "sW"
@@ -5617,6 +5634,7 @@ mappings {
     ruleName: "listattributevaluelookuptoindex"
     functionName: "listattributevaluelookuptoindex"
     inputIntName: "index"
+    inputIntName: "strides"
     outputIntName: "sD"
     inputToOutput {
       key: "sD"
@@ -6084,6 +6102,7 @@ mappings {
   rule {
     ruleName: "ndarrayinputtondarray"
     functionName: "ndarrayinputtondarray"
+    inputTensorName: "input"
     inputTensorName: "value"
     inputToOutput {
       key: "input"
@@ -6144,10 +6163,10 @@ mappings {
   rule {
     ruleName: "invertbooleannumber"
     functionName: "invertbooleannumber"
-    outputIntName: "exclusive"
-    outputIntName: "reverse"
     inputBooleanName: "exclusive"
     inputBooleanName: "reverse"
+    outputBooleanName: "exclusive"
+    outputBooleanName: "reverse"
     inputToOutput {
       key: "exclusive"
       value: "exclusive"
@@ -6188,18 +6207,6 @@ mappings {
         argType: BOOL
       }
     }
-    inputFrameworkOpName: "ZerosLike"
-  }
-  rule {
-    ruleName: "valuemapping"
-    functionName: "valuemapping"
-    outputIntName: "dataType"
-    inputDataTypeName: "T"
-    inputToOutput {
-      key: "dataType"
-      value: "T"
-    }
-    ruleType: "attribute"
     inputFrameworkOpName: "ZerosLike"
   }
 }
@@ -6320,6 +6327,18 @@ mappings {
       value: "updates"
     }
     ruleType: "tensor"
+    inputFrameworkOpName: "ScatterNdAdd"
+  }
+  rule {
+    ruleName: "valuemapping"
+    functionName: "valuemapping"
+    inputBooleanName: "use_locking"
+    outputBooleanName: "lock"
+    inputToOutput {
+      key: "lock"
+      value: "use_locking"
+    }
+    ruleType: "attribute"
     inputFrameworkOpName: "ScatterNdAdd"
   }
 }
@@ -6922,6 +6941,18 @@ mappings {
     ruleType: "tensor"
     inputFrameworkOpName: "ScatterNdUpdate"
   }
+  rule {
+    ruleName: "valuemapping"
+    functionName: "valuemapping"
+    inputBooleanName: "use_locking"
+    outputBooleanName: "lock"
+    inputToOutput {
+      key: "lock"
+      value: "use_locking"
+    }
+    ruleType: "attribute"
+    inputFrameworkOpName: "ScatterNdUpdate"
+  }
 }
 mappings {
   frameworkName: "tensorflow"
@@ -7228,17 +7259,6 @@ mappings {
       value: "num_segments"
     }
     ruleType: "tensor"
-    inputFrameworkOpName: "UnsortedSegmentSum"
-  }
-  rule {
-    ruleName: "ndarrayinputtonumericalattribute"
-    functionName: "ndarrayinputtonumericalattribute"
-    outputIntName: "numSegments"
-    inputToOutput {
-      key: "numSegments"
-      value: "num_segments"
-    }
-    ruleType: "attribute"
     inputFrameworkOpName: "UnsortedSegmentSum"
   }
 }
@@ -8275,6 +8295,18 @@ mappings {
     ruleType: "tensor"
     inputFrameworkOpName: "ScatterNdSub"
   }
+  rule {
+    ruleName: "valuemapping"
+    functionName: "valuemapping"
+    inputBooleanName: "use_locking"
+    outputBooleanName: "lock"
+    inputToOutput {
+      key: "lock"
+      value: "use_locking"
+    }
+    ruleType: "attribute"
+    inputFrameworkOpName: "ScatterNdSub"
+  }
 }
 mappings {
   frameworkName: "tensorflow"
@@ -9045,15 +9077,15 @@ mappings {
     functionName: "valuemapping"
     inputIntName: "axis"
     outputIntName: "dimensions"
-    outputIntName: "dataType"
     inputDataTypeName: "T"
-    inputToOutput {
-      key: "dataType"
-      value: "T"
-    }
+    outputDataTypeName: "dtype"
     inputToOutput {
       key: "dimensions"
       value: "axis"
+    }
+    inputToOutput {
+      key: "dtype"
+      value: "T"
     }
     ruleType: "attribute"
     inputFrameworkOpName: "OneHot"
@@ -9069,13 +9101,13 @@ mappings {
     inputTensorName: "x"
     inputTensorName: "perm"
     outputTensorName: "input"
-    outputTensorName: "permutationVector"
+    outputTensorName: "permuteDims"
     inputToOutput {
       key: "input"
       value: "x"
     }
     inputToOutput {
-      key: "permutationVector"
+      key: "permuteDims"
       value: "perm"
     }
     ruleType: "tensor"
@@ -9616,18 +9648,6 @@ mappings {
     ruleType: "attribute"
     inputFrameworkOpName: "Cast"
   }
-  rule {
-    ruleName: "datatypetoint"
-    functionName: "datatypetoint"
-    outputIntName: "dst"
-    inputDataTypeName: "DstT"
-    inputToOutput {
-      key: "dst"
-      value: "DstT"
-    }
-    ruleType: "attribute"
-    inputFrameworkOpName: "Cast"
-  }
 }
 mappings {
   frameworkName: "tensorflow"
@@ -9700,8 +9720,9 @@ mappings {
     ruleName: "valuemapping"
     functionName: "valuemapping"
     inputFloatName: "iou_threshold"
+    outputTensorName: "outputs"
     inputToOutput {
-      key: "iouThreshold"
+      key: "outputs"
       value: "iou_threshold"
     }
     ruleType: "attribute"
@@ -9891,6 +9912,7 @@ mappings {
     ruleName: "convertinputstringtondarray"
     functionName: "convertinputstringtondarray"
     inputStringAttrName: "message"
+    inputTensorName: "message"
     inputToOutput {
       key: "message"
       value: "message"
@@ -9933,34 +9955,36 @@ mappings {
     ruleType: "attribute"
     inputFrameworkOpName: "Max"
   }
-  rule {
-    ruleName: "ndarraytointattributevalue"
-    functionName: "ndarraytointattributevalue"
-    outputIntName: "dimensions"
-    inputToOutput {
-      key: "dimensions"
-      value: "reduction_indices"
-    }
-    ruleType: "attribute"
-    inputFrameworkOpName: "Max"
-  }
 }
 mappings {
   frameworkName: "tensorflow"
-  opName: "tensorarrayv3"
+  opName: "create_list"
   inputFrameworkOpName: "TensorArrayV3"
   rule {
-    ruleName: "datatypetoint"
-    functionName: "datatypetoint"
-    outputIntName: "dataType"
-    inputDataTypeName: "dtype"
+    ruleName: "multiinputindex"
+    functionName: "multiinputindex"
+    inputTensorName: "size"
+    outputTensorName: "input"
     inputToOutput {
-      key: "dataType"
+      key: "input"
+      value: "size"
+    }
+    ruleType: "tensor"
+    inputFrameworkOpName: "TensorArrayV3"
+  }
+  rule {
+    ruleName: "valuemapping"
+    functionName: "valuemapping"
+    inputDataTypeName: "dtype"
+    outputDataTypeName: "importDataType"
+    inputToOutput {
+      key: "importDataType"
       value: "dtype"
     }
     ruleType: "attribute"
     inputFrameworkOpName: "TensorArrayV3"
   }
+  variableResolutionType: OVERRIDE
 }
 mappings {
   frameworkName: "tensorflow"
@@ -10159,17 +10183,6 @@ mappings {
     inputToOutput {
       key: "keepDims"
       value: "keep_dims"
-    }
-    ruleType: "attribute"
-    inputFrameworkOpName: "Prod"
-  }
-  rule {
-    ruleName: "ndarraytointattributevalue"
-    functionName: "ndarraytointattributevalue"
-    outputIntName: "dimensions"
-    inputToOutput {
-      key: "dimensions"
-      value: "reduction_indices"
     }
     ruleType: "attribute"
     inputFrameworkOpName: "Prod"
@@ -10478,13 +10491,13 @@ mappings {
     inputTensorName: "images"
     inputTensorName: "size"
     outputTensorName: "image"
-    outputTensorName: "size"
+    outputTensorName: "newImageSize"
     inputToOutput {
       key: "image"
       value: "images"
     }
     inputToOutput {
-      key: "size"
+      key: "newImageSize"
       value: "size"
     }
     ruleType: "tensor"
@@ -11572,7 +11585,7 @@ mappings {
   rule {
     ruleName: "ndarrayinputtonumericalattribute"
     functionName: "ndarrayinputtonumericalattribute"
-    outputIntName: "k"
+    outputDoubleName: "k"
     inputToOutput {
       key: "k"
       value: "k"
@@ -11803,6 +11816,18 @@ mappings {
       value: "reduction_indices"
     }
     ruleType: "tensor"
+    inputFrameworkOpName: "All"
+  }
+  rule {
+    ruleName: "valuemapping"
+    functionName: "valuemapping"
+    inputBooleanName: "keep_dims"
+    outputBooleanName: "keepDims"
+    inputToOutput {
+      key: "keepDims"
+      value: "keep_dims"
+    }
+    ruleType: "attribute"
     inputFrameworkOpName: "All"
   }
 }
@@ -12572,7 +12597,7 @@ mappings {
     ruleName: "valuemapping"
     functionName: "valuemapping"
     inputIntName: "k"
-    outputIntName: "k"
+    outputDoubleName: "k"
     inputBooleanName: "sorted"
     outputBooleanName: "needSort"
     inputToOutput {
@@ -12619,7 +12644,7 @@ mappings {
     ruleName: "valuemapping"
     functionName: "valuemapping"
     inputIntName: "num_bits"
-    outputIntName: "numBits"
+    outputIntName: "num_bits"
     inputBooleanName: "narrow_range"
     outputBooleanName: "narrowed"
     inputToOutput {
@@ -12627,7 +12652,7 @@ mappings {
       value: "narrow_range"
     }
     inputToOutput {
-      key: "numBits"
+      key: "num_bits"
       value: "num_bits"
     }
     ruleType: "attribute"
@@ -12691,9 +12716,9 @@ mappings {
     ruleName: "multiinputindex"
     functionName: "multiinputindex"
     inputTensorName: "inputs"
-    outputTensorName: "inArrs"
+    outputTensorName: "i"
     inputToOutput {
-      key: "inArrs"
+      key: "i"
       value: "inputs"
     }
     ruleType: "tensor"
@@ -12989,8 +13014,8 @@ mappings {
   rule {
     ruleName: "invertbooleannumber"
     functionName: "invertbooleannumber"
-    outputIntName: "reverse"
     inputBooleanName: "reverse"
+    outputBooleanName: "reverse"
     inputToOutput {
       key: "reverse"
       value: "reverse"
@@ -13223,27 +13248,6 @@ mappings {
     inputFrameworkOpName: "Range"
   }
   rule {
-    ruleName: "ndarrayinputtonumericalattribute"
-    functionName: "ndarrayinputtonumericalattribute"
-    outputDoubleName: "from"
-    outputDoubleName: "to"
-    outputDoubleName: "step"
-    inputToOutput {
-      key: "from"
-      value: "start"
-    }
-    inputToOutput {
-      key: "step"
-      value: "delta"
-    }
-    inputToOutput {
-      key: "to"
-      value: "limit"
-    }
-    ruleType: "attribute"
-    inputFrameworkOpName: "Range"
-  }
-  rule {
     ruleName: "valuemapping"
     functionName: "valuemapping"
     inputDataTypeName: "Tidx"
@@ -13282,17 +13286,6 @@ mappings {
       value: "value_range"
     }
     ruleType: "tensor"
-    inputFrameworkOpName: "HistogramFixedWidth"
-  }
-  rule {
-    ruleName: "ndarraytointattributevalue"
-    functionName: "ndarraytointattributevalue"
-    outputIntName: "nbins"
-    inputToOutput {
-      key: "nbins"
-      value: "nbins"
-    }
-    ruleType: "attribute"
     inputFrameworkOpName: "HistogramFixedWidth"
   }
 }
@@ -14376,17 +14369,6 @@ mappings {
     ruleType: "attribute"
     inputFrameworkOpName: "Mean"
   }
-  rule {
-    ruleName: "ndarraytointattributevalue"
-    functionName: "ndarraytointattributevalue"
-    outputIntName: "dimensions"
-    inputToOutput {
-      key: "dimensions"
-      value: "reduction_indices"
-    }
-    ruleType: "attribute"
-    inputFrameworkOpName: "Mean"
-  }
 }
 mappings {
   frameworkName: "tensorflow"
@@ -14611,17 +14593,6 @@ mappings {
     inputFrameworkOpName: "ConcatV2"
   }
   rule {
-    ruleName: "ndarrayinputtonumericalattribute"
-    functionName: "ndarrayinputtonumericalattribute"
-    outputIntName: "concatDimension"
-    inputToOutput {
-      key: "concatDimension"
-      value: "axis"
-    }
-    ruleType: "attribute"
-    inputFrameworkOpName: "ConcatV2"
-  }
-  rule {
     ruleName: "argdescriptorconstant"
     functionName: "argdescriptorconstant"
     inputBooleanName: "isDynamicAxis"
@@ -14706,6 +14677,18 @@ mappings {
       value: "reduction_indices"
     }
     ruleType: "tensor"
+    inputFrameworkOpName: "Any"
+  }
+  rule {
+    ruleName: "valuemapping"
+    functionName: "valuemapping"
+    inputBooleanName: "keep_dims"
+    outputBooleanName: "keepDims"
+    inputToOutput {
+      key: "keepDims"
+      value: "keep_dims"
+    }
+    ruleType: "attribute"
     inputFrameworkOpName: "Any"
   }
 }
@@ -14809,6 +14792,7 @@ mappings {
     ruleName: "listattributevaluelookuptoindex"
     functionName: "listattributevaluelookuptoindex"
     inputIntName: "index"
+    inputIntName: "ksizes"
     outputIntName: "ksizeRows"
     inputToOutput {
       key: "ksizeRows"
@@ -14829,6 +14813,7 @@ mappings {
     ruleName: "listattributevaluelookuptoindex"
     functionName: "listattributevaluelookuptoindex"
     inputIntName: "index"
+    inputIntName: "ksizes"
     outputIntName: "ksizeCols"
     inputToOutput {
       key: "ksizeCols"
@@ -14850,6 +14835,7 @@ mappings {
     ruleName: "listattributevaluelookuptoindex"
     functionName: "listattributevaluelookuptoindex"
     inputIntName: "index"
+    inputIntName: "strides"
     outputIntName: "kstrideRows"
     inputToOutput {
       key: "kstrideRows"
@@ -14871,6 +14857,7 @@ mappings {
     ruleName: "listattributevaluelookuptoindex"
     functionName: "listattributevaluelookuptoindex"
     inputIntName: "index"
+    inputIntName: "strides"
     outputIntName: "kstrideCols"
     inputToOutput {
       key: "kstrideCols"
@@ -14892,6 +14879,7 @@ mappings {
     ruleName: "listattributevaluelookuptoindex"
     functionName: "listattributevaluelookuptoindex"
     inputIntName: "index"
+    inputIntName: "rates"
     outputIntName: "krateRows"
     inputToOutput {
       key: "krateRows"
@@ -14913,6 +14901,7 @@ mappings {
     ruleName: "listattributevaluelookuptoindex"
     functionName: "listattributevaluelookuptoindex"
     inputIntName: "index"
+    inputIntName: "rates"
     outputIntName: "krateCols"
     inputToOutput {
       key: "krateCols"
@@ -14935,7 +14924,7 @@ mappings {
     functionName: "stringequals"
     inputStringAttrName: "padding"
     inputStringAttrName: "padding"
-    outputIntName: "isSameMode"
+    outputBooleanName: "isSameMode"
     inputToOutput {
       key: "isSameMode"
       value: "padding"
@@ -14962,6 +14951,56 @@ mappings {
     }
     ruleType: "attribute"
     inputFrameworkOpName: "ExtractImagePatches"
+  }
+}
+mappings {
+  frameworkName: "tensorflow"
+  opName: "random_multinomial"
+  inputFrameworkOpName: "Multinomial"
+  rule {
+    ruleName: "ndarraymapping"
+    functionName: "ndarraymapping"
+    inputTensorName: "logits"
+    inputTensorName: "num_samples"
+    outputTensorName: "input"
+    outputTensorName: "inputSamples"
+    inputToOutput {
+      key: "input"
+      value: "logits"
+    }
+    inputToOutput {
+      key: "inputSamples"
+      value: "num_samples"
+    }
+    ruleType: "tensor"
+    inputFrameworkOpName: "Multinomial"
+  }
+  rule {
+    ruleName: "valuemapping"
+    functionName: "valuemapping"
+    inputDataTypeName: "output_dtype"
+    outputDataTypeName: "dtype"
+    inputToOutput {
+      key: "dtype"
+      value: "output_dtype"
+    }
+    ruleType: "attribute"
+    inputFrameworkOpName: "Multinomial"
+  }
+  rule {
+    ruleName: "argdescriptorconstant"
+    functionName: "argdescriptorconstant"
+    inputIntName: "dimC"
+    ruleType: "attribute"
+    transformerArgs {
+      key: "value"
+      transformerArgs {
+        name: "dimC"
+        int64Value: -1
+        argType: INT64
+      }
+    }
+    inputFrameworkOpName: "Multinomial"
   }
 }
 mappings {
@@ -15649,10 +15688,10 @@ mappings {
   rule {
     ruleName: "invertbooleannumber"
     functionName: "invertbooleannumber"
-    outputIntName: "exclusive"
-    outputIntName: "reverse"
     inputBooleanName: "exclusive"
     inputBooleanName: "reverse"
+    outputBooleanName: "exclusive"
+    outputBooleanName: "reverse"
     inputToOutput {
       key: "exclusive"
       value: "exclusive"

@@ -35,6 +35,11 @@ import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
 import org.deeplearning4j.nn.updater.MultiLayerUpdater;
 import org.deeplearning4j.nn.updater.UpdaterBlock;
 import org.deeplearning4j.nn.updater.graph.ComputationGraphUpdater;
+import org.deeplearning4j.optimize.api.ConvexOptimizer;
+import org.deeplearning4j.optimize.api.StepFunction;
+import org.deeplearning4j.optimize.solvers.StochasticGradientDescent;
+import org.deeplearning4j.optimize.stepfunctions.NegativeDefaultStepFunction;
+import org.deeplearning4j.optimize.stepfunctions.NegativeGradientStepFunction;
 import org.nd4j.common.base.Preconditions;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.factory.Nd4j;
@@ -455,7 +460,7 @@ public class NetworkUtils {
             long soFar = 0;
             for( int sub=0; sub<paramsMultiplier; sub++) {
                 //subsetUpdaterView: [m0, m1, m2] etc
-                INDArray subsetUpdaterView = updaterView.get(NDArrayIndex.interval(0, 0, true), NDArrayIndex.interval(soFar, soFar + nParamsInBlock));
+                INDArray subsetUpdaterView = updaterView.get(NDArrayIndex.interval(soFar, soFar + nParamsInBlock));
 
                 long offsetWithinSub = 0;
                 for (UpdaterBlock.ParamState ps : params) {
@@ -464,9 +469,9 @@ public class NetworkUtils {
                     INDArray pv = ps.getParamView();
                     long nParamsThisParam = pv.length();
 
-                    INDArray currSplit = subsetUpdaterView.get(NDArrayIndex.interval(0, 0, true), NDArrayIndex.interval(offsetWithinSub, offsetWithinSub + nParamsThisParam));
+                    INDArray currSplit = subsetUpdaterView.get(NDArrayIndex.interval(offsetWithinSub, offsetWithinSub + nParamsThisParam));
                     if(!stateViewsPerParam.containsKey(paramName))
-                        stateViewsPerParam.put(paramName, new ArrayList<INDArray>());
+                        stateViewsPerParam.put(paramName, new ArrayList<>());
                     stateViewsPerParam.get(paramName).add(currSplit);
                     offsetWithinSub += nParamsThisParam;
                 }
@@ -493,7 +498,7 @@ public class NetworkUtils {
             }
         }
         INDArray newUpdaterState = Nd4j.hstack(toConcat);
-        Preconditions.checkState(newUpdaterState.rank() == 2, "Expected rank 2");
+        Preconditions.checkState(newUpdaterState.rank() == 1, "Expected rank 2");
         Preconditions.checkState(origUpdaterState.length() == newUpdaterState.length(), "Updater state array lengths should be equal: got %s s. %s",
                 origUpdaterState.length(), newUpdaterState.length());
         return newUpdaterState;
@@ -510,4 +515,49 @@ public class NetworkUtils {
         }
     }
 
+    public static int getIterationCount(Model model) {
+        if (model instanceof MultiLayerNetwork) {
+            return ((MultiLayerNetwork) model).getLayerWiseConfigurations().getIterationCount();
+        } else if (model instanceof ComputationGraph) {
+            return ((ComputationGraph) model).getConfiguration().getIterationCount();
+        } else {
+            return model.conf().getIterationCount();
+        }
+    }
+
+    public static void incrementIterationCount(Model model, int incrementBy) {
+        if (model instanceof MultiLayerNetwork) {
+            MultiLayerConfiguration conf = ((MultiLayerNetwork) model).getLayerWiseConfigurations();
+            conf.setIterationCount(conf.getIterationCount() + incrementBy);
+        } else if (model instanceof ComputationGraph) {
+            ComputationGraphConfiguration conf = ((ComputationGraph) model).getConfiguration();
+            conf.setIterationCount(conf.getIterationCount() + incrementBy);
+        } else {
+            model.conf().setIterationCount(model.conf().getIterationCount() + incrementBy);
+        }
+    }
+
+    public static int getEpochCount(Model model) {
+        if (model instanceof MultiLayerNetwork) {
+            return ((MultiLayerNetwork) model).getLayerWiseConfigurations().getEpochCount();
+        } else if (model instanceof ComputationGraph) {
+            return ((ComputationGraph) model).getConfiguration().getEpochCount();
+        } else {
+            return model.conf().getEpochCount();
+        }
+    }
+
+    public static StepFunction getDefaultStepFunctionForOptimizer(Class<? extends ConvexOptimizer> optimizerClass) {
+        if (optimizerClass == StochasticGradientDescent.class) {
+            return new NegativeGradientStepFunction();
+        } else {
+            return new NegativeDefaultStepFunction();
+        }
+    }
+
+    public static void applyConstraints(Model model) {
+        int iter = getIterationCount(model);
+        int epoch = getEpochCount(model);
+        model.applyConstraints(iter, epoch);
+    }
 }

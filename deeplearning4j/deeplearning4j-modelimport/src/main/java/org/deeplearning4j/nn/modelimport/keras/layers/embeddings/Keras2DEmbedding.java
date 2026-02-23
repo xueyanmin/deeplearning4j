@@ -23,16 +23,15 @@ package org.deeplearning4j.nn.modelimport.keras.layers.embeddings;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.extern.slf4j.Slf4j;
-import org.deeplearning4j.nn.api.layers.LayerConstraint;
-import org.deeplearning4j.nn.conf.InputPreProcessor;
-import org.deeplearning4j.nn.conf.RNNFormat;
-import org.deeplearning4j.nn.conf.inputs.InputType;
-import org.deeplearning4j.nn.conf.layers.EmbeddingLayer;
-import org.deeplearning4j.nn.conf.layers.EmbeddingSequenceLayer;
 import org.deeplearning4j.nn.modelimport.keras.KerasLayer;
 import org.deeplearning4j.nn.modelimport.keras.exceptions.InvalidKerasConfigurationException;
 import org.deeplearning4j.nn.modelimport.keras.exceptions.UnsupportedKerasConfigurationException;
+import org.deeplearning4j.nn.api.layers.LayerConstraint;
+import org.deeplearning4j.nn.conf.InputPreProcessor;
+import org.deeplearning4j.nn.conf.inputs.InputType;
+import org.deeplearning4j.nn.conf.layers.EmbeddingLayer;
 import org.deeplearning4j.nn.modelimport.keras.utils.KerasConstraintUtils;
+import org.deeplearning4j.nn.modelimport.keras.utils.KerasInitilizationUtils;
 import org.deeplearning4j.nn.modelimport.keras.utils.KerasLayerUtils;
 import org.deeplearning4j.nn.params.DefaultParamInitializer;
 import org.deeplearning4j.nn.weights.IWeightInit;
@@ -43,9 +42,6 @@ import org.nd4j.linalg.factory.Nd4j;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-
-import static org.deeplearning4j.nn.modelimport.keras.utils.KerasInitilizationUtils.getWeightInitFromConfig;
-import static org.deeplearning4j.nn.modelimport.keras.utils.KerasLayerUtils.getNOutFromConfig;
 
 /**
  * Imports an Embedding layer from Keras.
@@ -110,14 +106,14 @@ public class Keras2DEmbedding extends KerasLayer {
                     "in DL4J, apply masking as a pre-processing step to your input." +
                     "See https://deeplearning4j.konduit.ai/models/recurrent#masking-one-to-many-many-to-one-and-sequence-classification for more on this.");
 
-        IWeightInit init = getWeightInitFromConfig(layerConfig,
+        IWeightInit init = KerasInitilizationUtils.getWeightInitFromConfig(layerConfig,
                 conf.getLAYER_FIELD_EMBEDDING_INIT(),
                 enforceTrainingConfig,
                 conf, kerasMajorVersion);
 
         LayerConstraint embeddingConstraint = KerasConstraintUtils.getConstraintsFromConfig(
                 layerConfig, conf.getLAYER_FIELD_EMBEDDINGS_CONSTRAINT(), conf, kerasMajorVersion);
-        int nOutFromConfig = getNOutFromConfig(layerConfig, conf);
+        int nOutFromConfig = KerasLayerUtils.getNOutFromConfig(layerConfig, conf);
         EmbeddingLayer.Builder builder = new EmbeddingLayer.Builder()
                 .name(this.layerName)
                 .nIn(inputDim)

@@ -21,10 +21,14 @@
 package org.deeplearning4j.datasets.iterator.impl;
 
 import lombok.Getter;
+import org.deeplearning4j.common.resources.DL4JResources;
+import org.deeplearning4j.common.resources.ResourceType;
 import org.deeplearning4j.datasets.fetchers.EmnistDataFetcher;
+import org.eclipse.deeplearning4j.resources.utils.EMnistSet;
 import org.nd4j.linalg.dataset.api.DataSetPreProcessor;
 import org.nd4j.linalg.dataset.api.iterator.BaseDatasetIterator;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -50,31 +54,24 @@ public class EmnistDataSetIterator extends BaseDatasetIterator {
     private static final int NUM_MNIST_TEST = 10000;
 
     private static final char[] LABELS_COMPLETE = new char[] {48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 65, 66, 67, 68,
-                    69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 97, 98, 99,
-                    100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119,
-                    120, 121, 122};
+            69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 97, 98, 99,
+            100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119,
+            120, 121, 122};
 
     private static final char[] LABELS_MERGE = new char[] {48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 65, 66, 67, 68, 69,
-                    70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 97, 98, 100,
-                    101, 102, 103, 104, 110, 113, 114, 116};
+            70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 97, 98, 100,
+            101, 102, 103, 104, 110, 113, 114, 116};
 
     private static final char[] LABELS_BALANCED = new char[] {48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 65, 66, 67, 68,
-                    69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 97, 98, 100,
-                    101, 102, 103, 104, 110, 113, 114, 116};
+            69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 97, 98, 100,
+            101, 102, 103, 104, 110, 113, 114, 116};
 
     private static final char[] LABELS_DIGITS = new char[] {48, 49, 50, 51, 52, 53, 54, 55, 56, 57};
 
     private static final char[] LABELS_LETTERS = new char[] {65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79,
-                    80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90};
+            80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90};
 
-    /**
-     * EMNIST dataset has multiple different subsets. See {@link EmnistDataSetIterator} Javadoc for details.
-     */
-    public enum Set {
-        COMPLETE, MERGE, BALANCED, LETTERS, DIGITS, MNIST
-    }
-
-    protected Set dataSet;
+    protected EMnistSet dataSet;
     protected int batch, numExamples;
     @Getter
     protected DataSetPreProcessor preProcessor;
@@ -87,7 +84,7 @@ public class EmnistDataSetIterator extends BaseDatasetIterator {
      * @param train   If true: use training set. If false: use test set
      * @throws IOException If an error occurs when loading/downloading the dataset
      */
-    public EmnistDataSetIterator(Set dataSet, int batch, boolean train) throws IOException {
+    public EmnistDataSetIterator(EMnistSet dataSet, int batch, boolean train) throws IOException {
         this(dataSet, batch, train, System.currentTimeMillis());
     }
 
@@ -99,7 +96,7 @@ public class EmnistDataSetIterator extends BaseDatasetIterator {
      * @param train     If true: use training set. If false: use test set
      * @param seed      Random number generator seed
      */
-    public EmnistDataSetIterator(Set dataSet, int batchSize, boolean train, long seed) throws IOException {
+    public EmnistDataSetIterator(EMnistSet dataSet, int batchSize, boolean train, long seed) throws IOException {
         this(dataSet, batchSize, false, train, true, seed);
     }
 
@@ -112,13 +109,28 @@ public class EmnistDataSetIterator extends BaseDatasetIterator {
      * @param shuffle  whether to shuffle the examples
      * @param rngSeed  random number generator seed to use when shuffling examples
      */
-    public EmnistDataSetIterator(Set dataSet, int batch, boolean binarize, boolean train, boolean shuffle, long rngSeed)
+    public EmnistDataSetIterator(EMnistSet dataSet, int batch, boolean binarize, boolean train, boolean shuffle, long rngSeed, File topLevelDir)
             throws IOException {
         super(batch, numExamples(train, dataSet), new EmnistDataFetcher(dataSet, binarize, train, shuffle, rngSeed));
         this.dataSet = dataSet;
     }
 
-    private static int numExamples(boolean train, Set ds) {
+
+    /**
+     * Get the specified number of MNIST examples (test or train set), with optional shuffling and binarization.
+     *
+     * @param batch    Size of each minibatch
+     * @param binarize whether to binarize the data or not (if false: normalize in range 0 to 1)
+     * @param train    Train vs. test set
+     * @param shuffle  whether to shuffle the examples
+     * @param rngSeed  random number generator seed to use when shuffling examples
+     */
+    public EmnistDataSetIterator(EMnistSet dataSet, int batch, boolean binarize, boolean train, boolean shuffle, long rngSeed)
+            throws IOException {
+        this(dataSet,batch,binarize,train,shuffle,rngSeed, DL4JResources.getDirectory(ResourceType.DATASET,"emnist"));
+    }
+
+    private static int numExamples(boolean train, EMnistSet ds) {
         if (train) {
             return numExamplesTrain(ds);
         } else {
@@ -132,7 +144,7 @@ public class EmnistDataSetIterator extends BaseDatasetIterator {
      * @param dataSet Subset to get
      * @return Number of examples for the specified subset
      */
-    public static int numExamplesTrain(Set dataSet) {
+    public static int numExamplesTrain(EMnistSet dataSet) {
         switch (dataSet) {
             case COMPLETE:
                 return NUM_COMPLETE_TRAIN;
@@ -157,7 +169,7 @@ public class EmnistDataSetIterator extends BaseDatasetIterator {
      * @param dataSet Subset to get
      * @return Number of examples for the specified subset
      */
-    public static int numExamplesTest(Set dataSet) {
+    public static int numExamplesTest(EMnistSet dataSet) {
         switch (dataSet) {
             case COMPLETE:
                 return NUM_COMPLETE_TEST;
@@ -182,7 +194,7 @@ public class EmnistDataSetIterator extends BaseDatasetIterator {
      * @param dataSet Subset to get
      * @return Number of labels for the specified subset
      */
-    public static int numLabels(Set dataSet) {
+    public static int numLabels(EMnistSet dataSet) {
         switch (dataSet) {
             case COMPLETE:
                 return 62;
@@ -225,7 +237,7 @@ public class EmnistDataSetIterator extends BaseDatasetIterator {
      * @param dataSet DataSet to get the label assignment for
      * @return Label assignment and given dataset
      */
-    public static char[] getLabelsArray(Set dataSet) {
+    public static char[] getLabelsArray(EMnistSet dataSet) {
         switch (dataSet) {
             case COMPLETE:
                 return LABELS_COMPLETE;
@@ -249,7 +261,7 @@ public class EmnistDataSetIterator extends BaseDatasetIterator {
      * @param dataSet DataSet to get the label assignment for
      * @return Label assignment and given dataset
      */
-    public static List<String> getLabels(Set dataSet) {
+    public static List<String> getLabels(EMnistSet dataSet) {
         char[] c = getLabelsArray(dataSet);
         List<String> l = new ArrayList<>(c.length);
         for (char c2 : c) {
@@ -264,7 +276,7 @@ public class EmnistDataSetIterator extends BaseDatasetIterator {
      * @param dataSet Set to get balanced value for
      * @return True if balanced dataset, false otherwise
      */
-    public static boolean isBalanced(Set dataSet) {
+    public static boolean isBalanced(EMnistSet dataSet) {
         switch (dataSet) {
             case COMPLETE:
             case MERGE:

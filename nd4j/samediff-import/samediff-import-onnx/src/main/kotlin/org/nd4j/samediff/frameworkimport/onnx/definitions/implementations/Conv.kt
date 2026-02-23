@@ -40,6 +40,7 @@ import org.nd4j.samediff.frameworkimport.hooks.annotations.PreHookRule
 import org.nd4j.samediff.frameworkimport.registry.OpMappingRegistry
 import org.nd4j.shade.protobuf.GeneratedMessageV3
 import org.nd4j.shade.protobuf.ProtocolMessageEnum
+import onnx.Onnx
 
 /**
  * A port of cast.py from onnx tensorflow for samediff:
@@ -56,30 +57,47 @@ class Conv : PreImportHook  {
         outputNames: List<String>,
         op: SameDiffOp,
         mappingRegistry: OpMappingRegistry<GeneratedMessageV3, GeneratedMessageV3, GeneratedMessageV3, GeneratedMessageV3, ProtocolMessageEnum, GeneratedMessageV3, GeneratedMessageV3>,
-        importGraph: ImportGraph<GeneratedMessageV3, GeneratedMessageV3, GeneratedMessageV3, GeneratedMessageV3, GeneratedMessageV3, GeneratedMessageV3, ProtocolMessageEnum>
+        importGraph: ImportGraph<GeneratedMessageV3, GeneratedMessageV3, GeneratedMessageV3, GeneratedMessageV3, GeneratedMessageV3, GeneratedMessageV3, ProtocolMessageEnum>,
+        dynamicVariables: Map<String, GeneratedMessageV3>
     ): Map<String, List<SDVariable>> {
         val inWeights = sd.getVariable(op.inputsToOp[1])
-        val weightsRank = inWeights.shape.size
+
+        // Get weights shape from ONNX tensor proto in dynamicVariables
+        val weightsName = op.inputsToOp[1]
+        val weightsTensor = dynamicVariables[weightsName] as? Onnx.TensorProto
+        val weightsShape = if (weightsTensor != null && weightsTensor.dimsCount > 0) {
+            weightsTensor.dimsList.map { it }.toLongArray()
+        } else {
+            throw IllegalStateException("Cannot determine weights shape for Conv op: $weightsName not found in dynamicVariables")
+        }
+        val weightsRank = weightsShape.size
 
         var inputVariable = sd.getVariable(op.inputsToOp[0])
         val rank = weightsRank
-        val xShape = inputVariable.shape
+
+        // Get input shape from ONNX tensor proto if available
+        val inputName = op.inputsToOp[0]
+        val inputTensor = dynamicVariables[inputName] as? Onnx.TensorProto
+        val xShape = if (inputTensor != null && inputTensor.dimsCount > 0) {
+            inputTensor.dimsList.map { it }.toLongArray()
+        } else {
+            null // Input might be dynamic (from previous op output)
+        }
         val spatialSize = rank - 2
         val storageComputeFormat = ImportUtils.getDataFormat(rank)
         val computeIndex = storageComputeFormat.second.indexOf('C')
         val spatialFormat = StringUtils.join(storageComputeFormat.second.filter { input -> input == 'C' || input == 'W' })
 
-        val perm = (2 to weightsRank - 1).toList() + listOf(1,0)
+        val perm = ((2 to weightsRank - 1).toList() + listOf(1,0)).map { input -> input.toLong() }.toLongArray()
         val kernelShape = if(attributes.containsKey("kernel_shape")) {
             val kernelShapeList = attributes["kernel_shape"] as List<Int>
             kernelShapeList.map { input -> input }.toIntArray()
         } else {
-            val weightsShape = inWeights.shape
             weightsShape.map { input -> input.toInt() }.toIntArray()
         }
 
-        var weights = sd.permute(inWeights,*perm.toIntArray())
-        var inWeightsShape = ArrayUtil.permute(ArrayUtil.copy(inWeights.shape),perm.toIntArray())
+        var weights = sd.permute(inWeights,*perm)
+        var inWeightsShape = ArrayUtil.permute(ArrayUtil.copy(weightsShape),perm)
         val dilations = if(attributes.containsKey("dilations")) {
             val dilationsList = attributes["dilations"] as List<Int>
             val dilationsArr = dilationsList
@@ -143,7 +161,7 @@ class Conv : PreImportHook  {
             val depthWiseFilterShape = mutableListOf<Int>()
             for(i in 0 until 2) depthWiseFilterShape.add(inWeightsShape[i].toInt())
             depthWiseFilterShape.add(-1)
-            depthWiseFilterShape.add(Math.floorDiv(weights.shape[3].toInt(),groups.toInt()))
+            depthWiseFilterShape.add(Math.floorDiv(inWeightsShape[3].toInt(),groups.toInt()))
             weights = weights.reshape(*depthWiseFilterShape.toIntArray())
             inputVariable = sd.permute(inputVariable,*ImportUtils.getPermFromFormats(storageComputeFormat.first,storageComputeFormat.second))
             xs.add(inputVariable)
@@ -283,12 +301,6 @@ class Conv : PreImportHook  {
         }
 
 
-        //remove old op: as there is no 1 to 1 relationship
-        //when saving the model it will throw a nullpointer exception
-        //with a not fully configured op. The convolution operation
-        //in this model replaces the 1 to 1 intended call
-        //otherwise used.
-        sd.ops.remove(op.name)
 
         //grouped convolutions need to handle bias differently
         if(op.inputsToOp.size > 2) {
@@ -396,7 +408,9 @@ class Conv : PreImportHook  {
         val adaptedPads = adaptPads(pads)
         val numDim = adaptedPads.size / 2
         val newPads = Nd4j.create(Nd4j.createBuffer(adaptedPads.toLongArray())).transpose().reshape('c',2,numDim)
-        val newPads2 = Nd4j.concat(0,Nd4j.create(Nd4j.createBuffer(longArrayOf(0,0,0,0))).reshape(4),newPads.ravel().reshape(newPads.length()))
+        val firstConcat = Nd4j.create(Nd4j.createBuffer(longArrayOf(0,0,0,0))).reshape(4)
+        val secondConcat = newPads.ravel()
+        val newPads2 = Nd4j.concat(0,firstConcat,secondConcat)
         val inputPadding = sd.constant(newPads2.reshape('c',numDim + 2,2).castTo(DataType.INT32))
         return sd.image().pad(x,inputPadding,Mode.CONSTANT,0.0)
     }

@@ -27,12 +27,128 @@
 #include <helpers/StringUtils.h>
 #include <ops/declarable/DeclarableOp.h>
 #include <ops/declarable/OpRegistrator.h>
+#include <array/DataTypeUtils.h>
+
+#if defined(SD_GCC_FUNCTRACE)
+#include <ops/declarable/OpExecutionLogger.h>
+#endif
 
 #include <cstdarg>
+#include <sstream>
 
 namespace sd {
 namespace ops {
-sd::Status conditionHelper(const char *file, int line, int condition, int argNumber, const char *format, ...) {
+
+/**
+ * Helper function to dump all stack traces for arrays and shape info in a Context.
+ * This is called when an exception occurs during op execution to aid in debugging.
+ */
+static std::string dumpContextStackTraces(Context* block, const char* opName) {
+  std::ostringstream oss;
+
+  oss << "\n========================================\n";
+  oss << "Exception in op: " << (opName ? opName : "unknown") << "\n";
+  oss << "ALLOCATION STACK TRACES:\n";
+  oss << "========================================\n\n";
+
+#if defined(SD_GCC_FUNCTRACE) && !defined(__JAVACPP_HACK__)
+  // Dump input array stack traces WITH ACTUAL ALLOCATION STACK TRACES
+  oss << "INPUT ARRAYS:\n";
+  oss << "-------------\n";
+  for (int i = 0; i < block->width(); i++) {
+#ifdef __cpp_exceptions
+    try {
+      NDArray* input = block->array(i);
+      if (input != nullptr) {
+        oss << "\nInput " << i << ":\n";
+        oss << "  Shape: " << ShapeUtils::shapeAsString(input) << "\n";
+        oss << "  Data type: " << DataTypeUtils::asString(input->dataType()) << "\n";
+
+        // Get the actual allocation stack trace from the NDArray's ConstantShapeBuffer
+        oss << "\n  ALLOCATION STACK TRACE:\n";
+        std::string stackTrace = input->shapeInfoConstBuffer()->getStackTraceAsString();
+        if (!stackTrace.empty()) {
+          oss << stackTrace;
+        } else {
+          oss << "  (No stack trace available)\n";
+        }
+        oss << "\n";
+      }
+    } catch (const std::exception& e) {
+      oss << "Input " << i << ": Error accessing array - " << e.what() << "\n\n";
+    }
+#else
+    NDArray* input = block->array(i);
+    if (input != nullptr) {
+      oss << "\nInput " << i << ":\n";
+      oss << "  Shape: " << ShapeUtils::shapeAsString(input) << "\n";
+      oss << "  Data type: " << DataTypeUtils::asString(input->dataType()) << "\n";
+
+      // Get the actual allocation stack trace from the NDArray's ConstantShapeBuffer
+      oss << "\n  ALLOCATION STACK TRACE:\n";
+      std::string stackTrace = input->shapeInfoConstBuffer()->getStackTraceAsString();
+      if (!stackTrace.empty()) {
+        oss << stackTrace;
+      } else {
+        oss << "  (No stack trace available)\n";
+      }
+      oss << "\n";
+    }
+#endif
+  }
+
+  // Dump output array info - CRASH-SAFE: output arrays may have garbage pointers during error handling
+  // DO NOT call outputArray() or shapeInfo() on outputs - they may crash on garbage _shapeInfoBuffer
+  // Only log pointer addresses which is safe even for corrupted arrays
+  oss << "\nOUTPUT ARRAYS (pointer addresses only - crash-safe during error handling):\n";
+  oss << "--------------\n";
+  auto& outVec = block->fastpath_out();
+  for (size_t i = 0; i < outVec.size(); i++) {
+    NDArray* output = outVec[i];
+    oss << "Output " << i << ": ptr=" << (void*)output << "\n";
+  }
+#else
+  oss << "Functrace not enabled - no stack traces available\n";
+  oss << "\nINPUT ARRAYS (basic info only):\n";
+  oss << "-------------\n";
+  for (int i = 0; i < block->width(); i++) {
+#ifdef __cpp_exceptions
+    try {
+      NDArray* input = block->array(i);
+      if (input != nullptr) {
+        oss << "Input " << i << ": ";
+        oss << "Shape: " << ShapeUtils::shapeAsString(input) << ", ";
+        oss << "Type: " << DataTypeUtils::asString(input->dataType()) << "\n";
+      }
+    } catch (const std::exception& e) {
+      oss << "Input " << i << ": Error - " << e.what() << "\n";
+    }
+#else
+    NDArray* input = block->array(i);
+    if (input != nullptr) {
+      oss << "Input " << i << ": ";
+      oss << "Shape: " << ShapeUtils::shapeAsString(input) << ", ";
+      oss << "Type: " << DataTypeUtils::asString(input->dataType()) << "\n";
+    }
+#endif
+  }
+
+  // Output arrays - CRASH-SAFE: only log pointer addresses
+  // DO NOT call outputArray() or shapeInfo() - they may crash on garbage _shapeInfoBuffer
+  oss << "\nOUTPUT ARRAYS (pointer addresses only - crash-safe during error handling):\n";
+  oss << "--------------\n";
+  auto& outVec2 = block->fastpath_out();
+  for (size_t i = 0; i < outVec2.size(); i++) {
+    NDArray* output = outVec2[i];
+    oss << "Output " << i << ": ptr=" << (void*)output << "\n";
+  }
+#endif
+
+  oss << "========================================\n";
+  return oss.str();
+}
+
+ErrorResult conditionHelper(const char *file, int line, int condition, int argNumber, const char *format, ...) {
   if (!condition) {
     va_list args;
 
@@ -42,10 +158,13 @@ sd::Status conditionHelper(const char *file, int line, int condition, int argNum
     va_end(args);
     printf("\n");
     fflush(stdout);
-
-    return sd::Status::BAD_PARAMS;
+    ErrorResult errorResult;
+    errorResult.status = Status::BAD_ARGUMENTS;
+    return errorResult;
   }
-  return sd::Status::OK;
+  ErrorResult errorResult;
+  errorResult.status = Status::OK;
+  return errorResult;
 }
 
 DeclarableOp::DeclarableOp() {
@@ -101,11 +220,11 @@ sd::NDArray *sd::ops::DeclarableOp::getZ(Context &ctx, int inputId) {
   NDArray *z = nullptr;
 
   if (ctx.isFastPath()) {
-    if (ctx.fastpath_out().size() <= inputId) {
+    if (ctx.fastpath_out().size() <= static_cast<size_t>(inputId)) {
       if (ctx.isInplace()) {
         z = ctx.fastpath_in()[inputId];
       } else
-        throw std::runtime_error("fastpath_out: unresolved output array");
+        THROW_EXCEPTION("fastpath_out: unresolved output array");
     } else {
       z = ctx.fastpath_out()[inputId];
     }
@@ -133,8 +252,7 @@ sd::NDArray *sd::ops::DeclarableOp::getZ(Context &ctx, int inputId) {
         sd_printf("Can't get Z variable for node_%i!\n", ctx.nodeId());
       }
     } else {
-      sd_printf("BOOM!\n", "");
-      throw std::runtime_error("Boom!");
+      THROW_EXCEPTION("getZ: Unable to return z variable!");
     }
   }
 
@@ -218,7 +336,6 @@ int sd::ops::DeclarableOp::prepareOutputs(Context &ctx) {
 
     if (Environment::getInstance().isProfiling() && node != nullptr) inputStart = std::chrono::system_clock::now();
 
-    int cntIn = 0;
     // we build list of input shapes
     if (fp) {
       for (const auto p : ctx.fastpath_in()) {
@@ -230,8 +347,9 @@ int sd::ops::DeclarableOp::prepareOutputs(Context &ctx) {
         auto var = ctx.variable(p);
         if (var->variableType() == VariableType::NDARRAY) {
           NDArray *array = var->getNDArray();
+          var->markRemovable(false);
           if (array == nullptr)
-            throw unresolved_input_exception::build("Variable wasn't resolved prior shape calculation", p);
+            THROW_EXCEPTION(unresolved_input_exception::build("OP PREPARE OUTPUTS: Variable wasn't resolved prior shape calculation", p).what());
 
           inSha.push_back(array->shapeInfo());
 
@@ -240,9 +358,9 @@ int sd::ops::DeclarableOp::prepareOutputs(Context &ctx) {
         } else {
           canUseFastPath = false;
         }
-        cntIn++;
       }
     }
+
 
     // if we override shape function, we'll return size of fastPath
     if (fp && ctx.shapeFunctionOverride()) {
@@ -261,7 +379,31 @@ int sd::ops::DeclarableOp::prepareOutputs(Context &ctx) {
       shapeStart = std::chrono::system_clock::now();
     }
 
+
     auto outSha = this->calculateOutputShape(&inSha, ctx);
+    if (sd::Environment::getInstance().isDebugAndVerbose()) {
+      sd_printf("Node_%i: %s\n", ctx.nodeId(), this->getOpDescriptor()->getOpName()->c_str());
+      sd_printf("Input shapes:\n",0);
+      for (int e = 0; e < inSha.size(); e++) {
+        if (inSha.at(e) != nullptr) {
+          sd_printf("Shape_%i: ", e);
+          shape::printShapeInfoLinear(inSha.at(e));
+        } else {
+          sd_printf("Shape_%i: nullptr\n", e);
+        }
+      }
+      sd_printf("Output shapes:\n",0);
+      for (int e = 0; e < outSha->size(); e++) {
+        if (outSha->at(e) != nullptr) {
+          sd_printf("Shape_%i: ", e);
+          shape::printShapeInfoLinear(outSha->at(e));
+        } else {
+          sd_printf("Shape_%i: nullptr\n", e);
+        }
+      }
+    }
+
+
     results = outSha->size();
 
     // optionally saving shapeTime
@@ -277,15 +419,15 @@ int sd::ops::DeclarableOp::prepareOutputs(Context &ctx) {
     }
 
     int cnt = 0;
-
-    for (auto out : *outSha->asVector()) {
+    for (int jj = 0; jj < outSha->size(); jj++) {
+      auto out = outSha->at(jj);
       if (!fp) {
         // we need to check, if Z is really needed
         std::pair<int, int> pair(ctx.nodeId(), cnt++);
 
         if (!ctx.isValueAvailable(pair.second)) {
           if (Environment::getInstance().isDebugAndVerbose())
-            shape::printShapeInfoLinear("Going to create variable with shape", out);
+            shape::printShapeInfoLinear("OP PREPARE OUTPUTS: Going to create variable with shape", out);
 
           // we're creating non-initialized array here
           auto outArr = new NDArray(out, true, ctx.launchContext(), false);
@@ -300,32 +442,41 @@ int sd::ops::DeclarableOp::prepareOutputs(Context &ctx) {
 
           if (canUseFastPath) ctx.setOutputArray(pair.second, var->getNDArray());
 
-          if (!shape::equalsSoft(out, shape) || shape::isEmpty(out) != shape::isEmpty(shape)) {
+          // note we only compare the shapes here not the shape info which may
+          // have extra information attached to it. We compare data types and empty status down below.
+          // sometimes empty strides (that don't actually matter) can cause errors, we omit this on purpose
+          if (!shape::equalsSoft(out, shape)) {
             auto eShape = ShapeUtils::shapeAsString(out);
             auto aShape = ShapeUtils::shapeAsString(shape);
             auto eShapeInfoString = ShapeUtils::shapeInfoAsString(out);
             auto aShapeInfoString = ShapeUtils::shapeInfoAsString(shape);
-            // outSha->destroy();
             delete outSha;
 
             sd_printf(
-                "Expected vs provided shapes mismatch %s vs %s at index %i with expected shape info %s and output "
+                "OP PREPARE OUTPUTS: Op name: %s Failed to set output for op context. Expected vs provided shapes mismatch %s vs %s at index %i with expected shape info %s and output "
                 "shape info %s\n",
-                eShape.c_str(), aShape.c_str(), pair.second, eShapeInfoString.c_str(), aShapeInfoString.c_str());
+                getOpName()->c_str(),eShape.c_str(), aShape.c_str(), pair.second, eShapeInfoString.c_str(), aShapeInfoString.c_str());
 
-            throw std::runtime_error("Expected vs provided shapes mismatch");
+            THROW_EXCEPTION("OP PREPARE OUTPUTS: Expected vs provided shapes mismatch first case");
+          }
+
+          if (shape::isEmptyConst(out) != shape::isEmptyConst(shape)) {
+            sd_printf("OP PREPARE OUTPUTS: First array empty: %d Second shape empty: %d\n", shape::isEmptyConst(out), shape::isEmptyConst(shape));
+            delete outSha;
+            THROW_EXCEPTION("OP PREPARE OUTPUTS: Expected vs provided shapes mismatch");
           }
 
           // checking out data type equality
           if (ArrayOptions::dataType(out) != ArrayOptions::dataType(shape)) {
             std::string msg =
                 "Provided array [" + StringUtils::valueToString<int>(pair.second) + "] has unexpected data type";
-            throw sd::datatype_exception::build(msg, ArrayOptions::dataType(out), ArrayOptions::dataType(shape));
+            delete outSha;
+            THROW_EXCEPTION(sd::datatype_exception::build(msg, ArrayOptions::dataType(out), ArrayOptions::dataType(shape)).what());
           }
         }
       } else {
         auto fout = ctx.fastpath_out();
-        auto idx = cnt++;
+        size_t idx = cnt++;
         if (fout.size() <= idx) {
           // array doesnt exist
           auto outArr = new NDArray(out, true, ctx.launchContext());
@@ -335,21 +486,20 @@ int sd::ops::DeclarableOp::prepareOutputs(Context &ctx) {
           int shapeEquals = shape::equalsSoft(out, array->shapeInfo());
           int arrayEmpty = array->isEmpty();
           // checking out shape equality
-          if (!shapeEquals || arrayEmpty) {
+          if (!shapeEquals) {
             auto eShape = ShapeUtils::shapeAsString(out);
             auto aShape = ShapeUtils::shapeAsString(array->shapeInfo());
             auto eShapeInfoString = ShapeUtils::shapeInfoAsString(out);
             auto aShapeInfoString = ShapeUtils::shapeInfoAsString(array->shapeInfo());
             if (eShapeInfoString != aShapeInfoString) {
-              // outSha->destroy();
               delete outSha;
 
               sd_printf(
-                  "Expected vs provided shapes mismatch %s vs %s at index %i with expected shape info %s and output "
+                  "OP PREPARE OUTPUTS: OP name: %s Expected vs provided shapes mismatch %s vs %s at index %i with expected shape info %s and output "
                   "shape info %s. Conditions, shapeEquals: %d, array empty: %d\n",
-                  eShape.c_str(), aShape.c_str(), idx, eShapeInfoString.c_str(), aShapeInfoString.c_str(), shapeEquals,
+                  getOpName()->c_str(),eShape.c_str(), aShape.c_str(), idx, eShapeInfoString.c_str(), aShapeInfoString.c_str(), shapeEquals,
                   arrayEmpty);
-              throw std::runtime_error("Output array did not match expected shape.");
+              THROW_EXCEPTION("Output array did not match expected shape.");
             }
           }
         }
@@ -392,32 +542,83 @@ bool sd::ops::DeclarableOp::allocateResult(Context &block, sd::LongType *shape) 
 
   // if that's first run - we probably have nothing here
   if (var->getNDArray() == nullptr) {
-    std::shared_ptr<DataBuffer> buffer =
-        std::make_shared<DataBuffer>(len * sizeof(int8_t), ArrayOptions::dataType(__shape), workspace);
-    var->setNDArray(new NDArray(buffer, ShapeDescriptor(__shape), block.launchContext()));
+    auto shapeInfo = ConstantShapeHelper::getInstance().bufferForShapeInfo(__shape)->primary();
+    RELEASE(__shape, workspace);
+    DataBuffer * buffer = nullptr;
+#ifdef __cpp_exceptions
+    try {
+      buffer = new DataBuffer(len * sizeof(int8_t), ArrayOptions::dataType(shapeInfo), workspace);
+      var->setNDArray(new NDArray(buffer, shapeInfo, block.launchContext()));
+    } catch (...) {
+      // Clean up buffer if NDArray construction fails
+      if (buffer != nullptr) {
+        delete buffer;
+      }
+      throw;
+    }
+#else
+    buffer = new DataBuffer(len * sizeof(int8_t), ArrayOptions::dataType(shapeInfo), workspace);
+    var->setNDArray(new NDArray(buffer, shapeInfo, block.launchContext()));
+#endif
   } else if (var->getNDArray()->lengthOf() != len) {
     // if length not match - lets reallocate array
     delete var->getNDArray();
-    std::shared_ptr<DataBuffer> buffer =
-        std::make_shared<DataBuffer>(len * sizeof(int8_t), ArrayOptions::dataType(__shape), workspace);
-    var->setNDArray(new NDArray(buffer, ShapeDescriptor(__shape), block.launchContext()));
+    auto shapeInfo = ConstantShapeHelper::getInstance().bufferForShapeInfo(__shape)->primary();
+    DataBuffer * buffer = nullptr;
+#ifdef __cpp_exceptions
+    try {
+      buffer = new DataBuffer(len * sizeof(int8_t), ArrayOptions::dataType(shapeInfo), workspace);
+      var->setNDArray(new NDArray(buffer, shapeInfo, block.launchContext()));
+    } catch (...) {
+      // Clean up buffer if NDArray construction fails
+      if (buffer != nullptr) {
+        delete buffer;
+      }
+      RELEASE(__shape, workspace);
+      throw;
+    }
+#else
+    buffer = new DataBuffer(len * sizeof(int8_t), ArrayOptions::dataType(shapeInfo), workspace);
+    var->setNDArray(new NDArray(buffer, shapeInfo, block.launchContext()));
+#endif
+    RELEASE(__shape, workspace);
+  } else {
+    RELEASE(__shape, workspace);
   }
 
   return true;
+}
+
+
+void sd::ops::DeclarableOp::DeclarableOp::traceExecIfNeeded(Context &block) {
+  if(OpRegistrator::getInstance().traceOps()) {
+    std::vector<const LongType *> *inputShapeBuffers = new std::vector<const LongType *>();
+    for(size_t i = 0; i < block.width(); i++) {
+      inputShapeBuffers->push_back(block.variable(i)->getNDArray()->shapeInfo());
+    }
+    std::vector<const LongType *> *outputShapeBuffers = new std::vector<const LongType *>();
+    for(size_t i = 0; i < block.outputWidth(); i++) {
+      outputShapeBuffers->push_back(block.fastpath_out()[i]->shapeInfo());
+    }
+
+    OpExecTrace *opExecTrace = new OpExecTrace(inputShapeBuffers,outputShapeBuffers, getOpName());
+    OpRegistrator::getInstance().registerOpExec(opExecTrace);
+  }
 }
 
 bool sd::ops::DeclarableOp::allocateResult(Context &block, std::initializer_list<sd::LongType> &shape, char order) {
   auto var = block.variable(block.getNodeId(), 0);
   auto workspace = block.getWorkspace();
 
+  std::vector<sd::LongType> shape2 = shape;
   sd::LongType len = shape::length(shape);
   // if that's first run - we probably have nothing here
   if (var->getNDArray() == nullptr) {
-    var->setNDArray(new NDArray(order, shape, block.dataType(), block.launchContext()));
+    var->setNDArray(new NDArray(order, shape2, block.dataType(), block.launchContext()));
   } else if (var->getNDArray()->lengthOf() != len) {
     // if length not match - lets reallocate array
     delete var->getNDArray();
-    var->setNDArray(new NDArray(order, shape, block.dataType(), block.launchContext()));
+    var->setNDArray(new NDArray(order, shape2, block.dataType(), block.launchContext()));
   }
 
   return true;
@@ -432,39 +633,75 @@ sd::Status sd::ops::DeclarableOp::validateDataTypes(Context &block) {
   _registrator.unlock();
 
   // rolling over inputs first
-  int cnt = 0, inT = 0;
+  size_t cnt = 0, inT = 0;
   std::vector<sd::DataType> inputTypes(block.width());
   if (block.isFastPath()) {
     for (auto array : block.fastpath_in()) {
-      if (array == nullptr) continue;
+      if (array == nullptr) {
+        continue;
+      }
 
-      inputTypes[inT++] = array->dataType();
-      if (!_descriptor->checkInputMatch(cnt, array->dataType())) {
-        auto ctype = DataTypeUtils::asString(array->dataType());
-        sd_printf("Op [%s] failed check for input [%i], DataType: [%s]\n", _descriptor->getOpName()->data(), cnt,
-                  ctype.c_str());
-        return sd::Status::BAD_ARGUMENTS;
+      auto dtype = array->dataType();
+
+      inputTypes[inT++] = dtype;
+      if (!_descriptor->checkInputMatch(cnt, dtype)) {
+        auto ctype = DataTypeUtils::asString(dtype);
+
+        auto inputTypes2 = _descriptor->getInputTypesForInput(cnt);
+        if(inputTypes2.size() > 1) {
+          std::string allTypes;
+          for(size_t i = 0; i < inputTypes2.size(); i++) {
+            allTypes += DataTypeUtils::asString(inputTypes2[i]);
+            if(i < inputTypes2.size() - 1) {
+              allTypes += ",";
+            }
+          }
+          std::string errorMessage;
+          errorMessage += "Op: [";
+          errorMessage += _descriptor->getOpName()->data();
+          errorMessage += "];";
+          errorMessage += " for input: ";
+          errorMessage += std::to_string(cnt);
+          errorMessage += " DataType: [";
+          errorMessage += ctype.c_str();
+          errorMessage += "] Expected data types:[ ";
+          errorMessage += allTypes.c_str();
+          errorMessage += "]";
+          THROW_EXCEPTION(errorMessage.c_str());
+        } else {
+          std::string errorMessage;
+          errorMessage += "Op: [";
+          errorMessage += _descriptor->getOpName()->data();
+          errorMessage += "] failed check for input [";
+          errorMessage += std::to_string(cnt);
+          errorMessage += "], DataType: [";
+          errorMessage += ctype.c_str();
+          errorMessage += "]";
+          THROW_EXCEPTION(errorMessage.c_str());
+        }
       }
       cnt++;
     }
+
   } else {
     for (auto &p : *(block.inputs())) {
       auto var = block.variable(p);
 
-      // we're not checking validity, if ANY types were explicitly allowed
-      // if (block.dataType(cnt) == sd::DataType::ANY)
-      //    continue;
-
       // only validating non-null variables
       if (var != nullptr && var->hasNDArray()) {
         auto array = var->getNDArray();
-
         inputTypes[inT++] = array->dataType();
         if (!_descriptor->checkInputMatch(cnt, array->dataType())) {
           auto ctype = DataTypeUtils::asString(array->dataType());
-          sd_printf("Op [%s] failed check for input [%i], DataType: [%s]\n", _descriptor->getOpName()->data(), cnt,
-                    ctype.c_str());
-          return sd::Status::BAD_ARGUMENTS;
+          std::string errorMessage;
+          errorMessage += "Op: [";
+          errorMessage += _descriptor->getOpName()->data();
+          errorMessage += "] failed check for input [";
+          errorMessage += std::to_string(cnt);
+          errorMessage += "], DataType: [";
+          errorMessage += ctype.c_str();
+          errorMessage += "]";
+          THROW_EXCEPTION(errorMessage.c_str());
         }
       }
 
@@ -473,7 +710,7 @@ sd::Status sd::ops::DeclarableOp::validateDataTypes(Context &block) {
   }
 
   if (block.isFastPath()) {
-    int index = 0;
+    size_t index = 0;
     for (auto array : block.fastpath_out()) {
       if (array == nullptr) continue;
 
@@ -487,9 +724,15 @@ sd::Status sd::ops::DeclarableOp::validateDataTypes(Context &block) {
 
           if (ia->dataType() != cType) {
             auto t = DataTypeUtils::asString(cType);
-            sd_printf("Op [%s] failed check for output [%i], DataType: [%s]\n", _descriptor->getOpName()->data(), index,
-                      t.c_str());
-            return sd::Status::BAD_ARGUMENTS;
+            std::string errorMessage;
+            errorMessage += "Op: [";
+            errorMessage += _descriptor->getOpName()->data();
+            errorMessage += "] failed check for output [";
+            errorMessage += std::to_string(index);
+            errorMessage += "], DataType: [";
+            errorMessage += t.c_str();
+            errorMessage += "]";
+            THROW_EXCEPTION(errorMessage.c_str());
           }
         } else {
           // for same mode, output type must be the same as input type
@@ -497,32 +740,50 @@ sd::Status sd::ops::DeclarableOp::validateDataTypes(Context &block) {
 
           if (ia->dataType() != cType) {
             auto t = DataTypeUtils::asString(cType);
-            sd_printf("Op [%s] failed check for output [%i], DataType: [%s]\n", _descriptor->getOpName()->data(), index,
-                      t.c_str());
-            return sd::Status::BAD_ARGUMENTS;
+            std::string errorMessage;
+            errorMessage += "Op: [";
+            errorMessage += _descriptor->getOpName()->data();
+            errorMessage += "] failed check for output [";
+            errorMessage += std::to_string(index);
+            errorMessage += "], DataType: [";
+            errorMessage += t.c_str();
+            errorMessage += "]";
+            THROW_EXCEPTION(errorMessage.c_str());
           }
         }
       } else if (_descriptor->isInherit(index)) {
         // in inherit mode, output type must be the same as one of input types
-        if (std::find(inputTypes.begin(), inputTypes.end(), cType) == inputTypes.end()) {
+        if (std::find(std::begin(inputTypes), std::end(inputTypes), cType) == std::end(inputTypes)) {
           auto t = DataTypeUtils::asString(cType);
-          sd_printf("Op [%s] failed check for output [%i], DataType: [%s].\n", _descriptor->getOpName()->data(), index,
-                    t.c_str());
-          return sd::Status::BAD_ARGUMENTS;
+          std::string errorMessage;
+          errorMessage += "Op: [";
+          errorMessage += _descriptor->getOpName()->data();
+          errorMessage += "] failed check for output [";
+          errorMessage += std::to_string(index);
+          errorMessage += "], DataType: [";
+          errorMessage += t.c_str();
+          errorMessage += "] - not found in input types";
+          THROW_EXCEPTION(errorMessage.c_str());
         }
 
       } else if (!_descriptor->checkOutputMatch(index, cType)) {
         auto t = DataTypeUtils::asString(cType);
-        sd_printf("Op [%s] failed check for output [%i], DataType: [%s];\n", _descriptor->getOpName()->data(), index,
-                  t.c_str());
-        return sd::Status::BAD_ARGUMENTS;
+        std::string errorMessage;
+        errorMessage += "Op: [";
+        errorMessage += _descriptor->getOpName()->data();
+        errorMessage += "] failed check for output [";
+        errorMessage += std::to_string(index);
+        errorMessage += "], DataType: [";
+        errorMessage += t.c_str();
+        errorMessage += "]";
+        THROW_EXCEPTION(errorMessage.c_str());
       }
       index++;
     }
   } else {
     // checking optionally available outputs
     auto varSpace = block.getVariableSpace();
-    for (int index = 0; index < DataTypeUtils::max<int>(); index++) {
+    for (size_t index = 0; index < static_cast<size_t>(DataTypeUtils::max<int>()); index++) {
       if (varSpace != nullptr && varSpace->hasVariable(block.nodeId(), index)) {
         auto var = block.variable(block.nodeId(), index);
 
@@ -534,40 +795,64 @@ sd::Status sd::ops::DeclarableOp::validateDataTypes(Context &block) {
           if (_descriptor->isSameMode()) {
             if (index >= block.width()) {
               if (block.width() == 0) continue;
-
               auto iv = block.variable(0);
 
               if (iv->getNDArray()->dataType() != cType) {
                 auto t = DataTypeUtils::asString(cType);
-                sd_printf("Op [%s] failed check for output [%i], DataType: [%s]\n", _descriptor->getOpName()->data(),
-                          index, t.c_str());
-                return sd::Status::BAD_ARGUMENTS;
+                std::string errorMessage;
+                errorMessage += "Op: [";
+                errorMessage += _descriptor->getOpName()->data();
+                errorMessage += "] failed check for output [";
+                errorMessage += std::to_string(index);
+                errorMessage += "], DataType: [";
+                errorMessage += t.c_str();
+                errorMessage += "]";
+                THROW_EXCEPTION(errorMessage.c_str());
               }
             } else {
+
               // for same mode, output type must be the same as input type
               auto iv = block.variable(index);
 
               if (iv->getNDArray()->dataType() != cType) {
                 auto t = DataTypeUtils::asString(cType);
-                sd_printf("Op [%s] failed check for output [%i], DataType: [%s]\n", _descriptor->getOpName()->data(),
-                          index, t.c_str());
-                return sd::Status::BAD_ARGUMENTS;
+                std::string errorMessage;
+                errorMessage += "Op: [";
+                errorMessage += _descriptor->getOpName()->data();
+                errorMessage += "] failed check for output [";
+                errorMessage += std::to_string(index);
+                errorMessage += "], DataType: [";
+                errorMessage += t.c_str();
+                errorMessage += "]";
+                THROW_EXCEPTION(errorMessage.c_str());
               }
             }
           } else if (_descriptor->isInherit(index)) {
             // in inherit mode, output type must be the same as one of input types
-            if (std::find(inputTypes.begin(), inputTypes.end(), cType) == inputTypes.end()) {
+            if (std::find(std::begin(inputTypes), std::end(inputTypes), cType) == std::end(inputTypes)) {
               auto t = DataTypeUtils::asString(cType);
-              sd_printf("Op [%s] failed check for output [%i], DataType: [%s].\n", _descriptor->getOpName()->data(),
-                        index, t.c_str());
-              return sd::Status::BAD_ARGUMENTS;
+              std::string errorMessage;
+              errorMessage += "Op: [";
+              errorMessage += _descriptor->getOpName()->data();
+              errorMessage += "] failed check for output [";
+              errorMessage += std::to_string(index);
+              errorMessage += "], DataType: [";
+              errorMessage += t.c_str();
+              errorMessage += "] - not found in input types";
+              THROW_EXCEPTION(errorMessage.c_str());
             }
 
           } else if (!_descriptor->checkOutputMatch(index, cType)) {
             auto t = DataTypeUtils::asString(cType);
-            sd_printf("Op [%s] failed check for output [%i], DataType: [%s];\n", _descriptor->getOpName()->data(),
-                      index, t.c_str());
-            return sd::Status::BAD_ARGUMENTS;
+            std::string errorMessage;
+            errorMessage += "Op: [";
+            errorMessage += _descriptor->getOpName()->data();
+            errorMessage += "] failed check for output [";
+            errorMessage += std::to_string(index);
+            errorMessage += "], DataType: [";
+            errorMessage += t.c_str();
+            errorMessage += "]";
+            THROW_EXCEPTION(errorMessage.c_str());
           }
         }
       } else
@@ -587,18 +872,17 @@ sd::Status sd::ops::DeclarableOp::execute(Context *block) {
   sd::LongType memoryBefore =
       block->workspace() == nullptr ? 0L : block->workspace()->getSpilledSize() + block->workspace()->getUsedSize();
   if (Environment::getInstance().isProfiling()) timeEnter = std::chrono::system_clock::now();
-
   // basic validation: ensure inputs are set
   REQUIRE_OK(this->validateNonEmptyInput(*block));
 
   // ensure number of IArgs, TArgs match our expectations
   REQUIRE_OK(this->validateArguments(*block));
-
   // validating data types for inputs and (optionally) outputs
   REQUIRE_OK(this->validateDataTypes(*block));
 
   // this method will allocate output NDArrays for this op
   auto numOutputs = this->prepareOutputs(*block);
+
 
   if (Environment::getInstance().isProfiling()) {
     timeStart = std::chrono::system_clock::now();
@@ -608,6 +892,80 @@ sd::Status sd::ops::DeclarableOp::execute(Context *block) {
   sd::Status status;
   bool hasHelper = false;
 
+#if defined(SD_GCC_FUNCTRACE)
+  // Log operation start before execution
+  // Note: Java stack trace would be captured via Context if available
+  std::string javaStackTrace = "";  // TODO: Get from Context if Java side sets it
+  OpExecutionLogger::getInstance().logOpStart(this->getOpName()->c_str(), block, javaStackTrace);
+  // Set current op name for lifecycle trackers to capture
+  OpExecutionLogger::setCurrentOpName(*this->getOpName());
+#endif
+
+  // Wrap execution in try-catch to dump stack traces on exceptions
+#ifdef __cpp_exceptions
+  try {
+    // platform helpers use might be forbidden for various reasons, so we'll check it out first
+    if (block->helpersAllowed() && sd::Environment::getInstance().helpersAllowed()) {
+      // if we have platform-specific helper for this op - invoke it
+      if (OpRegistrator::getInstance().hasHelper(this->getOpHash(), block->engine())) {
+        auto helper = OpRegistrator::getInstance().getPlatformHelper(this->getOpHash(), block->engine());
+        if (helper->isUsable(*block)) {
+          status = helper->invokeHelper(*block);
+          hasHelper = true;
+        }
+      }
+    }
+
+    if (!hasHelper) status = this->validateAndExecute(*block);
+
+#if defined(SD_GCC_FUNCTRACE)
+    // Log successful execution
+    if (status == sd::Status::OK) {
+      OpExecutionLogger::getInstance().logOpSuccess(this->getOpName()->c_str(), block);
+    } else {
+      OpExecutionLogger::getInstance().logOpFailure(this->getOpName()->c_str(), block, "Operation returned non-OK status");
+    }
+    // Clear current op name after operation completes
+    OpExecutionLogger::clearCurrentOpName();
+#endif
+
+  } catch (const std::exception& e) {
+#if defined(SD_GCC_FUNCTRACE)
+    // Log operation failure
+    OpExecutionLogger::getInstance().logOpFailure(this->getOpName()->c_str(), block, e.what());
+    // Clear current op name on failure
+    OpExecutionLogger::clearCurrentOpName();
+#endif
+
+    // Dump stack traces for all arrays and shape buffers in the context
+    std::string stackTraceDump = dumpContextStackTraces(block, this->getOpName()->c_str());
+
+    // Create enhanced error message with stack traces
+    std::string enhancedError;
+    enhancedError += "Exception during op execution: ";
+    enhancedError += e.what();
+    enhancedError += stackTraceDump;
+
+    // Re-throw with enhanced message
+    THROW_EXCEPTION(enhancedError.c_str());
+  } catch (...) {
+#if defined(SD_GCC_FUNCTRACE)
+    // Log operation failure
+    OpExecutionLogger::getInstance().logOpFailure(this->getOpName()->c_str(), block, "Unknown exception");
+    // Clear current op name on failure
+    OpExecutionLogger::clearCurrentOpName();
+#endif
+
+    // Catch any other exceptions
+    std::string stackTraceDump = dumpContextStackTraces(block, this->getOpName()->c_str());
+
+    std::string enhancedError;
+    enhancedError += "Unknown exception during op execution";
+    enhancedError += stackTraceDump;
+
+    THROW_EXCEPTION(enhancedError.c_str());
+  }
+#else
   // platform helpers use might be forbidden for various reasons, so we'll check it out first
   if (block->helpersAllowed() && sd::Environment::getInstance().helpersAllowed()) {
     // if we have platform-specific helper for this op - invoke it
@@ -620,13 +978,26 @@ sd::Status sd::ops::DeclarableOp::execute(Context *block) {
     }
   }
 
-  // if we don't have platform-specific helper - invoke generic implementation
   if (!hasHelper) status = this->validateAndExecute(*block);
+
+#if defined(SD_GCC_FUNCTRACE)
+  // Log result (no exceptions in this path)
+  if (status == sd::Status::OK) {
+    OpExecutionLogger::getInstance().logOpSuccess(this->getOpName()->c_str(), block);
+  } else {
+    OpExecutionLogger::getInstance().logOpFailure(this->getOpName()->c_str(), block, "Operation returned non-OK status");
+  }
+  // Clear current op name after operation completes
+  OpExecutionLogger::clearCurrentOpName();
+#endif
+#endif
   // optionally saving execution time
   if (Environment::getInstance().isProfiling()) {
     timeEnd = std::chrono::system_clock::now();
     outerTime = std::chrono::duration_cast<std::chrono::nanoseconds>(timeEnd - timeStart).count();
     block->setInnerTime(outerTime);
+    sd_debug("%s [%s] prepTime %lld time %lld \n", hasHelper ? "helper" : "ordinary", this->getOpName()->c_str(),
+             static_cast<sd::LongType>(prepTime), static_cast<sd::LongType>(outerTime));
   }
 
   if (Environment::getInstance().isProfiling() && block->getVariableSpace() != nullptr) {
@@ -635,8 +1006,8 @@ sd::Status sd::ops::DeclarableOp::execute(Context *block) {
       auto p = fp->profile();
       if (p != nullptr) {
         sd::LongType memoryAfter = block->workspace() == nullptr
-                                       ? 0L
-                                       : block->workspace()->getSpilledSize() + block->workspace()->getUsedSize();
+                                   ? 0L
+                                   : block->workspace()->getSpilledSize() + block->workspace()->getUsedSize();
         sd::LongType memoryUsed = memoryAfter - memoryBefore;
         p->nodeById(block->nodeId())->setPreparationTime(prepTime);
         p->nodeById(block->nodeId())->setExecutionTime(outerTime);
@@ -645,74 +1016,136 @@ sd::Status sd::ops::DeclarableOp::execute(Context *block) {
     }
   }
 
-
   // now we print out all outputs for this node
   if (sd::Environment::getInstance().isDebugAndVerbose()) {
+    std::string * opName = this->getOpName();
+    if(opName == nullptr) {
+      THROW_EXCEPTION("Op name is null!");
+    }
+    if(block == nullptr) {
+      THROW_EXCEPTION("Block is null!");
+    }
+    sd::LongType  width = block->width();
+    sd_printf("Op with name %s and num inputs %i \n", opName->c_str(), block->width());
     auto vs = block->getVariableSpace();
+    int numInputs = block->width();
+    for (int e = 0; e < numInputs; e++) {
+      auto array = block->isFastPath() ?  block->fastpath_in()[e]
+                                       : vs->getVariable(block->nodeId(), e)->getNDArray();
+      sd_printf("Checking input %d  block fast path %d op name %s\n",e,block->isFastPath(),this->getOpName()->c_str());
+      auto shape = ShapeUtils::shapeAsString(array);
+      //limit size preview for string arrays due to allocation size when debugging
+      int sizePreview = array->isS() ? 2 : 32;
+      auto first = array->isEmpty() ? new std::string(std::string("Empty NDArray")) : array->asString(sizePreview);
+      auto type = DataTypeUtils::asString(array->dataType());
 
-    for (int e = 0; e < numOutputs; e++) {
+      sd_printf("node_%i:%i input  shape: %s; dtype: %s; first values %s\n", block->nodeId(), e, shape.c_str(),
+                type.c_str(), first->c_str());
+    }
+
+    for (size_t e = 0; e < static_cast<size_t>(numOutputs); e++) {
       // if given output index doesn't exist - we're done
+      sd_printf("Declarable op execute: processing output %d\n",e);
 
       if (!block->isFastPath()) {
         if (!vs->hasVariable(block->nodeId(), e)) break;
       } else {
         // we have to check either in or out stack, depending on isInplace()
         if (block->isInplace()) {
-          if (block->fastpath_in().size() <= e) break;
+          if (block->fastpath_out().size() <= e) break;
         } else {
           if (block->fastpath_out().size() <= e) break;
         }
       }
 
-      auto array = block->isFastPath() ? block->isInplace() ? block->fastpath_in()[e] : block->fastpath_out()[e]
+      auto array = block->isFastPath() ?  block->fastpath_out()[e]
                                        : vs->getVariable(block->nodeId(), e)->getNDArray();
 
+      if(array == nullptr) {
+        THROW_EXCEPTION("DeclarableOp::execute: array is nullptr");
+      }
+
       auto shape = ShapeUtils::shapeAsString(array);
-      auto first = array->isEmpty() ? std::string("Empty NDArray") : array->asString(32);
+      bool isEmpty = array->isEmpty();
+      bool isScalar = array->isScalar();
+      int lengthOf = array->lengthOf();
+      sd::LongType len = sd::math::sd_min<LongType>(32, array->isEmpty() || array->isScalar() ? 1 : array->lengthOf());
+      auto first = array->isEmpty() ? new std::string(std::string("Empty NDArray")) : array->asString(len);
       auto type = DataTypeUtils::asString(array->dataType());
 
       sd_printf("node_%i:%i result shape: %s; dtype: %s; first values %s\n", block->nodeId(), e, shape.c_str(),
-                type.c_str(), first.c_str());
+                type.c_str(), first->c_str());
     }
   }
+
+  traceExecIfNeeded(*block);
 
 
   return status;
 }
 
-void DeclarableOp::overwriteResult(Context &block, int outputIdx, NDArray *array) {
-  throw std::runtime_error("Overwrite result used!");
-  // block.pushNDArrayToVariableSpace(block.nodeId(), outputIdx, array);
-  /*
-  auto varSpace = block.getVariableSpace();
-  if (varSpace->hasVariable(block.getNodeId(), outputIdx)) {
+void DeclarableOp::overwriteResult(Context &block, int outputIdx, NDArray *array, bool remove) {
+  if (block.isFastPath()) {
+    if (remove && block.fastpath_out()[outputIdx] != nullptr) {
+      // delete reference/call destructor if remove is true
+      sd_debug("Deleting extra reference in fast path at idx %d\n",outputIdx);
+      delete block.fastpath_out()[outputIdx];
+    }
+    sd_debug("In fast path, setting variable\n", 0);
+    block.fastpath_out()[outputIdx] = array;
+  } else if (block.getVariableSpace() == nullptr) {
+    THROW_EXCEPTION("Var space should not be null before pushing variable!");
+  } else {
+    block.pushNDArrayToVariableSpace(block.nodeId(), outputIdx, array, remove);
+    sd_debug("After pushing variable\n", 0);
+    auto varSpace = block.getVariableSpace();
+    if (varSpace == nullptr) {
+      THROW_EXCEPTION("Var space should not be null!");
+    }
+    sd_debug("After getting var space\n", 0);
+    if (varSpace->hasVariable(block.getNodeId(), outputIdx)) {
+      sd_debug("calling get variable\n", 0);
       auto var = varSpace->getVariable(block.getNodeId(), outputIdx);
-      if (var->getNDArray() != nullptr && var->isRemovable())
-          delete var->getNDArray();
+      sd_debug("after calling get variable", 0);
+      if (var->getNDArray() != nullptr && var->isRemovable()) delete var->getNDArray();
 
       var->setNDArray(array);
       var->markRemovable(true);
-  } else {
+    } else {
+      sd_debug("Creating new variable\n", 0);
       auto var = new Variable(array, nullptr, block.getNodeId(), outputIdx);
       varSpace->putVariable(block.getNodeId(), outputIdx, var);
+      sd_debug("Putting variable\n", 0);
+    }
   }
-  */
+}
+
+void DeclarableOp::overwriteResult(Context &block, int outputIdx, NDArray *array) {
+  block.pushNDArrayToVariableSpace(block.nodeId(), outputIdx, array);
+  auto varSpace = block.getVariableSpace();
+  if (varSpace->hasVariable(block.getNodeId(), outputIdx)) {
+    auto var = varSpace->getVariable(block.getNodeId(), outputIdx);
+    if (var->getNDArray() != nullptr && var->isRemovable()) delete var->getNDArray();
+
+    var->setNDArray(array);
+    var->markRemovable(true);
+  } else {
+    auto var = new Variable(array, nullptr, block.getNodeId(), outputIdx);
+    varSpace->putVariable(block.getNodeId(), outputIdx, var);
+  }
 }
 
 void DeclarableOp::overwriteResult(Context &block, int outputIdx, NDArrayList *list) {
-  throw std::runtime_error("Overwrite result used!");
-  // block.pushNDArrayListToVariableSpace(block.nodeId(), outputIdx, list);
-  /*
+  block.pushNDArrayListToVariableSpace(block.nodeId(), outputIdx, list);
   auto varSpace = block.getVariableSpace();
   if (varSpace->hasVariable(block.getNodeId(), outputIdx)) {
-      auto var = varSpace->getVariable(block.getNodeId(), outputIdx);
-      var->setNDArrayList(list);
+    auto var = varSpace->getVariable(block.getNodeId(), outputIdx);
+    var->setNDArrayList(list);
   } else {
-      auto var = new Variable(nullptr, nullptr, block.getNodeId(), outputIdx);
-      var->setNDArrayList(list);
-      varSpace->putVariable(block.getNodeId(), outputIdx, var);
+    auto var = new Variable(nullptr, nullptr, block.getNodeId(), outputIdx);
+    var->setNDArrayList(list);
+    varSpace->putVariable(block.getNodeId(), outputIdx, var);
   }
-  */
 }
 
 sd::Status sd::ops::DeclarableOp::validateArguments(Context &block) {
@@ -774,7 +1207,7 @@ sd::Status sd::ops::DeclarableOp::validateNonEmptyInput(Context &block) {
   if (this->getOpDescriptor()->getNumberOfInputs() == -2 || this->getOpDescriptor()->getNumberOfInputs() == 0)
     return sd::Status::OK;
 
-  if (block.width() < 1) {
+  if (block.width() < 1 && !block.isFastPath() && block.fastpath_in().size() < 1) {
     sd_printf("%s: no operands provided for the op", this->getOpName()->c_str());
     return sd::Status::BAD_INPUT;
   }
@@ -860,18 +1293,16 @@ sd::Status sd::ops::DeclarableOp::execute(sd::graph::RandomGenerator &rng, const
   block.markInplace(isInplace);
   block.setDataType(0, type);
 
-  // we need this line for tests basically
-  // if (rng != nullptr)
   block.setRng(rng);
 
-  for (int e = 0; e < tArgs.size(); e++) block.getTArguments()->emplace_back(tArgs.at(e));
+  for (size_t e = 0; e < tArgs.size(); e++) block.getTArguments()->emplace_back(tArgs.at(e));
 
   // FIXME: iargs should be sd::LongType
-  for (int e = 0; e < iArgs.size(); e++) block.getIArguments()->emplace_back(static_cast<int>(iArgs.at(e)));
+  for (size_t e = 0; e < iArgs.size(); e++) block.getIArguments()->emplace_back(static_cast<int>(iArgs.at(e)));
 
-  for (int e = 0; e < bArgs.size(); e++) block.getBArguments()->push_back(static_cast<int>(bArgs.at(e)));
+  for (size_t e = 0; e < bArgs.size(); e++) block.getBArguments()->push_back(static_cast<int>(bArgs.at(e)));
 
-  for (int e = 0; e < dArgs.size(); e++) block.getDArguments()->push_back(dArgs.at(e));
+  for (size_t e = 0; e < dArgs.size(); e++) block.getDArguments()->push_back(dArgs.at(e));
 
   sd::Status result = this->execute(&block);
 
@@ -933,13 +1364,15 @@ sd::Status DeclarableOp::execute(const std::vector<NDArray *> &inputs, const std
                                  bool isInplace) {
   Context ctx(1);
 
-  for (int e = 0; e < inputs.size(); e++) {
+  for (size_t e = 0; e < inputs.size(); e++) {
     ctx.setInputArray(e, inputs[e]);
   }
 
-  for (int e = 0; e < outputs.size(); e++) {
+
+  for (size_t e = 0; e < outputs.size(); e++) {
     ctx.setOutputArray(e, outputs[e]);
   }
+
 
   if (isInplace) ctx.markInplace(isInplace);
 
@@ -1015,15 +1448,14 @@ sd::ResultSet DeclarableOp::evaluate(const std::vector<NDArray *> &inputs, const
   block.setDataType(0, sd::DataType::FLOAT32);
   block.fillInputs(in);
   block.markInplace(isInplace);
-  // block.setRNG(ProviderRNG::getInstance().getRNG());
 
-  for (int e = 0; e < tArgs.size(); e++) block.getTArguments()->emplace_back(tArgs.at(e));
+  for (size_t e = 0; e < tArgs.size(); e++) block.getTArguments()->emplace_back(tArgs.at(e));
 
-  for (int e = 0; e < iArgs.size(); e++) block.getIArguments()->emplace_back(iArgs.at(e));
+  for (size_t e = 0; e < iArgs.size(); e++) block.getIArguments()->emplace_back(iArgs.at(e));
 
-  for (int e = 0; e < bArgs.size(); e++) block.getBArguments()->push_back(bArgs.at(e));
+  for (size_t e = 0; e < bArgs.size(); e++) block.getBArguments()->push_back(bArgs.at(e));
 
-  for (int e = 0; e < dArgs.size(); e++) block.getDArguments()->push_back(dArgs.at(e));
+  for (size_t e = 0; e < dArgs.size(); e++) block.getDArguments()->push_back(dArgs.at(e));
 
   sd::Status status = this->execute(&block);
   ResultSet arrayList;
@@ -1033,21 +1465,53 @@ sd::ResultSet DeclarableOp::evaluate(const std::vector<NDArray *> &inputs, const
   if (status != sd::Status::OK) return arrayList;
 
   if (!isInplace) {
-    for (int e = 0; e < DataTypeUtils::max<int>(); e++) {
-      std::pair<int, int> pair(1, e);
-      if (variableSpace.hasVariable(pair)) {
-        auto var = variableSpace.getVariable(pair);
-        auto arr = var->getNDArray();
+    if(block.isFastPath()) {
+      //note this *is* similar to the code below but we use fast paths instead
+      //we need to ensure variables don't get freed allowing reuse of outputs
+      //as views
+      for (int e = 0; e < DataTypeUtils::max<int>(); e++) {
+        std::pair<int, int> pair(1, e);
+        if (variableSpace.hasVariable(pair)) {
+          auto var = variableSpace.getVariable(pair);
+          auto arr = var->getNDArray();
+          if (!arr->isAttached()) {
+            var->markRemovable(false);
+            arr->setContext(sd::LaunchContext::defaultContext());
+          }
+        } else
+          break;
+      }
+      for(size_t e = 0; e < block.fastpath_out().size(); e++) {
+        auto arr = block.fastpath_out()[e];
         if (!arr->isAttached()) {
-          var->markRemovable(false);
           arr->setContext(sd::LaunchContext::defaultContext());
           arrayList.push_back(arr);
         } else {
           arrayList.push_back(arr->detach());
         }
-      } else
-        break;
+
+      }
+
+      arrayList.setNonRemovable();
+
+    } else {
+      for (int e = 0; e < DataTypeUtils::max<int>(); e++) {
+        std::pair<int, int> pair(1, e);
+        if (variableSpace.hasVariable(pair)) {
+          auto var = variableSpace.getVariable(pair);
+          auto arr = var->getNDArray();
+          if (!arr->isAttached()) {
+            var->markRemovable(false);
+            arr->setContext(sd::LaunchContext::defaultContext());
+            arrayList.push_back(arr);
+          } else {
+            arrayList.push_back(arr->detach());
+          }
+        } else
+          break;
+      }
     }
+
   } else {
     for (auto v : inputs) {
       arrayList.push_back(v);
@@ -1067,7 +1531,7 @@ sd::Status sd::ops::DeclarableOp::validateInputDimensionsMatch(Context &block) {
   if (block.width() == 0) return sd::Status::OK;
 
   NDArray *a0 = block.array(0);
-  for (int e = 1; e < block.width(); e++) {
+  for (size_t e = 1; e < block.width(); e++) {
     auto aV = block.array(e);
     if (!shape::equalsSoft(a0->shapeInfo(), aV->shapeInfo())) return sd::Status::BAD_DIMENSIONS;
   }
@@ -1090,17 +1554,6 @@ samediff::EmptyHandling DeclarableOp::emptyHandling() { return samediff::EmptyHa
 
 void DeclarableOp::registerTypes() { this->getOpDescriptor()->setSameMode(true); }
 
-/*
-template <typename T>
-int* sd::ops::DeclarableOp::calculateOutputShape(int* inputShape, sd::graph::Block& block) {
-    // default implementation suits transform, so just returns the same shape
 
-    int* newshape;
-    ALLOCATE(newshape, block.getWorkspace(), shape::shapeInfoLength(inputShape), int);
-    memcpy(newshape, inputShape, shape::shapeInfoByteLength(inputShape));
-
-    return newshape;
-}
-*/
 }  // namespace ops
 }  // namespace sd

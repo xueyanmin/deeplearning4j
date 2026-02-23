@@ -26,7 +26,7 @@
 #include <ops/declarable/helpers/stack.h>
 
 #include <iterator>
-
+#if NOT_EXCLUDED(OP_stack)
 namespace sd {
 NDArrayList::NDArrayList(int height, bool expandable) {
   _expandable = expandable;
@@ -35,11 +35,11 @@ NDArrayList::NDArrayList(int height, bool expandable) {
   _id.first = 0;
   _id.second = 0;
   _height = height;
-  // sd_printf("\nCreating NDArrayList\n","");
+   sd_debug("\nCreating NDArrayList\n","");
 }
 
 NDArrayList::~NDArrayList() {
-  // sd_printf("\nDeleting NDArrayList: [%i]\n", _chunks.size());
+  sd_debug("\nDeleting NDArrayList: [%i]\n", _chunks.size());
   for (auto const& v : _chunks) delete v.second;
 
   _chunks.clear();
@@ -51,12 +51,26 @@ sd::DataType NDArrayList::dataType() { return _dtype; }
 
 NDArray* NDArrayList::readRaw(int idx) {
   if (_chunks.count(idx) < 1) {
-    sd_printf("Non-existent chunk requested: [%i]\n", idx);
-    throw std::invalid_argument("Bad index");
+    sd_debug("Non-existent chunk requested: [%i]\n", idx);
+    THROW_EXCEPTION("Bad index");
   }
 
   return _chunks[idx];
 }
+
+
+NDArray* NDArrayList::remove(int idx) {
+  if(!isWritten(idx)) {
+    sd_debug("Non-existent chunk requested: [%i]\n", idx);
+    THROW_EXCEPTION("Bad index");
+  }
+
+  delete _chunks[idx];
+
+  _elements--;
+  return new NDArray(readRaw(idx)->dup());
+}
+
 
 sd::Status NDArrayList::write(int idx, NDArray* array) {
   if (_chunks.count(idx) == 0)
@@ -75,16 +89,16 @@ sd::Status NDArrayList::write(int idx, NDArray* array) {
       for (int e = 0; e < array->rankOf(); e++) _shape.emplace_back(array->sizeAt(e));
     } else {
       // if shape is inferred (say, from split_list)
-      if (array->rankOf() == _shape.size()) {
+      if (static_cast<size_t>(array->rankOf()) == _shape.size()) {
         // skipping first dim
-        for (int e = 1; e < _shape.size(); e++) {
+        for (size_t e = 1; e < _shape.size(); e++) {
           if (_shape[e] != array->sizeAt(e))
             return Logger::logStatusMsg(Status::BAD_INPUT,
                                         "NDArrayList: all arrays must have same size along inner dimensions");
         }
-      } else if (array->rankOf() == _shape.size() - 1) {
+      } else if (static_cast<size_t>(array->rankOf()) == _shape.size() - 1) {
         // case like 2d _shape, and 1D rows
-        for (int e = 1; e < _shape.size(); e++)
+        for (size_t e = 1; e < _shape.size(); e++)
           if (_shape[e] != array->sizeAt(e - 1))
             return Logger::logStatusMsg(Status::BAD_INPUT,
                                         "NDArrayList: all arrays must have same size along inner dimensions");
@@ -97,16 +111,16 @@ sd::Status NDArrayList::write(int idx, NDArray* array) {
       return Logger::logStatusMsg(Status::BAD_INPUT, "NDArrayList: all arrays must have same data type");
 
     // if shape is inferred (say, from split_list)
-    if (array->rankOf() == _shape.size()) {
+    if (static_cast<size_t>(array->rankOf()) == _shape.size()) {
       // skipping first dim
-      for (int e = 1; e < _shape.size(); e++) {
+      for (size_t e = 1; e < _shape.size(); e++) {
         if (_shape[e] != array->sizeAt(e))
           return Logger::logStatusMsg(Status::BAD_INPUT,
                                       "NDArrayList: all arrays must have same size along inner dimensions");
       }
-    } else if (array->rankOf() == _shape.size() - 1) {
+    } else if (static_cast<size_t>(array->rankOf()) == _shape.size() - 1) {
       // case like 2d _shape, and 1D rows
-      for (int e = 1; e < _shape.size(); e++)
+      for (size_t e = 1; e < _shape.size(); e++)
         if (_shape[e] != array->sizeAt(e - 1))
           return Logger::logStatusMsg(Status::BAD_INPUT,
                                       "NDArrayList: all arrays must have same size along inner dimensions");
@@ -115,7 +129,6 @@ sd::Status NDArrayList::write(int idx, NDArray* array) {
                                   "NDArrayList: all arrays must have same size along inner dimensions");
   }
 
-  //_elements++;
 
   // storing reference
   _chunks[idx] = array;
@@ -127,43 +140,55 @@ std::vector<sd::LongType>& NDArrayList::shape() { return _shape; }
 
 int NDArrayList::counter() { return _counter++; }
 
-void NDArrayList::unstack(NDArray* array, int axis) {
+void NDArrayList::unstack(NDArray* array, LongType axis) {
   _axis = axis;
-  std::vector<int> args({axis});
-  auto newAxis = ShapeUtils::evalDimsToExclude(array->rankOf(), args);
-  auto result = array->allTensorsAlongDimension(newAxis);
-  for (int e = 0; e < result.size(); e++) {
-    auto chunk = result.at(e);  //->dup(array->ordering());
+  std::vector<sd::LongType> args({axis});
+  auto newAxis = ShapeUtils::evalDimsToExclude(array->rankOf(),1, args.data());
+  auto result = array->allTensorsAlongDimension(*newAxis);
+  for (sd::LongType e = 0; e < result.size(); e++) {
+    auto chunk = result.at(e);
     write(e, new NDArray(chunk->dup(array->ordering())));
   }
+
+  delete newAxis;
 }
 
 NDArray* NDArrayList::stack() {
-  // FIXME: this is bad for perf, but ok as poc
-
   int numElements = _elements.load();
-  std::vector<const NDArray*> inputs(numElements);
+  if(numElements < 1) {
+    return  new NDArray(NDArrayFactory::empty<double>());
+
+  }
+  std::vector<NDArray*> inputs(numElements);
   for (int e = 0; e < numElements; e++) {
-    _chunks[e]->syncToDevice();
+    if(!_chunks[e]->isEmpty())
+      _chunks[e]->syncToDevice();
     inputs[e] = _chunks[e];
+  }
+
+  if(inputs[0] == nullptr) {
+    THROW_EXCEPTION("First input element was a null ptr!");
   }
 
   auto inShapeInfo = inputs[0]->shapeInfo();
   int rank = shape::rank(inShapeInfo);
   NDArray* array = nullptr;
 
-  if (shape::isEmpty(inShapeInfo)) {
+  if (shape::isEmptyConst(inShapeInfo)) {
     switch (rank) {
       case 0: {
         if (numElements == 1) {
-          array = new NDArray(inputs[0]->ordering(), {0}, ArrayOptions::dataType(inShapeInfo), inputs[0]->getContext());
+          std::vector<sd::LongType> shape = {0};
+          array = new NDArray(inputs[0]->ordering(), shape, ArrayOptions::dataType(inShapeInfo), inputs[0]->getContext());
         } else {
-          array = new NDArray('c', {(sd::LongType)numElements, 0}, ArrayOptions::dataType(inShapeInfo),
+          std::vector<sd::LongType> shape =  {(sd::LongType)numElements, 0};
+          array = new NDArray('c', shape, ArrayOptions::dataType(inShapeInfo),
                               inputs[0]->getContext());
         }
       }
     }
   } else {
+
     std::vector<sd::LongType> outShape(inShapeInfo + 1, inShapeInfo + 1 + rank);
     outShape.insert(outShape.begin(), (sd::LongType)numElements);
     array =
@@ -184,9 +209,6 @@ sd::LaunchContext* NDArrayList::context() { return _context; }
 int NDArrayList::elements() { return _elements.load(); }
 
 int NDArrayList::height() {
-  // if (_height != 0)
-  //    return _height;
-  // else
   return (int)_chunks.size();
 }
 
@@ -197,26 +219,27 @@ bool NDArrayList::isWritten(int index) {
     return false;
 }
 
-NDArray* NDArrayList::pick(std::initializer_list<int> indices) {
-  std::vector<int> idcs(indices);
+NDArray* NDArrayList::pick(std::initializer_list<LongType> indices) {
+  std::vector<LongType> idcs(indices);
   return pick(idcs);
 }
 
-NDArray* NDArrayList::pick(std::vector<int>& indices) {
+NDArray* NDArrayList::pick(std::vector<LongType>& indices) {
   std::vector<sd::LongType> shape(_shape);
 
-  // shape.insert(shape.begin() + _axis, indices.size());
   shape[_axis] = indices.size();
   // do we have to enforce C order here?
   auto array = new NDArray('c', shape, _chunks[0]->dataType(), _context);
-  std::vector<int> axis = ShapeUtils::evalDimsToExclude(shape.size(), {_axis});
-  auto tads = array->allTensorsAlongDimension(axis);
+  const sd::LongType *axis2 = const_cast<sd::LongType *>(&_axis);
+  std::vector<sd::LongType> *axis = ShapeUtils::evalDimsToExclude(shape.size(),1, axis2);
+  auto tads = array->allTensorsAlongDimension(*axis);
   int indicesSize = indices.size();
 
-  if (tads.size() != indicesSize) throw std::runtime_error("Number of TADs should match number of indices");
+  if (tads.size() != indicesSize) THROW_EXCEPTION("Number of TADs should match number of indices");
 
   for (int e = 0; e < indicesSize; e++) tads.at(e)->assign(_chunks[indices[e]]);
 
+  delete axis;
   return array;
 }
 
@@ -252,3 +275,4 @@ bool NDArrayList::equals(NDArrayList& other) {
   return true;
 }
 }  // namespace sd
+#endif

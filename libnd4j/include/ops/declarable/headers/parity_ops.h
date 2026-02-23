@@ -167,7 +167,7 @@ DECLARE_CONFIGURABLE_OP(betainc, 3, 1, false, 0, 0);
  */
 #if NOT_EXCLUDED(OP_biasadd)
 DECLARE_CUSTOM_OP(biasadd, 2, 1, true, 0, 0);
-DECLARE_CUSTOM_OP(biasadd_bp, 3, 2, false, 0, 0);
+DECLARE_CUSTOM_OP(biasadd_bp, 3, 2, false, 0, 0)
 #endif
 
 /**
@@ -187,7 +187,7 @@ DECLARE_CUSTOM_OP(diag_part, 1, 1, false, 0, 0);
 #endif
 
 /**
- * Returns a diagonal vector for any submatricies with in a given tensor.
+ * Returns a diagonal vector for any submatrices with in a given tensor.
  * It is an op inverse to matrix_set_giag.
  * Using input tensor as batched 2D diagonals flat them to vector (1D) with diagonal values.
  *
@@ -203,11 +203,11 @@ DECLARE_CUSTOM_OP(matrix_diag_part, 1, 1, false, 0, 0);
  * For A (MxN) Q is M x M and R is (NxN).
  *
  * Input :
- *    0 - float (or complex float) tensor with shape {.,..,...,M,N} - batch of float matricies
+ *    0 - float (or complex float) tensor with shape {.,..,...,M,N} - batch of float matrices
  *
  * Output:
- *    0 - float tensor with shape {.,..,...,MxN} - batch of ortogonal matricies {Qs}
- *    1 - float tensor with shape {.,..,...,NxN} - batch of upper triangular matricies {Rs}
+ *    0 - float tensor with shape {.,..,...,MxN} - batch of ortogonal matrices {Qs}
+ *    1 - float tensor with shape {.,..,...,NxN} - batch of upper triangular matrices {Rs}
  */
 #if NOT_EXCLUDED(OP_qr)
 DECLARE_CUSTOM_OP(qr, 1, 2, false, 0, 0);
@@ -409,9 +409,18 @@ DECLARE_CUSTOM_OP(unstack, 1, -1, false, 0, 1);
  * This operation extracts a strided (optionally) slice from a tensor,
  */
 #if NOT_EXCLUDED(OP_strided_slice)
-DECLARE_CUSTOM_OP(strided_slice, 1, 1, false, 0, 5);  // TODO: new op type needed. that returns VIEW
+DECLARE_CUSTOM_OP(strided_slice, 1, 1, false, 0, 5);
 DECLARE_CUSTOM_OP(strided_slice_bp, 2, 1, false, 0, 5);
 #endif
+
+/**
+ * This operation creates a view from a pre existing tensor.
+ *
+ */
+#if NOT_EXCLUDED(OP_create_view)
+DECLARE_CUSTOM_OP(create_view, -2, -1, true, 0, -2);
+#endif
+
 
 /**
  * This operation extracts a slice from a tensor.
@@ -427,17 +436,17 @@ DECLARE_CUSTOM_OP(slice_bp, 2, 1, false, 0, -2);
  * Expected arguments:
  * start: optional scalar with starting value
  * stop: optional scalar with end value
- * step: optional scalar witn step value
+ * step: optional scalar with step value
  *
  * Int args: (optional)
  * 0: optional scalar with starting value
  * 1: optional scalar with end value
- * 1: optional scalar witn step value
+ * 1: optional scalar with step value
  *
  * T args: (optional)
  * 0: optional scalar with starting value
  * 1: optional scalar with end value
- * 1: optional scalar witn step value
+ * 1: optional scalar with step value
  */
 #if NOT_EXCLUDED(OP_range)
 DECLARE_CUSTOM_OP(range, -2, 1, false, -2, -2);
@@ -850,9 +859,6 @@ DECLARE_CUSTOM_OP(embedding_lookup, 2, 1, false, 0, 1);
  */
 #if NOT_EXCLUDED(OP_dynamic_partition)
 DECLARE_CUSTOM_OP(dynamic_partition, 2, 1, false, 0, 1);
-#endif
-
-#if NOT_EXCLUDED(OP_dynamic_partition_bp)
 DECLARE_CUSTOM_OP(dynamic_partition_bp, 3, 2, false, 0, 1);
 #endif
 
@@ -963,6 +969,8 @@ DECLARE_CUSTOM_OP(sufficient_statistics, 2, 3, false, 0, 0);
 DECLARE_OP(weighted_cross_entropy_with_logits, 3, 1, true);
 #endif
 
+
+#if NOT_EXCLUDED(OP_dropout)
 /**
  * This op calculates dropout of input
  * Input arguments
@@ -973,12 +981,8 @@ DECLARE_OP(weighted_cross_entropy_with_logits, 3, 1, true);
  *  T parameter - probability (should be between 0 and 1)
  *  return value - a tensor with the same shape as target or input
  */
-#if NOT_EXCLUDED(OP_dropout)
-DECLARE_CONFIGURABLE_OP(dropout, 1, 1, true, 1, 1);
-#endif
-#if NOT_EXCLUDED(OP_dropout_bp)
-DECLARE_CONFIGURABLE_OP(dropout_bp, 2, 1, false, 1, 1);
-#endif
+DECLARE_CONFIGURABLE_OP(dropout, 1, 2, true, 1, 1);
+DECLARE_CONFIGURABLE_OP(dropout_bp, 3, 1, false, 1, 1);
 
 /*  Calculates alpha weighted dropout
     T params:
@@ -987,7 +991,6 @@ DECLARE_CONFIGURABLE_OP(dropout_bp, 2, 1, false, 1, 1);
         2 - alpha' value
         3 - beta value
  */
-#if NOT_EXCLUDED(OP_alpha_dropout_bp)
 DECLARE_CONFIGURABLE_OP(alpha_dropout_bp, 2, 1, false, 4, 1);
 #endif
 
@@ -1034,7 +1037,7 @@ DECLARE_CUSTOM_OP(broadcast_dynamic_shape, 2, 1, false, 0, 0);
  *
  * return value:
  *    tensor with dimension (x * y * z * ::: *) with determinant for all
- * M x M matricies
+ * M x M matrices
  */
 #if NOT_EXCLUDED(OP_matrix_determinant)
 DECLARE_CUSTOM_OP(matrix_determinant, 1, 1, false, 0, 0);
@@ -1048,7 +1051,7 @@ DECLARE_CUSTOM_OP(matrix_determinant, 1, 1, false, 0, 0);
  *
  * return value:
  *    tensor with dimension (x * y * z * ::: *) with log determinant for all
- * M x M matricies
+ * M x M matrices
  */
 
 #if NOT_EXCLUDED(OP_log_matrix_determinant)
@@ -1056,14 +1059,14 @@ DECLARE_CUSTOM_OP(log_matrix_determinant, 1, 1, false, 0, 0);
 #endif
 
 /**
- * logdet op. Logarithm of the determinant of hermitian positive matricies.
+ * logdet op. Logarithm of the determinant of hermitian positive matrices.
  *
  * input params:
  *    0 - the tensor with dimension (x * y * z * ::: * M * M)
  *
  * return value:
  *    tensor with dimension (x * y * z * ::: *) with log determinant for all
- * M x M matricies
+ * M x M matrices
  */
 
 #if NOT_EXCLUDED(OP_logdet)
@@ -1081,7 +1084,7 @@ DECLARE_CUSTOM_OP(logdet, 1, 1, false, 0, 0);
  *    0 - l2_regularizer (default 0. and only for 0 implemented)
  *
  * boolean args:
- *    0 - fast - default is true (optional) - use Cholesky decomposition instead QR decomposition of matricies.
+ *    0 - fast - default is true (optional) - use Cholesky decomposition instead QR decomposition of matrices.
  *
  * return value:
  *    tensor with dimension (x * y * z * ::: * N * K) with solutions
@@ -1101,7 +1104,7 @@ DECLARE_CUSTOM_OP(lstsq, 2, 1, false, 0, 0);
  *    0 - l2_regularizer (default 0. and only for 0 implemented)
  *
  * boolean args:
- *    0 - fast - default is true (optional) - use Cholesky decomposition instead QR decomposition of matricies.
+ *    0 - fast - default is true (optional) - use Cholesky decomposition instead QR decomposition of matrices.
  *
  * return value:
  *    tensor with dimension (x * y * z * ::: * N * K) with solutions
@@ -1113,13 +1116,13 @@ DECLARE_CUSTOM_OP(solve_ls, 2, 1, false, 0, 0);
 #endif
 
 /**
- * matrix_inverse op. - make inverse for all 2D square matricies found in the input tensor
+ * matrix_inverse op. - make inverse for all 2D square matrices found in the input tensor
  *
  * input params:
  *    0 - the tensor with dimension (x * y * z * ::: * M * M)
  *
  * return value:
- *    tensor with dimension (x * y * z * ::: * M * M) with inverse M x M matricies in it
+ *    tensor with dimension (x * y * z * ::: * M * M) with inverse M x M matrices in it
  */
 #if NOT_EXCLUDED(OP_matrix_inverse)
 DECLARE_OP(matrix_inverse, 1, 1, true);
@@ -1165,13 +1168,13 @@ DECLARE_CUSTOM_OP(solve, 2, 1, true, 0, 0);
 #endif
 
 /**
- * lu op. - make LUP decomposition of given batch of 2D square matricies
+ * lu op. - make LUP decomposition of given batch of 2D square matrices
  *
  * input params:
  *    0 - float tensor with dimension (x * y * z * ::: * M * M)
  *
  * return value:
- *    0 - float tensor with dimension (x * y * z * ::: * M * M) with LU M x M matricies in it
+ *    0 - float tensor with dimension (x * y * z * ::: * M * M) with LU M x M matrices in it
  *    1 - int (32 or 64) batched vector of permutations with length M - shape (x * y * z * ::: * M)
  *
  * int argument:
@@ -1208,8 +1211,6 @@ DECLARE_CUSTOM_OP(sequence_mask, 1, 1, false, 0, 0);
 
 #if NOT_EXCLUDED(OP_segment_max)
 DECLARE_CUSTOM_OP(segment_max, 2, 1, false, 0, 0);
-#endif
-#if NOT_EXCLUDED(OP_segment_max_bp)
 DECLARE_CUSTOM_OP(segment_max_bp, 3, 2, false, 0, 0);
 #endif
 
@@ -1225,8 +1226,6 @@ DECLARE_CUSTOM_OP(segment_max_bp, 3, 2, false, 0, 0);
  */
 #if NOT_EXCLUDED(OP_segment_min)
 DECLARE_CUSTOM_OP(segment_min, 2, 1, false, 0, 0);
-#endif
-#if NOT_EXCLUDED(OP_segment_min_bp)
 DECLARE_CUSTOM_OP(segment_min_bp, 3, 2, false, 0, 0);
 #endif
 
@@ -1242,8 +1241,6 @@ DECLARE_CUSTOM_OP(segment_min_bp, 3, 2, false, 0, 0);
  */
 #if NOT_EXCLUDED(OP_segment_sum)
 DECLARE_CUSTOM_OP(segment_sum, 2, 1, false, 0, 0);
-#endif
-#if NOT_EXCLUDED(OP_segment_sum_bp)
 DECLARE_CUSTOM_OP(segment_sum_bp, 3, 2, false, 0, 0);
 #endif
 
@@ -1259,8 +1256,6 @@ DECLARE_CUSTOM_OP(segment_sum_bp, 3, 2, false, 0, 0);
  */
 #if NOT_EXCLUDED(OP_segment_prod)
 DECLARE_CUSTOM_OP(segment_prod, 2, 1, false, 0, 0);
-#endif
-#if NOT_EXCLUDED(OP_segment_prod_bp)
 DECLARE_CUSTOM_OP(segment_prod_bp, 3, 2, false, 0, 0);
 #endif
 /**
@@ -1275,8 +1270,6 @@ DECLARE_CUSTOM_OP(segment_prod_bp, 3, 2, false, 0, 0);
  */
 #if NOT_EXCLUDED(OP_segment_mean)
 DECLARE_CUSTOM_OP(segment_mean, 2, 1, false, 0, 0);
-#endif
-#if NOT_EXCLUDED(OP_segment_mean_bp)
 DECLARE_CUSTOM_OP(segment_mean_bp, 3, 2, false, 0, 0);
 #endif
 
@@ -1292,8 +1285,6 @@ DECLARE_CUSTOM_OP(segment_mean_bp, 3, 2, false, 0, 0);
  */
 #if NOT_EXCLUDED(OP_unsorted_segment_max)
 DECLARE_CUSTOM_OP(unsorted_segment_max, 2, 1, false, 0, 0);
-#endif
-#if NOT_EXCLUDED(OP_unsorted_segment_max_bp)
 DECLARE_CUSTOM_OP(unsorted_segment_max_bp, 3, 2, false, 0, 1);
 #endif
 
@@ -1310,10 +1301,8 @@ DECLARE_CUSTOM_OP(unsorted_segment_max_bp, 3, 2, false, 0, 1);
  * return value:
  *    tensor with min values according to indices sets.
  */
-#if NOT_EXCLUDED(OP_unsorted_segment_min_bp)
+#if NOT_EXCLUDED(OP_unsorted_segment_min)
 DECLARE_CUSTOM_OP(unsorted_segment_min, 2, 1, false, 0, 0);
-#endif
-#if NOT_EXCLUDED(OP_unsorted_segment_min_bp)
 DECLARE_CUSTOM_OP(unsorted_segment_min_bp, 3, 2, false, 0, 1);
 #endif
 
@@ -1332,8 +1321,6 @@ DECLARE_CUSTOM_OP(unsorted_segment_min_bp, 3, 2, false, 0, 1);
  */
 #if NOT_EXCLUDED(OP_unsorted_segment_sum)
 DECLARE_CUSTOM_OP(unsorted_segment_sum, 2, 1, false, 0, 0);
-#endif
-#if NOT_EXCLUDED(OP_unsorted_segment_sum_bp)
 DECLARE_CUSTOM_OP(unsorted_segment_sum_bp, 3, 2, false, 0, 1);
 #endif
 
@@ -1352,8 +1339,6 @@ DECLARE_CUSTOM_OP(unsorted_segment_sum_bp, 3, 2, false, 0, 1);
  */
 #if NOT_EXCLUDED(OP_unsorted_segment_prod)
 DECLARE_CUSTOM_OP(unsorted_segment_prod, 2, 1, false, 0, 0);
-#endif
-#if NOT_EXCLUDED(OP_unsorted_segment_prod_bp)
 DECLARE_CUSTOM_OP(unsorted_segment_prod_bp, 3, 2, false, 0, 1);
 #endif
 
@@ -1372,8 +1357,6 @@ DECLARE_CUSTOM_OP(unsorted_segment_prod_bp, 3, 2, false, 0, 1);
  */
 #if NOT_EXCLUDED(OP_unsorted_segment_mean)
 DECLARE_CUSTOM_OP(unsorted_segment_mean, 2, 1, false, 0, 0);
-#endif
-#if NOT_EXCLUDED(OP_unsorted_segment_mean_bp)
 DECLARE_CUSTOM_OP(unsorted_segment_mean_bp, 3, 2, false, 0, 1);
 #endif
 
@@ -1392,8 +1375,6 @@ DECLARE_CUSTOM_OP(unsorted_segment_mean_bp, 3, 2, false, 0, 1);
  */
 #if NOT_EXCLUDED(OP_unsorted_segment_sqrt_n)
 DECLARE_CUSTOM_OP(unsorted_segment_sqrt_n, 2, 1, false, 0, 0);
-#endif
-#if NOT_EXCLUDED(OP_unsorted_segment_sqrt_n_bp)
 DECLARE_CUSTOM_OP(unsorted_segment_sqrt_n_bp, 3, 2, false, 0, 1);
 #endif
 
@@ -1452,7 +1433,7 @@ DECLARE_OP(draw_bounding_boxes, 3, 1, true);
  *    0 - NDArray with the same shape as input.
  */
 #if NOT_EXCLUDED(OP_roll)
-DECLARE_CONFIGURABLE_OP(roll, 1, 1, true, 0, 1);
+DECLARE_CONFIGURABLE_OP(roll, -2, 1, true, 0, 1);
 #endif
 
 /**
@@ -1496,9 +1477,6 @@ DECLARE_CUSTOM_OP(lin_space, 0, 1, false, 0, 0);
  */
 #if NOT_EXCLUDED(OP_reduce_sum)
 DECLARE_CUSTOM_OP(reduce_sum, -1, 1, false, 0, 0);
-#endif
-
-#if NOT_EXCLUDED(OP_reduce_sum_bp)
 DECLARE_CUSTOM_OP(reduce_sum_bp, -1, 1, false, 0, 0);
 #endif
 
@@ -1524,9 +1502,6 @@ DECLARE_CUSTOM_OP(reduce_sum_bp, -1, 1, false, 0, 0);
  */
 #if NOT_EXCLUDED(OP_reduce_prod)
 DECLARE_CUSTOM_OP(reduce_prod, -1, 1, false, 0, 0);
-#endif
-
-#if NOT_EXCLUDED(OP_reduce_prod_bp)
 DECLARE_CUSTOM_OP(reduce_prod_bp, -1, 1, false, 0, 0);
 #endif
 
@@ -1548,8 +1523,6 @@ DECLARE_CUSTOM_OP(reduce_prod_bp, -1, 1, false, 0, 0);
  */
 #if NOT_EXCLUDED(OP_reduce_min)
 DECLARE_CUSTOM_OP(reduce_min, -1, 1, false, 0, 0);
-#endif
-#if NOT_EXCLUDED(OP_reduce_min_bp)
 DECLARE_CUSTOM_OP(reduce_min_bp, -1, 1, false, 0, 0);
 #endif
 
@@ -1571,8 +1544,6 @@ DECLARE_CUSTOM_OP(reduce_min_bp, -1, 1, false, 0, 0);
  */
 #if NOT_EXCLUDED(OP_reduce_max)
 DECLARE_CUSTOM_OP(reduce_max, -1, 1, false, 0, 0);
-#endif
-#if NOT_EXCLUDED(OP_reduce_max_bp)
 DECLARE_CUSTOM_OP(reduce_max_bp, -1, 1, false, 0, 0);
 #endif
 
@@ -1594,8 +1565,6 @@ DECLARE_CUSTOM_OP(reduce_max_bp, -1, 1, false, 0, 0);
  */
 #if NOT_EXCLUDED(OP_reduce_norm1)
 DECLARE_CUSTOM_OP(reduce_norm1, -1, 1, false, 0, 0);
-#endif
-#if NOT_EXCLUDED(OP_reduce_norm1_bp)
 DECLARE_CUSTOM_OP(reduce_norm1_bp, -1, 1, false, 0, 0);
 #endif
 
@@ -1617,8 +1586,6 @@ DECLARE_CUSTOM_OP(reduce_norm1_bp, -1, 1, false, 0, 0);
  */
 #if NOT_EXCLUDED(OP_reduce_norm2)
 DECLARE_CUSTOM_OP(reduce_norm2, -1, 1, false, 0, 0);
-#endif
-#if NOT_EXCLUDED(OP_reduce_norm2_bp)
 DECLARE_CUSTOM_OP(reduce_norm2_bp, -1, 1, false, 0, 0);
 #endif
 
@@ -1640,8 +1607,6 @@ DECLARE_CUSTOM_OP(reduce_norm2_bp, -1, 1, false, 0, 0);
  */
 #if NOT_EXCLUDED(OP_reduce_sqnorm)
 DECLARE_CUSTOM_OP(reduce_sqnorm, -1, 1, false, 0, 0);
-#endif
-#if NOT_EXCLUDED(OP_reduce_sqnorm_bp)
 DECLARE_CUSTOM_OP(reduce_sqnorm_bp, -1, 1, false, 0, 0);
 #endif
 
@@ -1663,8 +1628,6 @@ DECLARE_CUSTOM_OP(reduce_sqnorm_bp, -1, 1, false, 0, 0);
  */
 #if NOT_EXCLUDED(OP_reduce_norm_max)
 DECLARE_CUSTOM_OP(reduce_norm_max, -1, 1, false, 0, 0);
-#endif
-#if NOT_EXCLUDED(OP_reduce_norm_max_bp)
 DECLARE_CUSTOM_OP(reduce_norm_max_bp, -1, 1, false, 0, 0);
 #endif
 
@@ -1686,9 +1649,6 @@ DECLARE_CUSTOM_OP(reduce_norm_max_bp, -1, 1, false, 0, 0);
  */
 #if NOT_EXCLUDED(OP_reduce_mean)
 DECLARE_CUSTOM_OP(reduce_mean, -1, 1, false, 0, 0);
-#endif
-
-#if NOT_EXCLUDED(OP_reduce_mean_bp)
 DECLARE_CUSTOM_OP(reduce_mean_bp, -1, 1, false, 0, 0)
 #endif
 /**
@@ -1847,11 +1807,11 @@ DECLARE_CUSTOM_OP(non_max_suppression_overlaps, 2, 1, false, 0, 0);
 #endif
 
 /*
- * cholesky op - decomposite positive square symetric matrix (or matricies when rank > 2).
+ * cholesky op - decomposite positive square symetric matrix (or matrices when rank > 2).
  * input:
- *     0 - matricies - tensor with shape (..., N, N) by float type
+ *     0 - matrices - tensor with shape (..., N, N) by float type
  *
- * output - lower triangular matrix (matricies when rank > 2) with the same shape as input.
+ * output - lower triangular matrix (matrices when rank > 2) with the same shape as input.
  * */
 #if NOT_EXCLUDED(OP_cholesky)
 DECLARE_OP(cholesky, 1, 1, true);

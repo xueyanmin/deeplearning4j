@@ -223,7 +223,6 @@ public class NDArrayStrings {
             }
             return vectorToString(arr, summarize);
         } else {
-            offset++;
             StringBuilder sb = new StringBuilder();
             sb.append("[");
             long nSlices = arr.slices();
@@ -241,11 +240,10 @@ public class NDArrayStrings {
                     if (arr.ordering() == 'f' && arr.rank() > 2 && arr.size(arr.rank() - 1) == 1) {
                         sb.append(format(arr.dup('c').slice(i), offset, summarize));
                     }
-//                    else if(arr.rank() <= 1 || arr.length() == 1) {
-//                        sb.append(format(Nd4j.scalar(arr.getDouble(0)),offset,summarize));
-//                    }
+
                     else {
-                        sb.append(format(arr.slice(i), offset, summarize));
+                        INDArray slice = arr.slice(i);
+                        sb.append(format(slice, offset, summarize));
                     }
                     if (i != nSlices - 1) {
                         if (arr.rank() == 3 && arr.slice(i).isRowVector()) sb.append("]");
@@ -266,7 +264,7 @@ public class NDArrayStrings {
         StringBuilder sb = new StringBuilder();
         sb.append("[");
         long l = arr.length();
-        for (int i = 0; i <l; i++) {
+        for (int i = 0; i < l; i++) {
             if (summarize && i > 2 && i < l - 3) {
                 sb.append("  ...");
                 // immediately jump to the last elements so we only print ellipsis once
